@@ -19,8 +19,6 @@ class Field:
         self.name = name
         self._values = None
         self._grads = None
-    def __repr__(self):
-        return f"Field {self.name} with value {self.values}"
     def set_values(self, values):
         self._values = values
     def set_local_value(self, i, j, k, value):
@@ -28,11 +26,11 @@ class Field:
     def get_values(self):
         return self._values
     def value2field(self, value):
-        pass
+        return value
     def get_field(self):
-        return value2field(self._values)
+        return self.value2field(self._values)
     def get_local_field(self, i, j, k):
-        return value2field(self._values[i, j, k])
+        return self.value2field(self._values[i, j, k])
     def get_field_mean(self):
         pass
     def get_field_variance(self):
@@ -64,8 +62,6 @@ class FieldRn(Field):
         super().__init__(lattice, name)
         self._values = jnp.zeros((lattice.size[0], lattice.size[1], lattice.size[2], dim))
         self.unit = unit
-    def value2field(self, value):
-        return value
     def get_field_mean(self):
         return jnp.mean(self._values, axis=[i for i in range(dim)])
     def get_field_variance(self):
