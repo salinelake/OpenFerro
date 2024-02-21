@@ -37,7 +37,7 @@ class self_interaction(interaction_base):
         self.field_name = field_name
     def set_energy_engine(self, energy_engine):
         self.energy_engine = energy_engine
-        self.force_engine = jit(grad(energy_engine, argnums=0 ))
+        self.force_engine =  grad(energy_engine, argnums=0 ) 
     def calculate_energy(self, field):
         return self.energy_engine(field, self.parameters)
     def calculate_force(self, field):
@@ -54,7 +54,7 @@ class mutual_interaction:
         self.field_name2 = field_name2
     def set_energy_engine(self, energy_engine):
         self.energy_engine = energy_engine
-        self.force_engine = jit(grad(energy_engine, argnums=(0, 1)))
+        self.force_engine =  grad(energy_engine, argnums=(0, 1)) 
     def calculate_energy(self, field1, field2):
         return self.energy_engine(field1, field2, self.parameters)
     def calculate_force(self, field1, field2):
@@ -62,7 +62,6 @@ class mutual_interaction:
         return (- gradient[0], - gradient[1])
 
 
-@jit
 def self_energy_R3_onsite_isotropic(field, parameters):
     """
     Returns the isotropic self-energy of a 3D field.
@@ -84,7 +83,6 @@ def self_energy_R3_onsite_isotropic(field, parameters):
 
 
 
-@jit
 def self_energy_R1_onsite(field, parameters):
     """
     Returns the isotropic self-energy of a field.
@@ -98,7 +96,6 @@ def self_energy_R1_onsite(field, parameters):
     energy += alpha * jnp.sum((field-offset)**4 )
     return energy
 
-@jit
 def self_energy_R3_neighbor_pbc(field, parameters):
     """
     Returns the short-range interaction of nearest neighbors for a R^3 field defined on a lattice with periodic boundary conditions.
@@ -117,7 +114,6 @@ def self_energy_R3_neighbor_pbc(field, parameters):
     energy += jnp.sum( jnp.dot(f_3p, J3) * f )
     return energy
 
-@jit
 def self_energy_R1_neighbor_pbc(field, parameters):
     """
     Returns the short-range interaction of nearest neighbors for a R^3 field defined on a lattice with periodic boundary conditions.
@@ -136,14 +132,12 @@ def self_energy_R1_neighbor_pbc(field, parameters):
     energy += jnp.sum( f_1p * f * J_3 )  
     return energy
 
-@jit
 def self_energy_dipole_dipole(field, parameters):
     """
     Returns the dipole-dipole interaction energy of a field with Ewald summation.
     """
     pass
 
-@jit
 def mutual_energy_R3(field1, field2, parameters):
     """
     Returns the mutual interaction energy of two R^3 fields.
