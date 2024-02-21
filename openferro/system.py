@@ -61,7 +61,7 @@ class System:
             'interaction_name':interaction_name, 
             'field_name': field_name, 
             'energy': interaction, 
-            'energy_gradient': grad(interaction, argnums=0)
+            'energy_gradient': jit(grad(interaction, argnums=0))
             }
         self._self_interaction_list.append(interaction_dict)
         return interaction_dict
@@ -84,7 +84,7 @@ class System:
             'field_name1': field_name1,
             'field_name2': field_name2,
             'energy': interaction,
-            'energy_gradient': grad(interaction, argnums=(0, 1))
+            'energy_gradient': jit(grad(interaction, argnums=(0, 1)))
             }
         self._mutual_interaction_list.append(interaction_dict)
         return interaction_dict
