@@ -9,7 +9,7 @@ import jax.numpy as jnp
 from jax import grad, jit, vmap
 from openferro.field import FieldSO3, FieldRn, FieldScalar
 from openferro.interaction import self_interaction, mutual_interaction
-
+from openferro.units import Constants
 class System:
     """
     A class to define a physical system. A system is a lattice with fields and a Hamiltonian.
@@ -24,7 +24,7 @@ class System:
         return f"System with lattice {self.lattice} and fields {self._fields_dict.keys()}"
      
     ## setter and getter methods for fields
-    def add_field(self, name, ftype='scalar', dim=None, unit=None, value=None):
+    def add_field(self, name, ftype='scalar', dim=None, unit=None, value=None, mass=1.0):
         if name in self._fields_dict:
             raise ValueError("Field with this name already exists. Pick another name")
         if ftype == 'scalar':
@@ -41,6 +41,8 @@ class System:
             self._fields_dict[name].set_values(jnp.zeros((self.lattice.size[0], self.lattice.size[1], self.lattice.size[2], 2)) + init)
         else:
             raise ValueError("Unknown field type. Choose from 'scalar', 'Rn', 'SO3'")
+        if mass is not None:
+            self._fields_dict[name].set_mass(mass)
         return self._fields_dict[name]
 
     def get_field_by_name(self, name):
@@ -50,40 +52,53 @@ class System:
         return [self._fields_dict[name] for name in self._fields_dict.keys()]
     
     ## setter and getter methods for interactions
-    def add_self_interaction(self, name, field_name, energy_engine, parameters=None):
+    def add_self_interaction(self, name, field_name, energy_engine, parameters=None, enable_jit=True):
         '''
         Add a self-interaction term to the Hamiltonian.
         Args:
+            name (string): name of the interaction
             field_name (string): name of the field
-            interaction (function): a function that takes the field as input and returns the interaction energy
+            energy_engine (function): a function that takes the field as input and returns the interaction energy
+            parameters (dict): parameters for the interaction
+            enable_jit (bool): whether to use JIT compilation
         '''
         if name in self._self_interaction_dict or name in self._mutual_interaction_dict:
             raise ValueError("Interaction with this name already exists. Pick another name.")
         interaction = self_interaction( field_name)
-        interaction.set_energy_engine(energy_engine)
+        interaction.set_energy_engine(energy_engine, enable_jit=enable_jit)
+        interaction.create_force_engine(enable_jit=enable_jit)
         if parameters is not None:
             interaction.set_parameters(parameters)
         self._self_interaction_dict[name] = interaction
         return interaction
 
-    def add_mutual_interaction(self, name, field_name1, field_name2, energy_engine,  parameters=None):
+    def add_mutual_interaction(self, name, field_name1, field_name2, energy_engine,  parameters=None, enable_jit=True):
         '''
         Add a mutual interaction term to the Hamiltonian.
         Args:
+            name (string): name of the interaction
             field_name1 (string): name of the first field
             field_name2 (string): name of the second field
-            interaction (function): a function that takes the fields as input and returns the interaction energy
+            energy_engine (function): a function that takes the fields as input and returns the interaction energy
+            parameters (dict): parameters for the interaction
+            enable_jit (bool): whether to use JIT compilation
         '''
         if name in self._self_interaction_dict or name in self._mutual_interaction_dict:
             raise ValueError("Interaction with this name already exists. Pick another name.")
         interaction = mutual_interaction( field_name1, field_name2)
-        interaction.set_energy_engine(energy_engine)
+        interaction.set_energy_engine(energy_engine, enable_jit=enable_jit)
+        interaction.create_force_engine(enable_jit=enable_jit)
         if parameters is not None:
             interaction.set_parameters(parameters)
         self._mutual_interaction_dict[name] = interaction
         return interaction
 
     def get_interaction_by_name(self, interaction_name):
+        """
+        Get an interaction by name.
+        Args:
+            interaction_name (string): name of the interaction
+        """
         if interaction_name in self._self_interaction_dict:
             return self._self_interaction_dict[interaction_name]
         elif interaction_name in self._mutual_interaction_dict:
@@ -93,44 +108,74 @@ class System:
                 self._self_interaction_dict.keys(), self._mutual_interaction_dict.keys())
  
     ## calculators for energy and forces
-    def calculate_energy_by_name(self, interaction_name):
+    def calc_energy_by_name(self, interaction_name):
         if interaction_name in self._self_interaction_dict:
             interaction = self.get_interaction_by_name(interaction_name)
-            field = self.get_field_by_name(interaction.field_name).get_field()
-            energy = interaction.calculate_energy(field)
+            field = self.get_field_by_name(interaction.field_name)
+            energy = interaction.calc_energy(field)
         elif interaction_name in self._mutual_interaction_dict:
             interaction = self.get_interaction_by_name(interaction_name)
-            field1 = self.get_field_by_name(interaction.field_name1).get_field()
-            field2 = self.get_field_by_name(interaction.field_name2).get_field()
-            energy = interaction.calculate_energy(field1, field2)
+            field1 = self.get_field_by_name(interaction.field_name1)
+            field2 = self.get_field_by_name(interaction.field_name2)
+            energy = interaction.calc_energy(field1, field2)
         else:
             raise ValueError("Interaction with this name does not exist. Existing interactions: ", 
                 self._self_interaction_dict.keys(), self._mutual_interaction_dict.keys())
         return energy            
 
-    def calculate_force_by_name(self, interaction_name):
+    def calc_force_by_name(self, interaction_name):
         if interaction_name in self._self_interaction_dict:
             interaction = self.get_interaction_by_name(interaction_name)
-            field = self.get_field_by_name(interaction.field_name).get_field()
-            force = interaction.calculate_force(field)
+            field = self.get_field_by_name(interaction.field_name)
+            force = interaction.calc_force(field)
         elif interaction_name in self._mutual_interaction_dict:
             interaction = self.get_interaction_by_name(interaction_name)
-            field1 = self.get_field_by_name(interaction.field_name1).get_field()
-            field2 = self.get_field_by_name(interaction.field_name2).get_field()
-            force = interaction.calculate_force(field1, field2)
+            field1 = self.get_field_by_name(interaction.field_name1)
+            field2 = self.get_field_by_name(interaction.field_name2)
+            force = interaction.calc_force(field1, field2)
         else:
             raise ValueError("Interaction with this name does not exist. Existing interactions: ", 
                 self._self_interaction_dict.keys(), self._mutual_interaction_dict.keys())
         return force
 
-    def calculate_total_self_energy(self):
-        return sum([self.calculate_energy_by_name(interaction_name) for interaction_name in self._self_interaction_dict])
+    def calc_total_self_energy(self):
+        return sum([self.calc_energy_by_name(interaction_name) for interaction_name in self._self_interaction_dict])
 
-    def calculate_total_mutual_interaction(self):
-        return sum([self.calculate_interaction_by_name(interaction_name) for interaction_name in self._mutual_interaction_dict])
+    def calc_total_mutual_interaction(self):
+        return sum([self.calc_interaction_by_name(interaction_name) for interaction_name in self._mutual_interaction_dict])
 
-    def calculate_total_energy(self):
-        return calculate_total_self_energy() + calculate_total_interaction()
+    def calc_potential_energy(self):
+        return self.calc_total_self_energy() + self.calc_total_mutual_interaction()
+
+    def calc_kinetic_energy(self):
+        kinetic_energy = 0.0
+        for field in self.get_all_fields():
+            velocity = field.get_velocity()
+            mass = field.get_mass()
+            kinetic_energy += 0.5 * jnp.sum(mass * velocity**2)
+        return kinetic_energy
+
+    def calc_temp_by_name(self, name):
+        field = self.get_field_by_name(name)
+        velocity = field.get_velocity()
+        mass = field.get_mass()
+        return jnp.mean(mass * velocity**2) / ( Constants.kb)
+
+    def update_force(self):
+        for field in self.get_all_fields():
+            field.zero_force()
+        for interaction_name in self._self_interaction_dict:
+            interaction = self._self_interaction_dict[interaction_name]
+            field = self.get_field_by_name(interaction.field_name)
+            force = interaction.calc_force(field)
+            field.accumulate_force(force)
+        for interaction_name in self._mutual_interaction_dict:
+            interaction = self.get_interaction_by_name(interaction_name)
+            field1 = self.get_field_by_name(interaction.field_name1)
+            field2 = self.get_field_by_name(interaction.field_name2)
+            force1, force2 = interaction.calc_force(field1, field2)
+            field1.accumulate_force(force1)
+            field2.accumulate_force(force2)
 
 
 class RingPolymerSystem(System):

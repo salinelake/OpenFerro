@@ -22,9 +22,9 @@ class interaction_base:
         return self.parameters[name]
     def set_energy_engine(self, energy_engine):
         pass
-    def calculate_energy(self):
+    def calc_energy(self):
         pass
-    def calculate_force(self):
+    def calc_force(self):
         pass
 
 
@@ -35,13 +35,24 @@ class self_interaction(interaction_base):
     def __init__(self, field_name, parameters=None):
         super().__init__( parameters)
         self.field_name = field_name
-    def set_energy_engine(self, energy_engine):
-        self.energy_engine = energy_engine
-        self.force_engine =  grad(energy_engine, argnums=0 ) 
-    def calculate_energy(self, field):
-        return self.energy_engine(field, self.parameters)
-    def calculate_force(self, field):
-        gradient = self.force_engine(field, self.parameters)
+    def set_energy_engine(self, energy_engine, enable_jit=True):
+        if enable_jit:
+            self.energy_engine = jit(energy_engine)
+        else:
+            self.energy_engine = energy_engine
+    def create_force_engine(self, enable_jit=True):
+        if self.energy_engine is None:
+            raise ValueError("Energy engine is not set. Set energy engine before creating force engine.")
+        if enable_jit:
+            self.force_engine =  jit(grad(self.energy_engine, argnums=0 )) 
+        else:
+            self.force_engine =  grad(self.energy_engine, argnums=0 )
+    def calc_energy(self, field):
+        field_values = field.get_values()
+        return self.energy_engine(field_values, self.parameters)
+    def calc_force(self, field):
+        field_values = field.get_values()
+        gradient = self.force_engine(field_values, self.parameters)
         return -gradient
 
 class mutual_interaction:
@@ -52,13 +63,26 @@ class mutual_interaction:
         super().__init__( parameters)
         self.field_name1 = field_name1
         self.field_name2 = field_name2
-    def set_energy_engine(self, energy_engine):
-        self.energy_engine = energy_engine
-        self.force_engine =  grad(energy_engine, argnums=(0, 1)) 
-    def calculate_energy(self, field1, field2):
-        return self.energy_engine(field1, field2, self.parameters)
-    def calculate_force(self, field1, field2):
-        gradient = self.force_engine(field1, field2, self.parameters)
+    def set_energy_engine(self, energy_engine, enable_jit=True):
+        if enable_jit:
+            self.energy_engine = jit(energy_engine)
+        else:
+            self.energy_engine = energy_engine
+    def create_force_engine(self, enable_jit=True):
+        if self.energy_engine is None:
+            raise ValueError("Energy engine is not set. Set energy engine before creating force engine.")
+        if enable_jit:
+            self.force_engine =  jit(grad(self.energy_engine, argnums=(0, 1) )) 
+        else:
+            self.force_engine =  grad(self.energy_engine, argnums=(0, 1) )
+    def calc_energy(self, field1, field2):
+        f1 = field1.get_values()
+        f2 = field2.get_values()
+        return self.energy_engine(f1, f2, self.parameters)
+    def calc_force(self, field1, field2):
+        f1 = field1.get_values()
+        f2 = field2.get_values()
+        gradient = self.force_engine(f1, f2, self.parameters)
         return (- gradient[0], - gradient[1])
 
 
