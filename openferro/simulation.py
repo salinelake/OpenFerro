@@ -75,6 +75,7 @@ class SimulationNVTLangevin(SimulationNVE):
         self.gamma = gamma
         self.z1 = jnp.exp( -dt * gamma )
         self.z2 = ( 1 - jnp.exp( -2 * dt * gamma ))**0.5
+
     def _step(self, key):
         dt = self.dt
         self.system.update_force()
@@ -92,6 +93,7 @@ class SimulationNVTLangevin(SimulationNVE):
             x0 += 0.5 * dt * v0
             field.set_values(x0)
             field.set_velocity(v0)
+    
     def step(self, nsteps=1):
         key = jax.random.PRNGKey(np.random.randint(0, 1000000))
         for i in range(nsteps):
