@@ -1,3 +1,8 @@
+"""
+Classes which define the time evolution of physical systems. 
+"""
+# This file is part of OpenFerro.
+
 import numpy as np
 import jax
 import jax.numpy as jnp

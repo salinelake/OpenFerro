@@ -1,3 +1,10 @@
+"""
+Classes which define the "interaction" between fields. Each interaction is associated with a term in the Hamiltonian. 
+Each interaction stores a function "self.energy_engine" that calculates the energy of the interaction and a function "force engine" that calculates the force of the interaction.
+Only the energy engine is required. The force engine is optional. If the force engine is not set, the force will be calculated by automatic differentiation of the energy engine.
+"""
+# This file is part of OpenFerro.
+
 import numpy as np
 import jax.numpy as jnp
 from jax import grad, jit, vmap
@@ -13,15 +20,18 @@ class interaction_base:
     def set_parameters(self, parameters):
         self.parameters = parameters
     def get_parameters(self):
-        return self.parameters  ## TODO: to list
+        return self.parameters  ## TODO
     def set_parameter_by_name(self, name, value):
         self.parameters[name] = value
     def get_parameter_by_name(self, name):
         if name not in self.parameters:
             raise ValueError("Parameter with this name does not exist. Existing parameters: ", self.parameters.keys())
         return self.parameters[name]
-    def set_energy_engine(self, energy_engine):
-        pass
+    def set_energy_engine(self, energy_engine, enable_jit=True):
+        if enable_jit:
+            self.energy_engine = jit(energy_engine)
+        else:
+            self.energy_engine = energy_engine
     def calc_energy(self):
         pass
     def calc_force(self):
@@ -35,11 +45,6 @@ class self_interaction(interaction_base):
     def __init__(self, field_name, parameters=None):
         super().__init__( parameters)
         self.field_name = field_name
-    def set_energy_engine(self, energy_engine, enable_jit=True):
-        if enable_jit:
-            self.energy_engine = jit(energy_engine)
-        else:
-            self.energy_engine = energy_engine
     def create_force_engine(self, enable_jit=True):
         if self.energy_engine is None:
             raise ValueError("Energy engine is not set. Set energy engine before creating force engine.")
@@ -63,11 +68,6 @@ class mutual_interaction:
         super().__init__( parameters)
         self.field_name1 = field_name1
         self.field_name2 = field_name2
-    def set_energy_engine(self, energy_engine, enable_jit=True):
-        if enable_jit:
-            self.energy_engine = jit(energy_engine)
-        else:
-            self.energy_engine = energy_engine
     def create_force_engine(self, enable_jit=True):
         if self.energy_engine is None:
             raise ValueError("Energy engine is not set. Set energy engine before creating force engine.")
@@ -85,85 +85,32 @@ class mutual_interaction:
         gradient = self.force_engine(f1, f2, self.parameters)
         return (- gradient[0], - gradient[1])
 
-
-def self_energy_R3_onsite_isotropic(field, parameters):
+class triple_interaction:
     """
-    Returns the isotropic self-energy of a 3D field.
-    See [Zhong, W., David Vanderbilt, and K. M. Rabe. Physical Review B 52.9 (1995): 6301.] for the meaning of the parameters.
+    A class to specify the  mutual interaction between three fields.
     """
-    k2 = parameters['k2']
-    alpha = parameters['alpha']
-    gamma = parameters['gamma']
-    offset = parameters['offset']
+    def __init__(self, field_name1, field_name2, field_name3, parameters=None):
+        super().__init__( parameters)
+        self.field_name1 = field_name1
+        self.field_name2 = field_name2
+        self.field_name3 = field_name3
+    def create_force_engine(self, enable_jit=True):
+        if self.energy_engine is None:
+            raise ValueError("Energy engine is not set. Set energy engine before creating force engine.")
+        if enable_jit:
+            self.force_engine =  jit(grad(self.energy_engine, argnums=(0, 1, 2) )) 
+        else:
+            self.force_engine =  grad(self.energy_engine, argnums=(0, 1, 2) )
+    def calc_energy(self, field1, field2, field3):
+        f1 = field1.get_values()
+        f2 = field2.get_values()
+        f3 = field3.get_values()
+        return self.energy_engine(f1, f2, f3, self.parameters)
+    def calc_force(self, field1, field2, field3):
+        f1 = field1.get_values()
+        f2 = field2.get_values()
+        f3 = field3.get_values()
+        gradient = self.force_engine(f1, f2, f3, self.parameters)
+        return (- gradient[0], - gradient[1], - gradient[2])
 
-    field2 = (field-offset) ** 2
-    energy = k2 * jnp.sum(field2)
-    energy += alpha * jnp.sum( (field2.sum(axis=-1))**2 )
-    energy += gamma * jnp.sum(
-        field2[...,0]*field2[...,1] + field2[...,1]*field2[...,2] + field2[...,2]*field2[...,0]
-        )
-    return energy
 
-
-
-
-def self_energy_R1_onsite(field, parameters):
-    """
-    Returns the isotropic self-energy of a field.
-    See [Zhong, W., David Vanderbilt, and K. M. Rabe. Physical Review B 52.9 (1995): 6301.] for the meaning of the parameters.
-    """
-    k2 = parameters['k2']
-    alpha = parameters['alpha']
-    offset = parameters['offset']
-
-    energy = k2 * jnp.sum((field-offset)**2)
-    energy += alpha * jnp.sum((field-offset)**4 )
-    return energy
-
-def self_energy_R3_neighbor_pbc(field, parameters):
-    """
-    Returns the short-range interaction of nearest neighbors for a R^3 field defined on a lattice with periodic boundary conditions.
-    """
-    J_1 = parameters['J_1']
-    J_2 = parameters['J_2']
-    J_3 = parameters['J_3']
-    offset = parameters['offset']
-
-    f = field - offset
-    f_1p = jnp.roll( f, 1, axis=0) 
-    energy = jnp.sum( jnp.dot(f_1p, J1) * f )  
-    f_2p = jnp.roll( f, 1, axis=1)
-    energy += jnp.sum( jnp.dot(f_2p, J2) * f )
-    f_3p = jnp.roll( f, 1, axis=2)
-    energy += jnp.sum( jnp.dot(f_3p, J3) * f )
-    return energy
-
-def self_energy_R1_neighbor_pbc(field, parameters):
-    """
-    Returns the short-range interaction of nearest neighbors for a R^3 field defined on a lattice with periodic boundary conditions.
-    """
-    J_1 = parameters['J1']
-    J_2 = parameters['J2']
-    J_3 = parameters['J3']
-    offset = parameters['offset']
-
-    f = field - offset
-    f_1p = jnp.roll( f, 1, axis=0) 
-    energy = jnp.sum( f_1p * f * J_1 )  
-    f_2p = jnp.roll( f, 1, axis=1)
-    energy += jnp.sum( f_1p * f * J_2 )  
-    f_3p = jnp.roll( f, 1, axis=2)
-    energy += jnp.sum( f_1p * f * J_3 )  
-    return energy
-
-def self_energy_dipole_dipole(field, parameters):
-    """
-    Returns the dipole-dipole interaction energy of a field with Ewald summation.
-    """
-    pass
-
-def mutual_energy_R3(field1, field2, parameters):
-    """
-    Returns the mutual interaction energy of two R^3 fields.
-    """
-    pass

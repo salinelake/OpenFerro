@@ -1,3 +1,9 @@
+"""
+Classes which define the integrator of molecular dynamics simulation. 
+"""
+# This file is part of OpenFerro.
+
+
 import numpy as np
 import jax.numpy as jnp
 from jax import grad, jit, vmap

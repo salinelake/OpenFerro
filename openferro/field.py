@@ -7,6 +7,7 @@ import numpy as np
 import jax
 import jax.numpy as jnp
 from openferro.units import Constants
+from openferro.lattice import BravaisLattice3D
 
 class Field:
     """
@@ -38,7 +39,8 @@ class Field:
         return jnp.var(self._values, axis=[i for i in range(self.dim)])
 
     ## setter and getter methods for getting the field in R^n
-    def value2Rn(self, value):
+    @staticmethod
+    def value2Rn(value):
         return value
     def get_Euclidean_value(self, i, j, k):
         return self.value2Rn(self._values[i, j, k])
@@ -108,7 +110,6 @@ class Field:
 class FieldRn(Field):
     """
     R^n field. Values are stored as n-dimensional vectors. 
-    Example: flexible dipole moment, strain field, electric field, etc.
     """
     def __init__(self, lattice, name, dim, unit=None):
         super().__init__(lattice, name)
@@ -123,6 +124,14 @@ class FieldScalar(FieldRn):
     def __init__(self, lattice, name, unit=None):
         super().__init__(lattice, name, dim=1, unit=unit)
 
+class FieldR3(FieldRn):
+    """
+    R^3 field. Values are stored as 3-dimensional vectors. 
+    Example: flexible dipole moment, electric field, etc.
+    """
+    def __init__(self, lattice, name, unit=None):
+        super().__init__(lattice, name, dim=3, unit=unit)
+
 class FieldSO3(FieldRn):
     """
     Unitless SO(3) field. Values are stored as (theta, phi) pairs in sperical coordinates. 
@@ -130,11 +139,54 @@ class FieldSO3(FieldRn):
     """
     def __init__(self, lattice, name ):
         super().__init__(lattice, name, dim=2, unit=unit)
-    def value2Rn(self, value):
-        theta = self._values[..., [0]]
-        phi = self._values[..., [1]]
+
+    @staticmethod
+    def value2Rn(values):
+        theta = values[..., [0]]
+        phi = values[..., [1]]
         x = jnp.sin(theta) * jnp.cos(phi)
         y = jnp.sin(theta) * jnp.sin(phi)
         z = jnp.cos(theta)
         return jnp.concatenate((x, y, z), axis=-1)
- 
+
+class LocalStrain(FieldRn):
+    """
+    Strain field on 3D lattice are separated into local contribution (local strain field) and global contribution (homogeneous strain associated to the supercell). 
+    The local strain field is encoded by the local displacement vector v_i(R)/a_i (a_i: the lattice vector) associated with each lattice site at R.
+    The homogeneous strain is represented by the strain tensor with Voigt convention, which is a 6-dimensional vector.
+    """
+    def __init__(self, lattice, name, unit=None):
+        super().__init__(lattice, name, dim=3, unit=unit)
+        self._homogeneous_strain = jnp.zeros((6))
+
+    @staticmethod
+    def get_local_strain(values):
+        '''
+        Calculate the local strain field from the local displacement field.
+        '''
+        padded_values = jnp.pad(values, ((1, 1), (1, 1), (1, 1), (0, 0)), mode='wrap')
+        grad_0, grad_1, grad_2 = jnp.gradient(padded_values, axis=(0, 1, 2))
+        grad_0 = grad_0[1:-1, 1:-1, 1:-1]
+        grad_1 = grad_1[1:-1, 1:-1, 1:-1]
+        grad_2 = grad_2[1:-1, 1:-1, 1:-1]
+
+        eta_1 = grad_0[..., 0]   # eta_xx
+        eta_2 = grad_1[..., 1]   # eta_yy
+        eta_3 = grad_2[..., 2]   # eta_zz
+        eta_4 = (grad_1[..., 2] + grad_2[..., 1]) / 2   # eta_yz
+        eta_5 = (grad_0[..., 2] + grad_2[..., 0]) / 2   # eta_xz
+        eta_6 = (grad_0[..., 1] + grad_1[..., 0]) / 2   # eta_xy
+        local_strain = jnp.stack([eta_1, eta_2, eta_3, eta_4, eta_5, eta_6], axis=-1)  # (l1, l2, l3, 6)
+        return local_strain
+
+
+class GlobalStrain(Field):
+    """
+    Treat the homogeneous strain as a field on a 1X1X1 lattice.
+    """
+    def __init__(self, lattice, name, unit=None):
+        super().__init__(lattice, name)
+        self.lattice = BravaisLattice3D(1,1,1,a1=lattice.a1, a2=lattice.a2, a3=lattice.a3)
+        self.dim = 1
+        self._values = jnp.zeros((6))
+        self.unit = unit

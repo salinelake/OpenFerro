@@ -39,6 +39,18 @@ class System:
             init = jnp.array(value, dtype=jnp.float32) if value is not None else jnp.zeros(2, dtype=jnp.float32)
             self._fields_dict[name] = FieldSO3(self.lattice, name)
             self._fields_dict[name].set_values(jnp.zeros((self.lattice.size[0], self.lattice.size[1], self.lattice.size[2], 2)) + init)
+        elif ftype == 'local_strain':
+            init = jnp.array(value, dtype=jnp.float32) if value is not None else jnp.zeros(3, dtype=jnp.float32)
+            self._fields_dict[name] = LocalStrain(self.lattice, name)
+            self._fields_dict[name].set_values(jnp.zeros((self.lattice.size[0], self.lattice.size[1], self.lattice.size[2], 3)) + init)
+        elif ftype == 'global_strain':
+            if value is not None:
+                assert len(value) == 6, "Global strain must be a 6D vector"
+                init = jnp.array(value, dtype=jnp.float32)
+            else:
+                init = jnp.zeros(6, dtype=jnp.float32)
+            self._fields_dict[name] = GlobalStrain(self.lattice, name)
+            self._fields_dict[name].set_values(jnp.zeros((1,1,1, 6)) + init)
         else:
             raise ValueError("Unknown field type. Choose from 'scalar', 'Rn', 'SO3'")
         if mass is not None:
