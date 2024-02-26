@@ -43,9 +43,44 @@ def self_energy_onsite_scalar(field, parameters):
     energy += alpha * jnp.sum((field-offset)**4 )
     return energy
 
-def short_range_1stnn(field, parameters):
+def short_range_1stnn_isotropic_scalar(field, parameters):
     """
     Returns the short-range interaction of nearest neighbors for a R^3 field defined on a lattice with periodic boundary conditions.
+    """
+    j = parameters['j']
+    offset = parameters['offset']
+
+    f = field - offset
+    f_0 = jnp.roll( f, 1, axis=0) 
+    f_1 = jnp.roll( f, 1, axis=1)
+    f_2 = jnp.roll( f, 1, axis=2)
+    energy = jnp.sum( j * f * (f_0+f_1+f_2))  
+    return energy
+
+def short_range_1stnn_isotropic(field, parameters):
+    """
+    Returns the short-range interaction of nearest neighbors for a R^3 field defined on a isotropic lattice with periodic boundary conditions.
+    """
+    j1 = parameters['j1']  ## uni-axis interaction orthogonal to displacement direction
+    j2 = parameters['j2']  ## uni-axis interaction along displacement direction
+
+    offset = parameters['offset']
+
+    f = field - offset
+    f_0 = jnp.roll( f, 1, axis=0) 
+    f_1 = jnp.roll( f, 1, axis=1)
+    f_2 = jnp.roll( f, 1, axis=2)
+
+    energy  = jnp.sum( j1 * f * (f_0+f_1+f_2))
+    energy += jnp.sum( (j2-j1) * f[...,0] * f_0[...,0])
+    energy += jnp.sum( (j2-j1) * f[...,1] * f_1[...,1])
+    energy += jnp.sum( (j2-j1) * f[...,2] * f_2[...,2])
+
+    return energy
+
+def short_range_1stnn_anisotropic(field, parameters):
+    """
+    Returns the short-range interaction of nearest neighbors for a R^3 field defined on a anisotropic lattice with periodic boundary conditions.
     """
     J_1 = parameters['J_1']
     J_2 = parameters['J_2']
@@ -61,23 +96,69 @@ def short_range_1stnn(field, parameters):
     energy += jnp.sum( jnp.dot(f_3p, J3) * f )
     return energy
 
-def short_range_1stnn_scalar(field, parameters):
+
+def short_range_2ednn_isotropic(field, parameters):
     """
     Returns the short-range interaction of nearest neighbors for a R^3 field defined on a lattice with periodic boundary conditions.
     """
-    J_1 = parameters['J_1']
-    J_2 = parameters['J_2']
-    J_3 = parameters['J_3']
-    offset = parameters['offset']
+    j3 = parameters['j3']  ## uni-axis interaction parallel to displacement plane
+    j4 = parameters['j4']  ## uni-axis interaction orthogonal to displacement plane
+    j5 = parameters['j5']  ## orthogonal-axis interaction on displacement plane
 
     f = field - offset
-    f_1p = jnp.roll( f, 1, axis=0) 
-    energy = jnp.sum( f_1p * f * J_1 )  
-    f_2p = jnp.roll( f, 1, axis=1)
-    energy += jnp.sum( f_1p * f * J_2 )  
-    f_3p = jnp.roll( f, 1, axis=2)
-    energy += jnp.sum( f_1p * f * J_3 )  
+    fxy_1 = jnp.roll( f, (1, 1), axis=(0,1)) 
+    fxy_2 = jnp.roll( f, (1,-1), axis=(0,1)) 
+    fxz_1 = jnp.roll( f, (1, 1), axis=(0,2)) 
+    fxz_2 = jnp.roll( f, (1,-1), axis=(0,2)) 
+    fyz_1 = jnp.roll( f, (1, 1), axis=(1,2)) 
+    fyz_2 = jnp.roll( f, (1,-1), axis=(1,2)) 
+    energy = jnp.sum( j3 * f * (fxy_1 + fxy_2 + fxz_1 + fxz_2 + fyz_1 + fyz_2 ) ) 
+    energy += jnp.sum( (j4-j3) * f[..., 2] * (fxy_1 + fxy_2)[...,2] )
+    energy += jnp.sum( (j4-j3) * f[..., 1] * (fxz_1 + fxz_2)[...,1] )
+    energy += jnp.sum( (j4-j3) * f[..., 0] * (fyz_1 + fyz_2)[...,0] )
+    energy += jnp.sum( j5 * f[..., [0,1]] * (fxy_1 - fxy_2)[...,[1,0]] )
+    energy += jnp.sum( j5 * f[..., [0,2]] * (fxz_1 - fxz_2)[...,[2,0]] )
+    energy += jnp.sum( j5 * f[..., [1,2]] * (fyz_1 - fyz_2)[...,[2,1]] )
     return energy
+
+def short_range_3rdnn_isotropic(field, parameters):
+    """
+    Returns the short-range interaction of nearest neighbors for a R^3 field defined on a lattice with periodic boundary conditions.
+    """
+    j6 = parameters['j6']  ## uni-axis interaction 
+    j7 = parameters['j7']  ## orthogonal-axis interaction
+
+    f = field - offset
+    f_1 = jnp.roll( f, ( 1, 1, 1), axis=(0,1,2))
+    f_2 = jnp.roll( f, ( 1,-1, 1), axis=(0,1,2))
+    f_3 = jnp.roll( f, (-1, 1, 1), axis=(0,1,2))
+    f_4 = jnp.roll( f, (-1,-1, 1), axis=(0,1,2))
+    ## get R_ij_alpha * R_ij_beta for different i-j displacement
+    r_1 = jnp.array([
+        [0, 1, 1],
+        [1, 0, 1],
+        [1, 1, 0],
+        ])
+    r_2 = jnp.array([
+        [ 0, -1,  1],
+        [-1,  0, -1],
+        [ 1, -1,  0],
+        ])    
+    r_3 = jnp.array([
+        [ 0, -1, -1],
+        [-1,  0,  1],
+        [-1,  1,  0],
+        ])
+    r_4 = jnp.array([
+        [ 0,  1, -1],
+        [ 1,  0, -1],
+        [-1, -1,  0],
+        ])
+    energy = jnp.sum( j6 * f * (f_1 + f_2 + f_3 + f_4) )
+    fr_sum = jnp.dot(f_1, r_1) + jnp.dot(f_2, r_2) + jnp.dot(f_3, r_3) + jnp.dot(f_4, r_4)
+    energy += jnp.sum( j7 * f * fr_sum )
+    return energy
+
 
 def self_energy_dipole_dipole(field, parameters):
     """
