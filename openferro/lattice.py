@@ -17,6 +17,32 @@ class BravaisLattice3D:
         self.a3 = jnp.array([0.0, 0.0, 1.0]) if a3 is None else a3
     def __repr__(self):
         return f"Bravais lattice with size {self.size} and primitive vectors {self.a1}, {self.a2}, {self.a3}"    
+    
+    @property
+    def ref_volume(self):
+        """
+        Returns the volume of the unit cell
+        """
+        return jnp.dot(jnp.cross(self.a1, self.a2), self.a3)
+    
+    @property
+    def latt_vec(self):
+        """
+        Returns lattice vectors.
+        """
+        return jnp.stack([self.a1, self.a2, self.a3], axis=0)
+    
+    @property
+    def reciprocal_latt_vec(self):
+        """
+        Calculates reciprocal lattice vectors.
+        """
+        coef = 2 * jnp.pi / self.ref_volume
+        b1 = coef * np.cross(self.a2,self.a3)  
+        b2 = coef * np.cross(self.a3,self.a1) 
+        b3 = coef * np.cross(self.a1,self.a2) 
+        return jnp.stack([b1, b2, b3], axis=0)
+
     def get_neighbours(self, i, j, k, pbc=False):  # check
         """
         Returns the neighbours of a site at position (i, j, k) 
@@ -49,6 +75,32 @@ class BravaisLattice2D:
         self.a2 = jnp.array([0.0, 1.0]) if a2 is None else a2
     def __repr__(self):
         return f"Bravais lattice with size {self.size} and primitive vectors {self.a1}, {self.a2}"    
+
+    @property
+    def ref_area(self):
+        """
+        Returns the area of the unit cell
+        """
+        return jnp.abs(jnp.cross(self.a1, self.a2))
+    
+    @property
+    def latt_vec(self):
+        """
+        Returns lattice vectors.
+        """
+        return jnp.stack([self.a1, self.a2], axis=0)
+    
+    @property
+    def reciprocal_latt_vec(self):
+        """
+        Calculates reciprocal lattice vectors.
+        """
+        coef = 2 * jnp.pi / (self.a1[0] * self.a2[1] - self.a1[1] * self.a2[0])
+        b1 = coef * jnp.array([self.a2[1], -self.a2[0]])
+        b2 = coef * jnp.array([-self.a1[1], self.a1[0]])
+        return jnp.stack([b1, b2], axis=0)
+
+    
     def get_neighbours(self, i, j, pbc=False):  # check
         """
         Returns the neighbours of a site at position (i, j) 

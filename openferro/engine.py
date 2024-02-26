@@ -7,7 +7,7 @@ Functions that define a term in the Hamiltonian. They will be added into <class 
 import numpy as np
 import jax.numpy as jnp
 from jax import grad, jit, vmap
-from field import LocalStrain
+from openferro.field import LocalStrain
 
 
 def self_energy_onsite_isotropic(field, parameters):
