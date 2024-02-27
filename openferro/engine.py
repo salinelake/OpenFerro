@@ -159,13 +159,6 @@ def short_range_3rdnn_isotropic(field, parameters):
     energy += jnp.sum( j7 * f * fr_sum )
     return energy
 
-
-def self_energy_dipole_dipole(field, parameters):
-    """
-    Returns the dipole-dipole interaction energy of a field with Ewald summation.
-    """
-    pass
-
 def homo_elastic_energy(global_strain, parameters):
     """
     Returns the homogeneous elastic energy of a strain field.

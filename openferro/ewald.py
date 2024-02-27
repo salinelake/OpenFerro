@@ -1,5 +1,5 @@
 """
-utilities functions for Ewald summation
+Functions for Ewald summation
 """
 # This file is part of OpenFerro.
 
@@ -7,14 +7,47 @@ import numpy as np
 import jax
 import jax.numpy as jnp
 from openferro.units import Constants
-
-def fft3(field, axes):
+ 
+def dipole_dipole_ewald(field, parameters):
     """
-    3D FFT
+    FFT realization of Ewald summation for dipole-dipole interaction.
+    lattice vectors are assumed to be orthogonal.
     """
-    results = jnp.fft.fftn(field, axes=axes)
-    return results.real, results.imag
+    l1, l2, l3 = field.shape[0], field.shape[1], field.shape[2]
+    # a1, a2, a3 = latt_vec
+    a1 = parameters['a1']
+    a2 = parameters['a2']
+    a3 = parameters['a3']
+    # if (a1[1] != 0) or (a1[2] != 0) or (a2[0] != 0) or (a2[2] != 0) or (a3[0] != 0) or (a3[1] != 0):
+    #     raise NotImplementedError("Ewald summation is only implemented for orthogonal lattice vectors")
+    a = jnp.array([a1 , a2 , a3 ])
+    b = 2 * jnp.pi / a
+    bmax = jnp.max(b)
+    amin = 2 * np.pi / bmax
+    tol = 1.0e-12
+    alpha = jnp.sqrt(-jnp.log(tol)) / amin
+    sigma = 1.0 / alpha / jnp.sqrt(2.0)   ## the ewald sigma parameter
 
+    ## k-space sum
+    coef_ksum = 1 / 2.0 / latt.ref_volume / Constants.epsilon0
+    G_grid = jnp.stack( jnp.meshgrid(
+        jnp.arange(l1) / l1 * b[0], 
+        jnp.arange(l2) / l2 * b[1], 
+        jnp.arange(l3) / l3 * b[2], 
+        indexing='ij'), axis=-1)   # (l1, l2, l3, 3)
+
+    F_fft3 = jnp.fft.fftn(field, axes=(0,1,2))
+    ewald_ksum = jnp.exp( - 0.5 * sigma**2 * jnp.sum(G_grid**2, axis=-1) ) / jnp.sum(G_grid**2, axis=-1)   # (l1, l2, l3)
+    ewald_ksum = ewald_ksum.at[0,0,0].set(0.0)   # mute Gamma point
+    Uk_squred = jnp.sum(F_fft3.real * G_grid, axis=-1)**2
+    Uk_squred += jnp.sum( F_fft3.imag * G_grid , axis=-1)**2   # (l1, l2, l3)
+    ewald_ksum = ewald_ksum * Uk_squred
+    ewald_ksum = coef_ksum * jnp.sum(ewald_ksum, axis=(0,1,2))
+
+    ## real-space sum
+    coef_rsum = 1 / 2.0 / jnp.pi / Constants.epsilon0 * alpha**3 / 3.0 / jnp.sqrt(jnp.pi) 
+    ewald_rsum = - coef_rsum * jnp.sum(field**2)
+    return ewald_ksum + ewald_rsum
 
 
 def dipole_dipole_ewald_slow(field, latt_vec):
@@ -73,44 +106,6 @@ def dipole_dipole_ewald_slow(field, latt_vec):
                     ewald_rsum -= coef_rsum * field[i1, i2, i3, alpha]**2
     return ewald_ksum + ewald_rsum
 
-def dipole_dipole_ewald(field, latt_vec):
-    """
-    FFT realization of Ewald summation for dipole-dipole interaction.
-    lattice vectors are assumed to be orthogonal.
-    """
-    l1, l2, l3 = field.shape[0], field.shape[1], field.shape[2]
-    a1, a2, a3 = latt_vec
-    # if (a1[1] != 0) or (a1[2] != 0) or (a2[0] != 0) or (a2[2] != 0) or (a3[0] != 0) or (a3[1] != 0):
-    #     raise NotImplementedError("Ewald summation is only implemented for orthogonal lattice vectors")
-    a = jnp.array([a1[0], a2[1], a3[2]])
-    b = 2 * jnp.pi / a
-    bmax = jnp.max(b)
-    amin = 2 * np.pi / bmax
-    tol = 1.0e-12
-    alpha = jnp.sqrt(-jnp.log(tol)) / amin
-    sigma = 1.0 / alpha / jnp.sqrt(2.0)   ## the ewald sigma parameter
-
-    ## k-space sum
-    coef_ksum = 1 / 2.0 / latt.ref_volume / Constants.epsilon0
-    G_grid = jnp.stack( jnp.meshgrid(
-        jnp.arange(l1) / l1 * b[0], 
-        jnp.arange(l2) / l2 * b[1], 
-        jnp.arange(l3) / l3 * b[2], 
-        indexing='ij'), axis=-1)   # (l1, l2, l3, 3)
-
-    F_real, F_imag = fft3(field, axes=(0,1,2))   # (l1, l2, l3, 3)
-    ewald_ksum = jnp.exp( - 0.5 * sigma**2 * jnp.sum(G_grid**2, axis=-1) ) / jnp.sum(G_grid**2, axis=-1)   # (l1, l2, l3)
-    ewald_ksum = ewald_ksum.at[0,0,0].set(0.0)   # mute Gamma point
-    Uk_squred = jnp.sum(F_real * G_grid,axis=-1)**2 + jnp.sum( F_imag * G_grid , axis=-1)**2   # (l1, l2, l3)
-    ewald_ksum = ewald_ksum * Uk_squred
-    ewald_ksum = coef_ksum * jnp.sum(ewald_ksum, axis=(0,1,2))
-
-    ## real-space sum
-    coef_rsum = 1 / 2.0 / jnp.pi / Constants.epsilon0 * alpha**3 / 3.0 / jnp.sqrt(jnp.pi) 
-    ewald_rsum = - coef_rsum * jnp.sum(field**2)
-    return ewald_ksum + ewald_rsum
-
-
 if __name__ == "__main__":
     from openferro.lattice import BravaisLattice3D
     from time import time
@@ -120,13 +115,13 @@ if __name__ == "__main__":
     latt_vec = latt.latt_vec
     key = jax.random.PRNGKey(0)
     field = jax.random.normal(key, (l1, l2, l3, 3))
-
+    paras = {'a1': latt_vec[0][0], 'a2': latt_vec[1][1], 'a3': latt_vec[2][2]}
     ## check dipole-dipole interaction energy calculation
     t0 = time()
     E1 = dipole_dipole_ewald_slow(field,  latt_vec)
     print("Time for slow method: ", time() - t0)
     t0 = time()
-    E2 = dipole_dipole_ewald(field,  latt_vec)
+    E2 = dipole_dipole_ewald(field,  paras)
     print("Time for fast method: ", time() - t0)
     print('E1={}eV,E2={}eV. They should be the same'.format(E1,E2))
 
@@ -137,7 +132,7 @@ if __name__ == "__main__":
     force = grad_slow(field, latt_vec)
     print("Time for slow gradient method: ", time() - t0)
     t0 = time()
-    force = grad_fast(field, latt_vec)
+    force = grad_fast(field, paras)
     print("Time for fast gradient method: ", time() - t0)
 
     ## scaling
@@ -148,9 +143,10 @@ if __name__ == "__main__":
         l3 = l1
         latt = BravaisLattice3D(l1, l2, l3)
         latt_vec = latt.latt_vec
+        paras = {'a1': latt_vec[0][0], 'a2': latt_vec[1][1], 'a3': latt_vec[2][2]}
         field = jax.random.normal(key, (l1, l2, l3, 3))
         t0 = time()
-        E = grad_fast(field,  latt_vec)
+        E = grad_fast(field,  paras)
         t_list.append(time() - t0)
     print("force scaling test: ", t_list)
 
@@ -161,8 +157,9 @@ if __name__ == "__main__":
         l3 = l1
         latt = BravaisLattice3D(l1, l2, l3)
         latt_vec = latt.latt_vec
+        paras = {'a1': latt_vec[0][0], 'a2': latt_vec[1][1], 'a3': latt_vec[2][2]}
         field = jax.random.normal(key, (l1, l2, l3, 3))
         t0 = time()
-        E = energy_fast(field,  latt_vec)
+        E = energy_fast(field,  paras)
         t_list.append(time() - t0)
     print("energy Scaling test: ", t_list)
