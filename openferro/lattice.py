@@ -23,7 +23,7 @@ class BravaisLattice3D:
         """
         Returns the volume of the unit cell
         """
-        return jnp.dot(jnp.cross(self.a1, self.a2), self.a3)
+        return jnp.abs(jnp.dot(jnp.cross(self.a1, self.a2), self.a3))
     
     @property
     def latt_vec(self):

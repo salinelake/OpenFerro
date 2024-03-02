@@ -104,6 +104,7 @@ def short_range_2ednn_isotropic(field, parameters):
     j3 = parameters['j3']  ## uni-axis interaction parallel to displacement plane
     j4 = parameters['j4']  ## uni-axis interaction orthogonal to displacement plane
     j5 = parameters['j5']  ## orthogonal-axis interaction on displacement plane
+    offset = parameters['offset']
 
     f = field - offset
     fxy_1 = jnp.roll( f, (1, 1), axis=(0,1)) 
@@ -112,10 +113,12 @@ def short_range_2ednn_isotropic(field, parameters):
     fxz_2 = jnp.roll( f, (1,-1), axis=(0,2)) 
     fyz_1 = jnp.roll( f, (1, 1), axis=(1,2)) 
     fyz_2 = jnp.roll( f, (1,-1), axis=(1,2)) 
+    ## uni-axis
     energy = jnp.sum( j3 * f * (fxy_1 + fxy_2 + fxz_1 + fxz_2 + fyz_1 + fyz_2 ) ) 
     energy += jnp.sum( (j4-j3) * f[..., 2] * (fxy_1 + fxy_2)[...,2] )
     energy += jnp.sum( (j4-j3) * f[..., 1] * (fxz_1 + fxz_2)[...,1] )
     energy += jnp.sum( (j4-j3) * f[..., 0] * (fyz_1 + fyz_2)[...,0] )
+    ## orthogonal-axis
     energy += jnp.sum( j5 * f[..., [0,1]] * (fxy_1 - fxy_2)[...,[1,0]] )
     energy += jnp.sum( j5 * f[..., [0,2]] * (fxz_1 - fxz_2)[...,[2,0]] )
     energy += jnp.sum( j5 * f[..., [1,2]] * (fyz_1 - fyz_2)[...,[2,1]] )
@@ -127,6 +130,7 @@ def short_range_3rdnn_isotropic(field, parameters):
     """
     j6 = parameters['j6']  ## uni-axis interaction 
     j7 = parameters['j7']  ## orthogonal-axis interaction
+    offset = parameters['offset']
 
     f = field - offset
     f_1 = jnp.roll( f, ( 1, 1, 1), axis=(0,1,2))
@@ -154,9 +158,15 @@ def short_range_3rdnn_isotropic(field, parameters):
         [ 1,  0, -1],
         [-1, -1,  0],
         ])
-    energy = jnp.sum( j6 * f * (f_1 + f_2 + f_3 + f_4) )
+    r_1 = r_1 * j7 + jnp.eye(3) * j6
+    r_2 = r_2 * j7 + jnp.eye(3) * j6
+    r_3 = r_3 * j7 + jnp.eye(3) * j6
+    r_4 = r_4 * j7 + jnp.eye(3) * j6
     fr_sum = jnp.dot(f_1, r_1) + jnp.dot(f_2, r_2) + jnp.dot(f_3, r_3) + jnp.dot(f_4, r_4)
-    energy += jnp.sum( j7 * f * fr_sum )
+    energy = jnp.sum(f * fr_sum)
+    # energy = jnp.sum( j6 * f * (f_1 + f_2 + f_3 + f_4) )
+    # fr_sum = jnp.dot(f_1, r_1) + jnp.dot(f_2, r_2) + jnp.dot(f_3, r_3) + jnp.dot(f_4, r_4)
+    # energy += jnp.sum( j7 * f * fr_sum )
     return energy
 
 def homo_elastic_energy(global_strain, parameters):
@@ -189,7 +199,7 @@ def elastic_energy(local_displacement, global_strain, parameters):
 
     ## get the homogeneous strain energy 
     gs = global_strain.flatten()
-    N = local_strain.shape[0] * local_strain.shape[1] * local_strain.shape[2]
+    N = local_displacement.shape[0] * local_displacement.shape[1] * local_displacement.shape[2]
     homo_elastic_energy = 0.5 * B11 * jnp.sum(gs[:3]**2)
     homo_elastic_energy += B12 * (gs[0]*gs[1]+gs[1]*gs[2]+gs[2]*gs[0])
     homo_elastic_energy += 0.5 * B44 * jnp.sum(gs[3:]**2)
@@ -200,11 +210,17 @@ def elastic_energy(local_displacement, global_strain, parameters):
     grad_0 = ls - jnp.roll( ls, 1, axis=0)     # v(R)-v(R-x)
     grad_1 = ls - jnp.roll( ls, 1, axis=1)     # v(R)-v(R-y)
     grad_2 = ls - jnp.roll( ls, 1, axis=2)     # v(R)-v(R-z)
-
-    inhomo_elastic_energy = 2 * g11 * (jnp.sum(grad_0[...,0]**2) + jnp.sum(grad_1[...,1]**2) + jnp.sum(grad_2[...,2]**2))
-    inhomo_elastic_energy +=  g12 * (grad_0[...,0] - jnp.roll(grad_0[...,0], -1, axis=0)) * (grad_1[...,1] - jnp.roll(grad_1[...,1], -1, axis=1))
-    inhomo_elastic_energy +=  g12 * (grad_2[...,2] - jnp.roll(grad_2[...,2], -1, axis=2)) * (grad_1[...,1] - jnp.roll(grad_1[...,1], -1, axis=1))
-    inhomo_elastic_energy +=  g12 * (grad_0[...,0] - jnp.roll(grad_0[...,0], -1, axis=0)) * (grad_2[...,2] - jnp.roll(grad_2[...,2], -1, axis=2))
+    
+    vxx_m = grad_0[...,0]
+    vxx_p = - jnp.roll(vxx_m, -1, axis=0)
+    vyy_m = grad_1[...,1]
+    vyy_p = - jnp.roll(vyy_m, -1, axis=1)
+    vzz_m = grad_2[...,2]
+    vzz_p = - jnp.roll(vzz_m, -1, axis=2)
+    inhomo_elastic_energy = 2 * g11 * (jnp.sum(vxx_m**2) + jnp.sum(vyy_m**2) + jnp.sum(vzz_m**2))
+    inhomo_elastic_energy +=  g12 * jnp.sum((vxx_m + vxx_p) * (vyy_m + vyy_p))
+    inhomo_elastic_energy +=  g12 * jnp.sum((vzz_m + vzz_p) * (vyy_m + vyy_p))
+    inhomo_elastic_energy +=  g12 * jnp.sum((vxx_m + vxx_p) * (vzz_m + vzz_p))
     
     vyx_m = grad_1[...,0]
     vyx_p = - jnp.roll(vyx_m, -1, axis=1)
@@ -232,7 +248,6 @@ def elastic_energy(local_displacement, global_strain, parameters):
     inhomo_elastic_energy +=  g44 * jnp.sum((vyz_p+vzy_m)**2)
     inhomo_elastic_energy +=  g44 * jnp.sum((vyz_m+vzy_p)**2)
     inhomo_elastic_energy +=  g44 * jnp.sum((vyz_p+vzy_p)**2)
-    
     return homo_elastic_energy + inhomo_elastic_energy
 
 
@@ -240,61 +255,65 @@ def homo_strain_dipole_interaction(global_strain, dipole_field, parameters ):
     B1xx = parameters['B1xx']
     B1yy = parameters['B1yy']
     B4yz = parameters['B4yz']
+    offset = parameters['offset']
     gs = global_strain.flatten()
     B1 = jnp.diag(jnp.array([B1xx, B1yy, B1yy]))
     B2 = jnp.diag(jnp.array([B1yy, B1xx, B1yy]))
     B3 = jnp.diag(jnp.array([B1yy, B1yy, B1xx]))
-    B4 = jnp.array(
-        [0,   0,   0],
-        [0,   0,B4yz],
-        [0,B4yz,   0],
-    )
-    B5 = jnp.array(
+    B4 = jnp.array([
+        [0,   0,  0],
         [0,   0, B4yz],
-        [0,   0,    0],
-        [B4yz,0,    0],
-    )
-    B6 = jnp.array(
+        [0,  B4yz,  0],
+    ])
+    B5 = jnp.array([
+        [0,   0, B4yz],
+        [0,   0,  0],
+        [B4yz,  0,  0],
+    ])
+    B6 = jnp.array([
         [0,   B4yz, 0],
-        [B4yz,   0, 0],
-        [   0,   0, 0],
-    )
+        [B4yz,  0,  0],
+        [0,   0,  0],
+    ])
     B_tensor = jnp.stack([B1, B2, B3, B4, B5, B6], axis=-1)
     
     ### get the homogeneous strain energy
     coef_mat = (B_tensor * gs).sum(-1)
-    energy = 0.5 * jnp.sum(jnp.dot(dipole_field, coef_mat) * dipole_field)
+    f = dipole_field - offset
+    energy = 0.5 * jnp.sum(jnp.dot(f, coef_mat) * f)
     return energy
 
 def inhomo_strain_dipole_interaction(local_displacement, dipole_field, parameters):
     B1xx = parameters['B1xx']
     B1yy = parameters['B1yy']
     B4yz = parameters['B4yz']
-    gs = global_strain.flatten()
+    offset = parameters['offset']
+
     B1 = jnp.diag(jnp.array([B1xx, B1yy, B1yy]))
     B2 = jnp.diag(jnp.array([B1yy, B1xx, B1yy]))
     B3 = jnp.diag(jnp.array([B1yy, B1yy, B1xx]))
-    B4 = jnp.array(
-        [0,   0,   0],
-        [0,   0,B4yz],
-        [0,B4yz,   0],
-    )
-    B5 = jnp.array(
+    B4 = jnp.array([
+        [0,   0,  0],
         [0,   0, B4yz],
-        [0,   0,    0],
-        [B4yz,0,    0],
-    )
-    B6 = jnp.array(
+        [0,  B4yz,  0],
+    ])
+    B5 = jnp.array([
+        [0,   0, B4yz],
+        [0,   0,  0],
+        [B4yz,  0,  0],
+    ])
+    B6 = jnp.array([
         [0,   B4yz, 0],
-        [B4yz,   0, 0],
-        [   0,   0, 0],
-    )
+        [B4yz,  0,  0],
+        [0,   0,  0],
+    ])
     B_tensor = jnp.stack([B1, B2, B3, B4, B5, B6], axis=1)  # (3,6,3)
     
     ### get the inhomogeneous strain energy
     local_strain = LocalStrain.get_local_strain(local_displacement)  # (l1, l2, l3, 6)
     local_strain = jnp.dot(local_strain, B_tensor) # (l1, l2, l3, 3,3 )
 
-    energy = 0.5 * jnp.sum(local_strain * dipole_field[:,:,:,None,:] * dipole_field[:,:,:,:,None])
+    f = dipole_field - offset
+    energy = 0.5 * jnp.sum(local_strain * f[:,:,:,None,:] * f[:,:,:,:,None])
 
     return energy

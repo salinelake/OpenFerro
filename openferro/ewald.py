@@ -18,6 +18,9 @@ def dipole_dipole_ewald(field, parameters):
     a1 = parameters['a1']
     a2 = parameters['a2']
     a3 = parameters['a3']
+    Z = parameters['Z_star']
+    epsilon_inf = parameters['epsilon_inf']
+    ref_volume = a1 * a2 * a3
     # if (a1[1] != 0) or (a1[2] != 0) or (a2[0] != 0) or (a2[2] != 0) or (a3[0] != 0) or (a3[1] != 0):
     #     raise NotImplementedError("Ewald summation is only implemented for orthogonal lattice vectors")
     a = jnp.array([a1 , a2 , a3 ])
@@ -29,7 +32,7 @@ def dipole_dipole_ewald(field, parameters):
     sigma = 1.0 / alpha / jnp.sqrt(2.0)   ## the ewald sigma parameter
 
     ## k-space sum
-    coef_ksum = 1 / 2.0 / latt.ref_volume / Constants.epsilon0
+    coef_ksum = 1 / 2.0 / ref_volume / Constants.epsilon0
     G_grid = jnp.stack( jnp.meshgrid(
         jnp.arange(l1) / l1 * b[0], 
         jnp.arange(l2) / l2 * b[1], 
@@ -47,16 +50,17 @@ def dipole_dipole_ewald(field, parameters):
     ## real-space sum
     coef_rsum = 1 / 2.0 / jnp.pi / Constants.epsilon0 * alpha**3 / 3.0 / jnp.sqrt(jnp.pi) 
     ewald_rsum = - coef_rsum * jnp.sum(field**2)
-    return ewald_ksum + ewald_rsum
+    return (ewald_ksum + ewald_rsum) * Z**2 / epsilon_inf
 
 
-def dipole_dipole_ewald_slow(field, latt_vec):
+def dipole_dipole_ewald_slow(field, latt_vec, Z=1.0, epsilon_inf=1.0):
     """
     For benchmarking purpose only. 
     Brute-force Ewald summation for dipole-dipole interaction
     """
     l1, l2, l3 = field.shape[0], field.shape[1], field.shape[2]
     a1, a2, a3 = latt_vec
+    ref_volume = jnp.dot(jnp.cross(a1, a2), a3)
     if (a1[1] != 0) or (a1[2] != 0) or (a2[0] != 0) or (a2[2] != 0) or (a3[0] != 0) or (a3[1] != 0):
         raise NotImplementedError("Ewald summation is only implemented for orthogonal lattice vectors")
     else:
@@ -78,7 +82,7 @@ def dipole_dipole_ewald_slow(field, latt_vec):
     k2_grid = jnp.sum(k_grid**2, axis=-1)
     
     ## get coefficients
-    coef_ksum = 1 / 2.0 / latt.ref_volume / Constants.epsilon0
+    coef_ksum = 1 / 2.0 / ref_volume / Constants.epsilon0
     coef_rsum = 1 / 2.0 / jnp.pi / Constants.epsilon0 * alpha**3 / 3.0 / jnp.sqrt(jnp.pi) 
 
     ###
@@ -104,7 +108,7 @@ def dipole_dipole_ewald_slow(field, latt_vec):
             for i3 in range(l3):
                 for alpha in range(3):
                     ewald_rsum -= coef_rsum * field[i1, i2, i3, alpha]**2
-    return ewald_ksum + ewald_rsum
+    return (ewald_ksum + ewald_rsum) * Z**2 / epsilon_inf
 
 if __name__ == "__main__":
     from openferro.lattice import BravaisLattice3D
@@ -115,7 +119,7 @@ if __name__ == "__main__":
     latt_vec = latt.latt_vec
     key = jax.random.PRNGKey(0)
     field = jax.random.normal(key, (l1, l2, l3, 3))
-    paras = {'a1': latt_vec[0][0], 'a2': latt_vec[1][1], 'a3': latt_vec[2][2]}
+    paras = {'a1': latt_vec[0][0], 'a2': latt_vec[1][1], 'a3': latt_vec[2][2], 'Z_star': 1.0, 'epsilon_inf': 1.0}
     ## check dipole-dipole interaction energy calculation
     t0 = time()
     E1 = dipole_dipole_ewald_slow(field,  latt_vec)
@@ -125,41 +129,41 @@ if __name__ == "__main__":
     print("Time for fast method: ", time() - t0)
     print('E1={}eV,E2={}eV. They should be the same'.format(E1,E2))
 
-    ## check dipole-dipole interaction force calculation
-    grad_slow = grad( dipole_dipole_ewald_slow  )
-    grad_fast =  jit(grad( jit(dipole_dipole_ewald) ))
-    t0 = time()
-    force = grad_slow(field, latt_vec)
-    print("Time for slow gradient method: ", time() - t0)
-    t0 = time()
-    force = grad_fast(field, paras)
-    print("Time for fast gradient method: ", time() - t0)
+    # ## check dipole-dipole interaction force calculation
+    # grad_slow = grad( dipole_dipole_ewald_slow  )
+    # grad_fast =  jit(grad( jit(dipole_dipole_ewald) ))
+    # t0 = time()
+    # force = grad_slow(field, latt_vec)
+    # print("Time for slow gradient method: ", time() - t0)
+    # t0 = time()
+    # force = grad_fast(field, paras)
+    # print("Time for fast gradient method: ", time() - t0)
 
-    ## scaling
-    l1_list = np.arange(1, 10) * 20
-    t_list = []
-    for l1 in l1_list:
-        l2 = l1
-        l3 = l1
-        latt = BravaisLattice3D(l1, l2, l3)
-        latt_vec = latt.latt_vec
-        paras = {'a1': latt_vec[0][0], 'a2': latt_vec[1][1], 'a3': latt_vec[2][2]}
-        field = jax.random.normal(key, (l1, l2, l3, 3))
-        t0 = time()
-        E = grad_fast(field,  paras)
-        t_list.append(time() - t0)
-    print("force scaling test: ", t_list)
+    # ## scaling
+    # l1_list = np.arange(1, 10) * 20
+    # t_list = []
+    # for l1 in l1_list:
+    #     l2 = l1
+    #     l3 = l1
+    #     latt = BravaisLattice3D(l1, l2, l3)
+    #     latt_vec = latt.latt_vec
+    #     paras = {'a1': latt_vec[0][0], 'a2': latt_vec[1][1], 'a3': latt_vec[2][2]}
+    #     field = jax.random.normal(key, (l1, l2, l3, 3))
+    #     t0 = time()
+    #     E = grad_fast(field,  paras)
+    #     t_list.append(time() - t0)
+    # print("force scaling test: ", t_list)
 
-    t_list = []
-    energy_fast = jit(dipole_dipole_ewald)
-    for l1 in l1_list:
-        l2 = l1
-        l3 = l1
-        latt = BravaisLattice3D(l1, l2, l3)
-        latt_vec = latt.latt_vec
-        paras = {'a1': latt_vec[0][0], 'a2': latt_vec[1][1], 'a3': latt_vec[2][2]}
-        field = jax.random.normal(key, (l1, l2, l3, 3))
-        t0 = time()
-        E = energy_fast(field,  paras)
-        t_list.append(time() - t0)
-    print("energy Scaling test: ", t_list)
+    # t_list = []
+    # energy_fast = jit(dipole_dipole_ewald)
+    # for l1 in l1_list:
+    #     l2 = l1
+    #     l3 = l1
+    #     latt = BravaisLattice3D(l1, l2, l3)
+    #     latt_vec = latt.latt_vec
+    #     paras = {'a1': latt_vec[0][0], 'a2': latt_vec[1][1], 'a3': latt_vec[2][2]}
+    #     field = jax.random.normal(key, (l1, l2, l3, 3))
+    #     t0 = time()
+    #     E = energy_fast(field,  paras)
+    #     t_list.append(time() - t0)
+    # print("energy Scaling test: ", t_list)

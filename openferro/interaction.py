@@ -60,7 +60,7 @@ class self_interaction(interaction_base):
         gradient = self.force_engine(field_values, self.parameters)
         return -gradient
 
-class mutual_interaction:
+class mutual_interaction(interaction_base):
     """
     A class to specify the  mutual interaction between two fields.
     """

@@ -7,8 +7,8 @@ Classes which define the physical system.
 import numpy as np
 import jax.numpy as jnp
 from jax import grad, jit, vmap
-from openferro.field import FieldSO3, FieldRn, FieldScalar
-from openferro.interaction import self_interaction, mutual_interaction
+from openferro.field import *
+from openferro.interaction import *
 from openferro.units import Constants
 class System:
     """
