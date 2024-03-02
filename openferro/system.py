@@ -154,7 +154,7 @@ class System:
         return sum([self.calc_energy_by_name(interaction_name) for interaction_name in self._self_interaction_dict])
 
     def calc_total_mutual_interaction(self):
-        return sum([self.calc_interaction_by_name(interaction_name) for interaction_name in self._mutual_interaction_dict])
+        return sum([self.calc_energy_by_name(interaction_name) for interaction_name in self._mutual_interaction_dict])
 
     def calc_potential_energy(self):
         return self.calc_total_self_energy() + self.calc_total_mutual_interaction()
