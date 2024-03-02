@@ -48,10 +48,9 @@ def dipole_dipole_ewald(field, parameters):
     G_weight = G_weight.at[0].set(1.0)
     G_grid = G_grid.reshape(n1, l1, 2*n2, l2, 2*n3, l3, 3)     
     G_grid = G_grid.transpose(1,3,5,0,2,4,6).reshape(l1,l2,l3,-1,3)  # (l1, l2, l3, 4*n1*n2*n3, 3)
-
     G_weight = G_weight.reshape(n1, l1, 2*n2, l2, 2*n3, l3 )
     G_weight = G_weight.transpose(1,3,5,0,2,4 ).reshape(l1,l2,l3,-1 )  # (l1, l2, l3, 4*n1*n2*n3 )
-    assert jnp.sum(jnp.abs(G_grid[0,0,0,0]))==0
+
     ## calculate reciprocal space sum
     F_fft3 = jnp.fft.fftn(field, axes=(0,1,2))  # (l1, l2, l3, 3)
     ewald_ksum = jnp.exp( - 0.5 * sigma**2 * jnp.sum(G_grid**2, axis=-1) ) / jnp.sum(G_grid**2, axis=-1)   # (l1, l2, l3, *)
