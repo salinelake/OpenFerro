@@ -12,7 +12,7 @@ def test_ewald():
     paras = {'a1': latt_vec[0][0], 'a2': latt_vec[1][1], 'a3': latt_vec[2][2], 'Z_star': 1.0, 'epsilon_inf': 1.0}
     ## check dipole-dipole interaction energy calculation
     E1 = dipole_dipole_ewald_slow(field,  paras)
-    dipole_dipole_ewald_engine = jit(get_dipole_dipole_energy(latt))
+    dipole_dipole_ewald_engine = jit(get_dipole_dipole_ewald(latt))
     E2 = dipole_dipole_ewald_engine(field,  paras)
     assert abs(E1 - E2) <  (abs(E1) / 1000)
 

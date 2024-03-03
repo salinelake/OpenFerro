@@ -10,6 +10,7 @@ from jax import grad, jit, vmap
 from openferro.field import *
 from openferro.interaction import *
 from openferro.units import Constants
+from openferro.engine import pV_energy
 class System:
     """
     A class to define a physical system. A system is a lattice with fields and a Hamiltonian.
@@ -103,6 +104,30 @@ class System:
         if parameters is not None:
             interaction.set_parameters(parameters)
         self._mutual_interaction_dict[name] = interaction
+        return interaction
+
+    def add_pressure(self, pressure, name='pV', field_name='gstrain', enable_jit=True):
+        '''
+        Add a pressure term to the Hamiltonian.
+        Args:
+            name (string): name of the interaction
+            pressure (float): pressure in bars
+            field_name (string): name of the field
+            parameters (dict): parameters for the interaction
+            enable_jit (bool): whether to use JIT compilation
+        '''
+        _pres = pressure * Constants.bar  # bar -> eV/Angstrom^3
+        if name in self._self_interaction_dict or name in self._mutual_interaction_dict:
+            raise ValueError("Interaction with this name already exists. Pick another name.")
+        field = self.get_field_by_name(field_name)
+        if not isinstance(field, GlobalStrain):
+            raise ValueError("Pressure can only be applied to global strain field")
+        interaction = self_interaction( field_name)
+        interaction.set_energy_engine(energy_engine=pV_energy, enable_jit=enable_jit)
+        interaction.create_force_engine(enable_jit=enable_jit)
+        parameters = {'p': _pres, 'V0':self.lattice.ref_volume}
+        interaction.set_parameters(parameters)
+        self._self_interaction_dict[name] = interaction
         return interaction
 
     def get_interaction_by_name(self, interaction_name):

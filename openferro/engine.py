@@ -32,7 +32,7 @@ def self_energy_onsite_isotropic(field, parameters):
 def self_energy_onsite_scalar(field, parameters):
     """
     Returns the self-energy of a scalar field. 
-    E= \sum_i E_i.  (sum over the lattice sites i)
+    E=  sum_i E_i.  (sum over the lattice sites i)
     E_i = k_2 * u_i^2 + alpha * u_i^4 
     """
     k2 = parameters['k2']
@@ -185,6 +185,15 @@ def homo_elastic_energy(global_strain, parameters):
     homo_elastic_energy += 0.5 * B44 * jnp.sum(gs[3:]**2)
     homo_elastic_energy *= N
     return homo_elastic_energy
+
+def pV_energy(global_strain, parameters):
+    """
+    Returns pressure * (volume - reference volume)
+    """
+    pres = parameters['p']
+    vol_ref = parameters['V0']
+    pV = ( global_strain[:3].sum()) * pres * vol_ref
+    return pV
 
 def elastic_energy(local_displacement, global_strain, parameters):
     """

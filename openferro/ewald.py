@@ -8,7 +8,7 @@ import jax
 import jax.numpy as jnp
 from openferro.units import Constants
 
-def get_dipole_dipole_energy(latt):
+def get_dipole_dipole_ewald(latt):
     """
     Returns the function to calculate the energy of dipole-dipole interaction.
     """
@@ -67,61 +67,61 @@ def get_dipole_dipole_energy(latt):
     return energy_engine
 
 
-def dipole_dipole_ewald(field, parameters):
-    """
-    FFT realization of Ewald summation for dipole-dipole interaction.
-    lattice vectors are assumed to be orthogonal.
-    """
-    l1, l2, l3 = field.shape[0], field.shape[1], field.shape[2]
-    # a1, a2, a3 = latt_vec
-    a1 = parameters['a1']
-    a2 = parameters['a2']
-    a3 = parameters['a3']
-    Z = parameters['Z_star']
-    epsilon_inf = parameters['epsilon_inf']
-    ref_volume = a1 * a2 * a3 * l1 * l2 * l3
-    a = jnp.array([a1 , a2 , a3 ])
-    b = 2 * jnp.pi / a
-    bmax = jnp.max(b)
-    amin = 2 * np.pi / bmax
-    alpha = 5 / amin
-    gcut = 2 * np.pi * alpha
-    sigma = 1.0 / alpha / jnp.sqrt(2.0)   ## the ewald sigma parameter
+# def dipole_dipole_ewald(field, parameters):
+#     """
+#     FFT realization of Ewald summation for dipole-dipole interaction.
+#     lattice vectors are assumed to be orthogonal.
+#     """
+#     l1, l2, l3 = field.shape[0], field.shape[1], field.shape[2]
+#     # a1, a2, a3 = latt_vec
+#     a1 = parameters['a1']
+#     a2 = parameters['a2']
+#     a3 = parameters['a3']
+#     Z = parameters['Z_star']
+#     epsilon_inf = parameters['epsilon_inf']
+#     ref_volume = a1 * a2 * a3 * l1 * l2 * l3
+#     a = jnp.array([a1 , a2 , a3 ])
+#     b = 2 * jnp.pi / a
+#     bmax = jnp.max(b)
+#     amin = 2 * np.pi / bmax
+#     alpha = 5 / amin
+#     gcut = 2 * np.pi * alpha
+#     sigma = 1.0 / alpha / jnp.sqrt(2.0)   ## the ewald sigma parameter
     
-    ## get coefficients
-    coef_ksum = 1 / 2.0 / ref_volume / Constants.epsilon0
-    coef_rsum = 1 / 2.0 / jnp.pi / Constants.epsilon0 * alpha**3 / 3.0 / jnp.sqrt(jnp.pi) 
+#     ## get coefficients
+#     coef_ksum = 1 / 2.0 / ref_volume / Constants.epsilon0
+#     coef_rsum = 1 / 2.0 / jnp.pi / Constants.epsilon0 * alpha**3 / 3.0 / jnp.sqrt(jnp.pi) 
 
-    ## get reriprocal space grid
-    n1 = int(gcut / b[0])
-    n2 = int(gcut / b[1])
-    n3 = int(gcut / b[2])
-    ng1, ng2, ng3 = l1*n1, l2*n2, l3*n3
-    G_grid = jnp.stack( jnp.meshgrid(
-        jnp.arange(   0, ng1) / l1 * b[0], 
-        jnp.arange(-ng2, ng2) / l2 * b[1], 
-        jnp.arange(-ng3, ng3) / l3 * b[2], 
-        indexing='ij'), axis=-1)   # (ng1, 2*ng2, 2*ng3, 3)
-    G_grid = jnp.roll(G_grid, shift=(-ng2, -ng3), axis=(1,2))  # move gamma point to (0,0,0)
-    G_weight = jnp.ones_like(G_grid[...,0]) * 2
-    G_weight = G_weight.at[0].set(1.0)
-    G_grid = G_grid.reshape(n1, l1, 2*n2, l2, 2*n3, l3, 3)     
-    G_grid = G_grid.transpose(1,3,5,0,2,4,6).reshape(l1,l2,l3,-1,3)  # (l1, l2, l3, 4*n1*n2*n3, 3)
-    G_weight = G_weight.reshape(n1, l1, 2*n2, l2, 2*n3, l3 )
-    G_weight = G_weight.transpose(1,3,5,0,2,4 ).reshape(l1,l2,l3,-1 )  # (l1, l2, l3, 4*n1*n2*n3 )
+#     ## get reriprocal space grid
+#     n1 = int(gcut / b[0])
+#     n2 = int(gcut / b[1])
+#     n3 = int(gcut / b[2])
+#     ng1, ng2, ng3 = l1*n1, l2*n2, l3*n3
+#     G_grid = jnp.stack( jnp.meshgrid(
+#         jnp.arange(   0, ng1) / l1 * b[0], 
+#         jnp.arange(-ng2, ng2) / l2 * b[1], 
+#         jnp.arange(-ng3, ng3) / l3 * b[2], 
+#         indexing='ij'), axis=-1)   # (ng1, 2*ng2, 2*ng3, 3)
+#     G_grid = jnp.roll(G_grid, shift=(-ng2, -ng3), axis=(1,2))  # move gamma point to (0,0,0)
+#     G_weight = jnp.ones_like(G_grid[...,0]) * 2
+#     G_weight = G_weight.at[0].set(1.0)
+#     G_grid = G_grid.reshape(n1, l1, 2*n2, l2, 2*n3, l3, 3)     
+#     G_grid = G_grid.transpose(1,3,5,0,2,4,6).reshape(l1,l2,l3,-1,3)  # (l1, l2, l3, 4*n1*n2*n3, 3)
+#     G_weight = G_weight.reshape(n1, l1, 2*n2, l2, 2*n3, l3 )
+#     G_weight = G_weight.transpose(1,3,5,0,2,4 ).reshape(l1,l2,l3,-1 )  # (l1, l2, l3, 4*n1*n2*n3 )
 
-    ## calculate reciprocal space sum
-    F_fft3 = jnp.fft.fftn(field, axes=(0,1,2))  # (l1, l2, l3, 3)
-    ewald_ksum = jnp.exp( - 0.5 * sigma**2 * jnp.sum(G_grid**2, axis=-1) ) / jnp.sum(G_grid**2, axis=-1)   # (l1, l2, l3, *)
-    ewald_ksum = ewald_ksum.at[0,0,0,0].set(0.0)   # mute Gamma point
-    Uk_squared  = jnp.sum( F_fft3.real[:,:,:,None,:] * G_grid, axis=-1)**2
-    Uk_squared += jnp.sum( F_fft3.imag[:,:,:,None,:] * G_grid, axis=-1)**2   # (l1, l2, l3, *)
-    ewald_ksum = ewald_ksum * Uk_squared
-    ewald_ksum = coef_ksum * jnp.sum(ewald_ksum * G_weight)
+#     ## calculate reciprocal space sum
+#     F_fft3 = jnp.fft.fftn(field, axes=(0,1,2))  # (l1, l2, l3, 3)
+#     ewald_ksum = jnp.exp( - 0.5 * sigma**2 * jnp.sum(G_grid**2, axis=-1) ) / jnp.sum(G_grid**2, axis=-1)   # (l1, l2, l3, *)
+#     ewald_ksum = ewald_ksum.at[0,0,0,0].set(0.0)   # mute Gamma point
+#     Uk_squared  = jnp.sum( F_fft3.real[:,:,:,None,:] * G_grid, axis=-1)**2
+#     Uk_squared += jnp.sum( F_fft3.imag[:,:,:,None,:] * G_grid, axis=-1)**2   # (l1, l2, l3, *)
+#     ewald_ksum = ewald_ksum * Uk_squared
+#     ewald_ksum = coef_ksum * jnp.sum(ewald_ksum * G_weight)
 
-    ## calculate real space sum
-    ewald_rsum = - coef_rsum * jnp.sum(field**2)
-    return (ewald_ksum + ewald_rsum) * Z**2 / epsilon_inf
+#     ## calculate real space sum
+#     ewald_rsum = - coef_rsum * jnp.sum(field**2)
+#     return (ewald_ksum + ewald_rsum) * Z**2 / epsilon_inf
 
 
 def dipole_dipole_ewald_slow(field, parameters):

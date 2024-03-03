@@ -19,12 +19,16 @@ class BravaisLattice3D:
         return f"Bravais lattice with size {self.size} and primitive vectors {self.a1}, {self.a2}, {self.a3}"    
     
     @property
-    def ref_volume(self):
+    def unit_volume(self):
         """
         Returns the volume of the unit cell
         """
         return jnp.abs(jnp.dot(jnp.cross(self.a1, self.a2), self.a3))
     
+    @property
+    def ref_volume(self):
+        return self.unit_volume * jnp.prod(self.size)
+
     @property
     def latt_vec(self):
         """
@@ -77,12 +81,16 @@ class BravaisLattice2D:
         return f"Bravais lattice with size {self.size} and primitive vectors {self.a1}, {self.a2}"    
 
     @property
-    def ref_area(self):
+    def unit_area(self):
         """
         Returns the area of the unit cell
         """
         return jnp.abs(jnp.cross(self.a1, self.a2))
     
+    @property
+    def ref_area(self):
+        return self.unit_area * jnp.prod(self.size)
+
     @property
     def latt_vec(self):
         """

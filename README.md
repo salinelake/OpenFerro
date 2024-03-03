@@ -19,7 +19,7 @@ OpenFerro is designed to minimize the effort required to build on-lattice Hamilt
 
 ## Units
 
-OpenFerro do not process unit conversion. The internal unit system is the same as the 'metal' unit system used in LAMMPS.
+OpenFerro do not process unit conversion. The unit system is the same as the 'metal' unit system used in LAMMPS.
 
 mass = grams/mole
 

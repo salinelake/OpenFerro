@@ -8,7 +8,7 @@ import jax
 import jax.numpy as jnp
 from jax import grad, jit, vmap
 from openferro.units import Constants
-
+from openferro.field import GlobalStrain
 class MDMinimize:
     def __init__(self, system, max_iter=100, tol=1e-5, dt=0.01):
         self.system = system
@@ -75,16 +75,18 @@ class SimulationNVTLangevin(SimulationNVE):
     """
     A class to define a simulation using the Langevin equation. A Langevin simulation evolves the system in time using the Langevin equation.
     """
-    def __init__(self, system, dt=0.01, temperature=0.0, gamma=1.0):
+    def __init__(self, system, dt=0.01, temperature=0.0, tau=0.1):
         super().__init__(system, dt, temperature)
-        self.gamma = gamma
-        self.z1 = jnp.exp( -dt * gamma )
-        self.z2 = ( 1 - jnp.exp( -2 * dt * gamma ))**0.5
+        self.gamma = 1.0 / tau
+        self.z1 = jnp.exp( -dt * self.gamma )
+        self.z2 = ( 1 - jnp.exp( -2 * dt * self.gamma ))**0.5
 
     def _step(self, key):
         dt = self.dt
         self.system.update_force()
         for field in self.system.get_all_fields():
+            if isinstance(field, GlobalStrain):
+                continue
             mass = field.get_mass()
             key, subkey = jax.random.split(key)
             ##
@@ -105,4 +107,43 @@ class SimulationNVTLangevin(SimulationNVE):
             key, subkey = jax.random.split(key)
             self._step(key)
 
+class SimulationNPTLangevin(SimulationNVE):
+    """
+    A class to define a simulation using the Langevin equation. A Langevin simulation evolves the system in time using the Langevin equation.
+    """
+    def __init__(self, system, dt=0.01, temperature=0.0, tau=0.1, tauP=1.0):
+        super().__init__(system, dt, temperature)
+        self.gamma = 1.0 / tau
+        self.gammaP = 1.0 / tauP
+        self.z1 = jnp.exp( -dt * self.gamma )
+        self.z2 = ( 1 - jnp.exp( -2 * dt * self.gamma ))**0.5
+        self.z1P = jnp.exp( -dt * self.gammaP )
+        self.z2P = ( 1 - jnp.exp( -2 * dt * self.gammaP ))**0.5
+        
 
+    def _step(self, key):
+        dt = self.dt
+        self.system.update_force()
+        for field in self.system.get_all_fields():
+            mass = field.get_mass()
+            key, subkey = jax.random.split(key)
+            ##
+            a0 = field.get_force() / mass
+            v0 = field.get_velocity()
+            x0 = field.get_values()
+            v0 += dt * a0
+            x0 += 0.5 * dt * v0
+            gaussian = jax.random.normal(subkey, v0.shape)
+            if isinstance(field, GlobalStrain):
+                v0 = self.z1P * v0 + self.z2P * gaussian * (self.kbT/ mass)**0.5
+            else:
+                v0 = self.z1 * v0 + self.z2 * gaussian * (self.kbT/ mass)**0.5
+            x0 += 0.5 * dt * v0
+            field.set_values(x0)
+            field.set_velocity(v0)
+    
+    def step(self, nsteps=1):
+        key = jax.random.PRNGKey(np.random.randint(0, 1000000))
+        for i in range(nsteps):
+            key, subkey = jax.random.split(key)
+            self._step(key)
