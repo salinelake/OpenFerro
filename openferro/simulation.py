@@ -15,16 +15,19 @@ class MDMinimize:
         self.max_iter = max_iter
         self.tol = tol
         self.dt = dt
-    def _step(self):
+    def _step(self, variable_cell):
         self.system.update_force()
         for field in self.system.get_all_fields():
+            if (variable_cell is False) and isinstance(field, GlobalStrain):
+                    continue
             x0 = field.get_values()
             f0 = field.get_force()
             x0 += self.dt * f0 / field.get_mass()
             field.set_values(x0)
-    def minimize(self):
+            
+    def minimize(self, variable_cell=True):
         for i in range(self.max_iter):
-            self._step()
+            self._step(variable_cell)
             converged = []
             for field in self.system.get_all_fields():
                 if jnp.max(jnp.abs(field.get_force())) < self.tol:
@@ -52,6 +55,8 @@ class SimulationNVE:
     def _step(self):
         dt = self.dt
         for field in self.system.get_all_fields():
+            if isinstance(field, GlobalStrain):
+                continue
             x0 = field.get_values()
             v0 = field.get_velocity()
             a0 = field.get_force() / field.get_mass()
@@ -111,8 +116,11 @@ class SimulationNPTLangevin(SimulationNVE):
     """
     A class to define a simulation using the Langevin equation. A Langevin simulation evolves the system in time using the Langevin equation.
     """
-    def __init__(self, system, dt=0.01, temperature=0.0, tau=0.1, tauP=1.0):
+    def __init__(self, system, dt=0.01, temperature=0.0, pressure=0.0, tau=0.1, tauP=1.0):
         super().__init__(system, dt, temperature)
+        self.pressure = pressure
+        self.system.get_interaction_by_name('pV').set_parameter_by_name(
+            'p', pressure * Constants.bar)  # bar -> eV/Angstrom^3
         self.gamma = 1.0 / tau
         self.gammaP = 1.0 / tauP
         self.z1 = jnp.exp( -dt * self.gamma )
