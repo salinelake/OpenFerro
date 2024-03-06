@@ -13,7 +13,8 @@ OpenFerro is designed to minimize the effort required to build on-lattice Hamilt
 
 # OpenFerro in a nutshell
 
-# Download and install
+# Installation
+Clone the package and pip install.
 
 # Use OpenFerro
 
