@@ -192,7 +192,8 @@ def pV_energy(global_strain, parameters):
     """
     pres = parameters['p']
     vol_ref = parameters['V0']
-    pV = ( global_strain[:3].sum()) * pres * vol_ref
+    gs = global_strain.flatten()
+    pV = ( gs[:3].sum()) * pres * vol_ref
     return pV
 
 def elastic_energy(local_displacement, global_strain, parameters):
@@ -284,7 +285,7 @@ def homo_strain_dipole_interaction(global_strain, dipole_field, parameters ):
         [B4yz,  0,  0],
         [0,   0,  0],
     ])
-    B_tensor = jnp.stack([B1, B2, B3, B4, B5, B6], axis=-1)
+    B_tensor = jnp.stack([B1, B2, B3, B4, B5, B6], axis=-1)  # (3,3,6)
     
     ### get the homogeneous strain energy
     coef_mat = (B_tensor * gs).sum(-1)

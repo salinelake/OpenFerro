@@ -25,7 +25,18 @@ class MDMinimize:
             x0 += self.dt * f0 / field.get_mass()
             field.set_values(x0)
             
-    def minimize(self, variable_cell=True):
+    def minimize(self, variable_cell=True, pressure=None):
+        ## sanity check
+        if variable_cell:
+            if pressure is None:
+                raise ValueError('Please specify pressure for variable-cell structural minimization')
+            else:
+                self.system.get_interaction_by_name('pV').set_parameter_by_name(
+                    'p', pressure * Constants.bar)  # bar -> eV/Angstrom^3
+        else:
+            if pressure is not None:
+                raise ValueError('Specifying pressure is not allowed for fixed-cell structural minimization')
+        ## structural relaxation
         for i in range(self.max_iter):
             self._step(variable_cell)
             converged = []

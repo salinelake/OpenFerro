@@ -75,6 +75,10 @@ class System:
         return [self._fields_dict[name] for name in self._fields_dict.keys()]
     
     ## setter and getter methods for interactions
+    @property
+    def interaction_dict(self):
+        return {**self._self_interaction_dict, **self._mutual_interaction_dict}
+
     def add_self_interaction(self, name, field_name, energy_engine, parameters=None, enable_jit=True):
         '''
         Add a self-interaction term to the Hamiltonian.
