@@ -28,7 +28,6 @@ def self_energy_onsite_isotropic(field, parameters):
         )
     return energy
 
-
 def self_energy_onsite_scalar(field, parameters):
     """
     Returns the self-energy of a scalar field. 
@@ -259,7 +258,6 @@ def elastic_energy(local_displacement, global_strain, parameters):
     inhomo_elastic_energy +=  g44 * jnp.sum((vyz_m+vzy_p)**2)
     inhomo_elastic_energy +=  g44 * jnp.sum((vyz_p+vzy_p)**2)
     return homo_elastic_energy + inhomo_elastic_energy
-
 
 def homo_strain_dipole_interaction(global_strain, dipole_field, parameters ):
     B1xx = parameters['B1xx']

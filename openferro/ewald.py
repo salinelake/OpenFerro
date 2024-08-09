@@ -11,6 +11,8 @@ from openferro.units import Constants
 def get_dipole_dipole_ewald(latt):
     """
     Returns the function to calculate the energy of dipole-dipole interaction.
+    Implemented according to Sec.5.3 of 
+    "Wang, D., et al. "Ewald summation for ferroelectric perovksites with charges and dipoles." Computational Materials Science 162 (2019): 314-321."
     """
     l1, l2, l3 = latt.size
     a1, a2, a3 = latt.latt_vec
@@ -36,17 +38,17 @@ def get_dipole_dipole_ewald(latt):
     n3 = int(gcut / b[2])
     ng1, ng2, ng3 = l1*n1, l2*n2, l3*n3
     G_grid = jnp.stack( jnp.meshgrid(
-        jnp.arange(   0, ng1) / l1 * b[0], 
+        jnp.arange(-ng1, ng1) / l1 * b[0], 
         jnp.arange(-ng2, ng2) / l2 * b[1], 
         jnp.arange(-ng3, ng3) / l3 * b[2], 
-        indexing='ij'), axis=-1)   # (ng1, 2*ng2, 2*ng3, 3)
-    G_grid = jnp.roll(G_grid, shift=(-ng2, -ng3), axis=(1,2))  # move gamma point to (0,0,0)
-    G_weight = jnp.ones_like(G_grid[...,0]) * 2
-    G_weight = G_weight.at[0].set(1.0)
-    G_grid = G_grid.reshape(n1, l1, 2*n2, l2, 2*n3, l3, 3)     
-    G_grid = G_grid.transpose(1,3,5,0,2,4,6).reshape(l1,l2,l3,-1,3)  # (l1, l2, l3, 4*n1*n2*n3, 3)
-    G_weight = G_weight.reshape(n1, l1, 2*n2, l2, 2*n3, l3 )
-    G_weight = G_weight.transpose(1,3,5,0,2,4 ).reshape(l1,l2,l3,-1 )  # (l1, l2, l3, 4*n1*n2*n3 )
+        indexing='ij'), axis=-1)   # (2*ng1, 2*ng2, 2*ng3, 3)
+    G_grid = jnp.roll(G_grid, shift=(-ng1, -ng2, -ng3), axis=(0, 1, 2))  # move gamma point to (0,0,0)
+    G_grid = G_grid.reshape(2*n1, l1, 2*n2, l2, 2*n3, l3, 3)     
+    G_grid = G_grid.transpose(1,3,5,0,2,4,6).reshape(l1,l2,l3,-1,3)  # (l1, l2, l3, 8*n1*n2*n3, 3)
+
+    ## get coefficients for reciprocal space sum
+    Uk_coef = jnp.exp( - 0.5 * sigma**2 * jnp.sum(G_grid**2, axis=-1) ) / jnp.sum(G_grid**2, axis=-1)   # (l1, l2, l3, 8*n1*n2*n3)
+    Uk_coef = Uk_coef.at[0,0,0,0].set(0.0)   # mute Gamma point
 
     def energy_engine(field, parameters):
         Z = parameters['Z_star']
@@ -54,12 +56,9 @@ def get_dipole_dipole_ewald(latt):
 
         ## calculate reciprocal space sum
         F_fft3 = jnp.fft.fftn(field, axes=(0,1,2))  # (l1, l2, l3, 3)
-        ewald_ksum = jnp.exp( - 0.5 * sigma**2 * jnp.sum(G_grid**2, axis=-1) ) / jnp.sum(G_grid**2, axis=-1)   # (l1, l2, l3, *)
-        ewald_ksum = ewald_ksum.at[0,0,0,0].set(0.0)   # mute Gamma point
         Uk_squared  = jnp.sum( F_fft3.real[:,:,:,None,:] * G_grid, axis=-1)**2
-        Uk_squared += jnp.sum( F_fft3.imag[:,:,:,None,:] * G_grid, axis=-1)**2   # (l1, l2, l3, *)
-        ewald_ksum = ewald_ksum * Uk_squared
-        ewald_ksum = coef_ksum * jnp.sum(ewald_ksum * G_weight)
+        Uk_squared += jnp.sum( F_fft3.imag[:,:,:,None,:] * G_grid, axis=-1)**2   # (l1, l2, l3, 8*n1*n2*n3)
+        ewald_ksum = coef_ksum * jnp.sum(Uk_coef * Uk_squared)
 
         ## calculate real space sum
         ewald_rsum = - coef_rsum * jnp.sum(field**2)

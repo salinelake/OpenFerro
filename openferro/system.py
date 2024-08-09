@@ -265,7 +265,7 @@ class System:
 
 class RingPolymerSystem(System):
     """
-    A class to define a ring polymer system for path-integral molecular dynamics simulations.
+    TODO: A class to define a ring polymer system for path-integral molecular dynamics simulations.
     """
     def __init__(self, lattice, nbeads=1, pbc=True):
         super().__init__(lattice, name)
