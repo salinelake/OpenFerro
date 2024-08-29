@@ -7,7 +7,7 @@ setup(
     author="Pinchen Xie",
     author_email="<pinchenx@math.princeton.edu>",
     # packages=find_packages(),
-    pakages=['openferro'],
+    packages=['openferro'],
     description=DESCRIPTION,
     python_requires=">=3.8",
     install_requires=[

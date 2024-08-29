@@ -1,7 +1,7 @@
 from openferro.ewald import *
 from openferro.lattice import BravaisLattice3D
 from jax import jit, grad
-
+from time import time as timer
 
 def test_ewald():
     l1,l2,l3 = 3,2,2
@@ -13,11 +13,25 @@ def test_ewald():
     ## check dipole-dipole interaction energy calculation
     E1 = dipole_dipole_ewald_slow(field,  paras)
     dipole_dipole_ewald_engine = jit(get_dipole_dipole_ewald(latt))
+    
+    t1 = timer()
     E2 = dipole_dipole_ewald_engine(field,  paras)
-    # print('Energy from exact calculation: ', E1)
-    # print('Energy from approximate Ewald summation: '  , E2)
+    jax.block_until_ready(E2)
+    t2 = timer()
+    print("Time for Ewald summation: initialization:", t2 - t1)
+
+    t1 = timer()
+    E2 = dipole_dipole_ewald_engine(field,  paras)
+    jax.block_until_ready(E2)
+    t2 = timer()
+    print("Time for Ewald summation: second time:", t2 - t1)
+
+    print('Energy from exact calculation: ', E1)
+    print('Energy from approximate Ewald summation: '  , E2)
     assert abs(E1 - E2) <  (abs(E1) / 100)
 
+# if __name__ == "__main__":
+#     test_ewald()
 
 # ## check dipole-dipole interaction force calculation
 # grad_slow = grad( dipole_dipole_ewald_slow  )

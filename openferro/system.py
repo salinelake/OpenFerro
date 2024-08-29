@@ -2,7 +2,7 @@
 Classes which define the physical system. 
 """
 # This file is part of OpenFerro.
-
+from time import time as timer
 
 import numpy as np
 import jax.numpy as jnp
@@ -144,8 +144,8 @@ class System:
         if not isinstance(field, GlobalStrain):
             raise ValueError("Pressure can only be applied to global strain field")
         interaction = self_interaction(field_name)
-        interaction.set_energy_engine(energy_engine=pV_energy, enable_jit=False)
-        interaction.create_force_engine(enable_jit=False)
+        interaction.set_energy_engine(energy_engine=pV_energy, enable_jit=True)
+        interaction.create_force_engine(enable_jit=True)
         parameters = {'p': _pres, 'V0':self.lattice.ref_volume}
         interaction.set_parameters(parameters)
         self._self_interaction_dict[name] = interaction
@@ -251,13 +251,22 @@ class System:
         for interaction_name in self._self_interaction_dict:
             interaction = self._self_interaction_dict[interaction_name]
             field = self.get_field_by_name(interaction.field_name)
+            t0 = timer()
+            print('update force from', interaction_name)
             force = interaction.calc_force(field)
+            jax.block_until_ready(force)
+            print('used time', timer()-t0)
+
             field.accumulate_force(force)
         for interaction_name in self._mutual_interaction_dict:
             interaction = self.get_interaction_by_name(interaction_name)
+            t0 = timer()
+            print('update force from', interaction_name)
             field1 = self.get_field_by_name(interaction.field_name1)
             field2 = self.get_field_by_name(interaction.field_name2)
             force1, force2 = interaction.calc_force(field1, field2)
+            jax.block_until_ready(force2)
+            print('used time', timer()-t0)
             field1.accumulate_force(force1)
             field2.accumulate_force(force2)
         return

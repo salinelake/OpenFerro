@@ -2,6 +2,7 @@
 Classes which define the time evolution of physical systems. 
 """
 # This file is part of OpenFerro.
+from time import time as timer
 
 import numpy as np
 import jax
@@ -143,6 +144,7 @@ class SimulationNPTLangevin(SimulationNVE):
     def _step(self, key):
         dt = self.dt
         self.system.update_force()
+        t0 = timer()
         for field in self.system.get_all_fields():
             mass = field.get_mass()
             key, subkey = jax.random.split(key)
@@ -160,6 +162,9 @@ class SimulationNPTLangevin(SimulationNVE):
             x0 += 0.5 * dt * v0
             field.set_values(x0)
             field.set_velocity(v0)
+        jax.block_until_ready(field.get_values())
+        t1 = timer()
+        print('time for doing integration:', t1-t0)
     
     def step(self, nsteps=1):
         key = jax.random.PRNGKey(np.random.randint(0, 1000000))
