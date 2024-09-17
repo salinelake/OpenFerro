@@ -9,6 +9,11 @@ OpenFerro is designed to minimize the effort required to build on-lattice Hamilt
 * **GPU supports**, making it highly efficient for large-scale simulations.
 * **highly modularized**, easy to implement new interaction terms in an lattice Hamiltonian model, benefitted from auto-differentiation.
 
+# Milestones
+(1, 90% completed) Ferroelectric effective Hamiltonian (Zhong, W., David Vanderbilt, and K. M. Rabe. "First-principles theory of ferroelectric phase transitions for perovskites: The case of BaTiO 3." Physical Review B 52.9 (1995): 6301.)
+(2) Landau-Lifshitz-Gilbert equation (Eriksson, Olle, et al. Atomistic spin dynamics: foundations and applications. Oxford university press, 2017.)
+(3) Multiferroic (Kornev, I. A., Lisenkov, S., Haumont, R., Dkhil, B., & Bellaiche, L. (2007). Finite-temperature properties of multiferroic BiFeO 3. Physical review letters, 99(22), 227602.)
+
 # Credits
 
 # OpenFerro in a nutshell
