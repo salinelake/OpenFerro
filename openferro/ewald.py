@@ -59,8 +59,16 @@ def get_dipole_dipole_ewald(latt):
     Uk_coef = None
 
     def energy_engine(field, parameters):
-        Z = parameters['Z_star']
-        epsilon_inf = parameters['epsilon_inf']
+        """
+        Calculate the energy of dipole-dipole interaction using Ewald summation.
+        Args:
+            field: jax.numpy array, shape=(l1, l2, l3, 3)
+            parameters: jax.numpy array 
+        Returns:
+            jax.numpy array, shape=(1,)
+        """
+        Z = parameters[0]
+        epsilon_inf = parameters[1]
 
         ## calculate reciprocal space sum
         F_fft3 = jnp.fft.fftn(field, axes=(0,1,2))  # (l1, l2, l3, 3)

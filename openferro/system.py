@@ -12,6 +12,7 @@ from openferro.interaction import *
 from openferro.units import Constants
 from openferro.engine import pV_energy
 import warnings
+## TODO: multi-system
 class System:
     """
     A class to define a physical system. A system is a lattice with fields and a Hamiltonian.
@@ -86,7 +87,7 @@ class System:
             name (string): name of the interaction
             field_name (string): name of the field
             energy_engine (function): a function that takes the field as input and returns the interaction energy
-            parameters (dict): parameters for the interaction
+            parameters (list): parameters for the interaction
             enable_jit (bool): whether to use JIT compilation
         '''
         if name == 'pV':
@@ -110,7 +111,7 @@ class System:
             field_name1 (string): name of the first field
             field_name2 (string): name of the second field
             energy_engine (function): a function that takes the fields as input and returns the interaction energy
-            parameters (dict): parameters for the interaction
+            parameters (list): parameters for the interaction
             enable_jit (bool): whether to use JIT compilation
         '''
         if name == 'pV':
@@ -132,7 +133,7 @@ class System:
             name (string): name of the interaction
             pressure (float): pressure in bars
             field_name (string): name of the field
-            parameters (dict): parameters for the interaction
+            parameters (list): parameters for the interaction
             enable_jit (bool): whether to use JIT compilation
         '''
         _pres = pressure * Constants.bar  # bar -> eV/Angstrom^3
@@ -146,7 +147,7 @@ class System:
         interaction = self_interaction(field_name)
         interaction.set_energy_engine(energy_engine=pV_energy, enable_jit=True)
         interaction.create_force_engine(enable_jit=True)
-        parameters = {'p': _pres, 'V0':self.lattice.ref_volume}
+        parameters = [_pres, self.lattice.ref_volume] 
         interaction.set_parameters(parameters)
         self._self_interaction_dict[name] = interaction
         return interaction

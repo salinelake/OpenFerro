@@ -14,19 +14,26 @@ class interaction_base:
     The base class to specify the interaction between fields.
     """
     def __init__(self, parameters=None):
-        self.parameters = {} if parameters is None else parameters
+        self.parameters = parameters
         self.energy_engine = None
         self.force_engine = None
     def set_parameters(self, parameters):
-        self.parameters = parameters
+        ## turning list or numpy array to jax array
+        if isinstance(parameters, jnp.ndarray):
+            paras = parameters
+        elif isinstance(parameters, np.ndarray) or isinstance(parameters, list):
+            paras = jnp.array(parameters)
+        else:
+            raise ValueError("Parameters must be a numpy array, a list, or a jax array")
+        self.parameters = paras
     def get_parameters(self):
-        return self.parameters  ## TODO
-    def set_parameter_by_name(self, name, value):
-        self.parameters[name] = value
-    def get_parameter_by_name(self, name):
-        if name not in self.parameters:
-            raise ValueError("Parameter with this name does not exist. Existing parameters: ", self.parameters.keys())
-        return self.parameters[name]
+        return self.parameters
+    # def set_parameter_by_name(self, name, value):
+    #     self.parameters[name] = value
+    # def get_parameter_by_name(self, name):
+    #     if name not in self.parameters:
+    #         raise ValueError("Parameter with this name does not exist. Existing parameters: ", self.parameters.keys())
+    #     return self.parameters[name]
     def set_energy_engine(self, energy_engine, enable_jit=True):
         if enable_jit:
             self.energy_engine = jit(energy_engine)

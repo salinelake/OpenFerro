@@ -25,15 +25,17 @@ class MDMinimize:
             f0 = field.get_force()
             x0 += self.dt * f0 / field.get_mass()
             field.set_values(x0)
-            
     def minimize(self, variable_cell=True, pressure=None):
         ## sanity check
         if variable_cell:
             if pressure is None:
                 raise ValueError('Please specify pressure for variable-cell structural minimization')
             else:
-                self.system.get_interaction_by_name('pV').set_parameter_by_name(
-                    'p', pressure * Constants.bar)  # bar -> eV/Angstrom^3
+                # self.system.get_interaction_by_name('pV').set_parameter_by_name(
+                #     'p', pressure * Constants.bar)  # bar -> eV/Angstrom^3
+                pV_param = self.system.get_interaction_by_name('pV').get_parameters()
+                pV_param_new = [pressure * Constants.bar, pV_param[1]]
+                self.system.get_interaction_by_name('pV').set_parameters(pV_param_new)
         else:
             if pressure is not None:
                 raise ValueError('Specifying pressure is not allowed for fixed-cell structural minimization')
@@ -95,18 +97,17 @@ class SimulationNVTLangevin(SimulationNVE):
     def __init__(self, system, dt=0.01, temperature=0.0, tau=0.1):
         super().__init__(system, dt, temperature)
         self.gamma = 1.0 / tau
-        self.z1 = jnp.exp( -dt * self.gamma )
-        self.z2 = ( 1 - jnp.exp( -2 * dt * self.gamma ))**0.5
-
+        self.z1 = jnp.exp(-dt * self.gamma)
+        self.z2 = jnp.sqrt(1 - jnp.exp(-2 * dt * self.gamma))
+ 
     def _step(self, key):
         dt = self.dt
         self.system.update_force()
-        for field in self.system.get_all_fields():
-            if isinstance(field, GlobalStrain):
-                continue
+
+        all_fields = [ field for field in self.system.get_all_fields() if not isinstance(field, GlobalStrain) ]
+        keys = jax.random.split(key, len(all_fields))
+        for field, subkey in zip(all_fields, keys):
             mass = field.get_mass()
-            key, subkey = jax.random.split(key)
-            ##
             a0 = field.get_force() / mass
             v0 = field.get_velocity()
             x0 = field.get_values()
@@ -117,33 +118,39 @@ class SimulationNVTLangevin(SimulationNVE):
             x0 += 0.5 * dt * v0
             field.set_values(x0)
             field.set_velocity(v0)
-    
+        return
+
     def step(self, nsteps=1):
         key = jax.random.PRNGKey(np.random.randint(0, 1000000))
-        for i in range(nsteps):
-            key, subkey = jax.random.split(key)
-            self._step(key)
+        keys = jax.random.split(key, nsteps)
+        for subkey in keys:
+            self._step(subkey)
+        return
 
-class SimulationNPTLangevin(SimulationNVE):
+class SimulationNPTLangevin(SimulationNVTLangevin):
     """
     A class to define a simulation using the Langevin equation. A Langevin simulation evolves the system in time using the Langevin equation.
     """
     def __init__(self, system, dt=0.01, temperature=0.0, pressure=0.0, tau=0.1, tauP=1.0):
         super().__init__(system, dt, temperature)
         self.pressure = pressure
-        self.system.get_interaction_by_name('pV').set_parameter_by_name(
-            'p', pressure * Constants.bar)  # bar -> eV/Angstrom^3
+        # self.system.get_interaction_by_name('pV').set_parameter_by_name(
+        #     'p', pressure * Constants.bar)  # bar -> eV/Angstrom^3  
+        pV_param = self.system.get_interaction_by_name('pV').get_parameters()
+        pV_param_new = [pressure * Constants.bar, pV_param[1]]
+        self.system.get_interaction_by_name('pV').set_parameters(pV_param_new)
         self.gamma = 1.0 / tau
         self.gammaP = 1.0 / tauP
         self.z1 = jnp.exp( -dt * self.gamma )
         self.z2 = ( 1 - jnp.exp( -2 * dt * self.gamma ))**0.5
         self.z1P = jnp.exp( -dt * self.gammaP )
         self.z2P = ( 1 - jnp.exp( -2 * dt * self.gammaP ))**0.5
-        
-
+         
     def _step(self, key):
         dt = self.dt
         self.system.update_force()
+        all_fields = [ field for field in self.system.get_all_fields() ]
+        keys = jax.random.split(key, len(all_fields))
         # t0 = timer()
         for field in self.system.get_all_fields():
             mass = field.get_mass()
@@ -165,9 +172,4 @@ class SimulationNPTLangevin(SimulationNVE):
         # jax.block_until_ready(field.get_values())
         # t1 = timer()
         # print('time for doing integration:', t1-t0)
-    
-    def step(self, nsteps=1):
-        key = jax.random.PRNGKey(np.random.randint(0, 1000000))
-        for i in range(nsteps):
-            key, subkey = jax.random.split(key)
-            self._step(key)
+        return
