@@ -27,7 +27,7 @@ class Field:
 
     ## setter and getter methods for values that encode the field
     def set_values(self, values):
-        self._values = values.copy()
+        self._values = values 
     def get_values(self):
         return self._values
     def set_local_value(self, loc, value):
@@ -81,7 +81,7 @@ class Field:
             raise ValueError("Field has no values. Set values before setting velocity.")
         else:
             assert velocity.shape == self._values.shape
-            self._velocity = velocity
+            self._velocity = velocity 
     ## setter and getter methods for forces
     def zero_force(self):
         if self._values is None:

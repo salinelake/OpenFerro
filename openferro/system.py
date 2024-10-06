@@ -12,7 +12,7 @@ from openferro.interaction import *
 from openferro.units import Constants
 from openferro.engine import pV_energy
 import warnings
-## TODO: multi-system
+
 class System:
     """
     A class to define a physical system. A system is a lattice with fields and a Hamiltonian.
@@ -246,30 +246,33 @@ class System:
         
 
 
-    def update_force(self):
+    def update_force(self, profile=False):
         for field in self.get_all_fields():
             field.zero_force()
         for interaction_name in self._self_interaction_dict:
+            if profile:
+                t0 = timer()
             interaction = self._self_interaction_dict[interaction_name]
             field = self.get_field_by_name(interaction.field_name)
-            # t0 = timer()
-            # print('update force from', interaction_name)
             force = interaction.calc_force(field)
-            # jax.block_until_ready(force)
-            # print('used time', timer()-t0)
-
             field.accumulate_force(force)
+            if profile:
+                t1 = timer()
+                jax.block_until_ready(force)
+                print('time for updating force from %s:' % interaction_name, t1-t0)
         for interaction_name in self._mutual_interaction_dict:
+            if profile:
+                t0 = timer()
             interaction = self.get_interaction_by_name(interaction_name)
-            # t0 = timer()
-            # print('update force from', interaction_name)
             field1 = self.get_field_by_name(interaction.field_name1)
             field2 = self.get_field_by_name(interaction.field_name2)
             force1, force2 = interaction.calc_force(field1, field2)
-            # jax.block_until_ready(force2)
-            # print('used time', timer()-t0)
             field1.accumulate_force(force1)
             field2.accumulate_force(force2)
+            if profile:
+                t1 = timer()
+                jax.block_until_ready(force2)
+                print('time for updating force from %s:' % interaction_name, t1-t0)
         return
 
 

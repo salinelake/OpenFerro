@@ -55,7 +55,7 @@ bto.add_self_interaction('dipole_dipole',
 bto.add_self_interaction('homo_elastic', 
                          field_name="gstrain", 
                          energy_engine=homo_elastic_energy, 
-                         parameters= [config["elastic"]["B11"], config["elastic"]["B12"], config["elastic"]["B44"], N],
+                         parameters= [config["elastic"]["B11"], config["elastic"]["B12"], config["elastic"]["B44"], float(N)],
                          enable_jit=True)
 
 bto.add_mutual_interaction('homo_strain_dipole', 

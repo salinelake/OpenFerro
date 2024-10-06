@@ -100,13 +100,14 @@ class SimulationNVTLangevin(SimulationNVE):
         self.z1 = jnp.exp(-dt * self.gamma)
         self.z2 = jnp.sqrt(1 - jnp.exp(-2 * dt * self.gamma))
  
-    def _step(self, key):
+    def _step(self, key, profile=False):
         dt = self.dt
-        self.system.update_force()
-
+        self.system.update_force(profile=profile)
         all_fields = [ field for field in self.system.get_all_fields() if not isinstance(field, GlobalStrain) ]
         keys = jax.random.split(key, len(all_fields))
         for field, subkey in zip(all_fields, keys):
+            if profile:
+                t2 = timer()
             mass = field.get_mass()
             a0 = field.get_force() / mass
             v0 = field.get_velocity()
@@ -118,13 +119,22 @@ class SimulationNVTLangevin(SimulationNVE):
             x0 += 0.5 * dt * v0
             field.set_values(x0)
             field.set_velocity(v0)
+            if profile:
+                t3 = timer()
+                jax.block_until_ready(field.get_values())
+                print('time for updating field %s:' % type(field), t3-t2)
         return
 
-    def step(self, nsteps=1):
+    def step(self, nsteps=1, profile=False):
         key = jax.random.PRNGKey(np.random.randint(0, 1000000))
         keys = jax.random.split(key, nsteps)
         for subkey in keys:
-            self._step(subkey)
+            if profile:
+                t0 = timer()
+            self._step(subkey, profile)
+            if profile:
+                t1 = timer()
+                print('time for one step:', t1-t0)
         return
 
 class SimulationNPTLangevin(SimulationNVTLangevin):
@@ -146,22 +156,21 @@ class SimulationNPTLangevin(SimulationNVTLangevin):
         self.z1P = jnp.exp( -dt * self.gammaP )
         self.z2P = ( 1 - jnp.exp( -2 * dt * self.gammaP ))**0.5
          
-    def _step(self, key):
+    def _step(self, key, profile=False):
         dt = self.dt
-        self.system.update_force()
+        self.system.update_force(profile=profile)
         all_fields = [ field for field in self.system.get_all_fields() ]
         keys = jax.random.split(key, len(all_fields))
-        # t0 = timer()
-        for field in self.system.get_all_fields():
+        for field, subkey in zip(all_fields, keys):
+            if profile:
+                t2 = timer()
             mass = field.get_mass()
-            key, subkey = jax.random.split(key)
-            ##
             a0 = field.get_force() / mass
             v0 = field.get_velocity()
             x0 = field.get_values()
             v0 += dt * a0
             x0 += 0.5 * dt * v0
-            gaussian = jax.random.normal(subkey, v0.shape)
+            gaussian = jax.random.normal(subkey, v0.shape)  # slow
             if isinstance(field, GlobalStrain):
                 v0 = self.z1P * v0 + self.z2P * gaussian * (self.kbT/ mass)**0.5
             else:
@@ -169,7 +178,8 @@ class SimulationNPTLangevin(SimulationNVTLangevin):
             x0 += 0.5 * dt * v0
             field.set_values(x0)
             field.set_velocity(v0)
-        # jax.block_until_ready(field.get_values())
-        # t1 = timer()
-        # print('time for doing integration:', t1-t0)
+            if profile:
+                t3 = timer()
+                jax.block_until_ready(field.get_values())
+                print('time for updating field %s:' % type(field), t3-t2)
         return
