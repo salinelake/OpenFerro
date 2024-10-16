@@ -11,6 +11,7 @@ from openferro.field import *
 from openferro.interaction import *
 from openferro.units import Constants
 from openferro.engine import pV_energy
+from openferro.parallelism import DeviceMesh
 import warnings
 
 class System:
@@ -65,6 +66,14 @@ class System:
         if mass is not None:
             self._fields_dict[name].set_mass(mass)
         return self._fields_dict[name]
+
+    def move_fields_to_multi_devs(self, mesh: DeviceMesh):
+        """
+        Move all fields to given devices.
+        """
+        for name in self._fields_dict.keys():
+            self._fields_dict[name].to_multi_devs(mesh)
+        
 
     def get_field_by_name(self, name):
         if name in self._fields_dict:
@@ -252,6 +261,7 @@ class System:
         for interaction_name in self._self_interaction_dict:
             if profile:
                 t0 = timer()
+                print('process self interaction: ', interaction_name)
             interaction = self._self_interaction_dict[interaction_name]
             field = self.get_field_by_name(interaction.field_name)
             force = interaction.calc_force(field)
@@ -263,6 +273,7 @@ class System:
         for interaction_name in self._mutual_interaction_dict:
             if profile:
                 t0 = timer()
+                print('process mutual interaction: ', interaction_name)
             interaction = self.get_interaction_by_name(interaction_name)
             field1 = self.get_field_by_name(interaction.field_name1)
             field2 = self.get_field_by_name(interaction.field_name2)

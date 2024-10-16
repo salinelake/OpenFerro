@@ -8,7 +8,7 @@ import jax
 import jax.numpy as jnp
 from openferro.units import Constants
 from openferro.lattice import BravaisLattice3D
-
+from openferro.parallelism import DeviceMesh
 class Field:
     """
     A class to define a field on a lattice. 
@@ -24,6 +24,13 @@ class Field:
         self._mass = None
         self._velocity = None
         self._force = None
+        self._sharding = None
+
+    def compare_shape(self, x, y):
+        if x.shape != y.shape:
+            raise ValueError("The two arrays to be compared have different shapes.")
+        # if x.sharding != y.sharding:
+        #     raise ValueError("The two arrays to be compared are not on the same devices.")
 
     ## setter and getter methods for values that encode the field
     def set_values(self, values):
@@ -71,6 +78,8 @@ class Field:
             elif mode == 'gaussian':
                 key = jax.random.PRNGKey(np.random.randint(0, 1000000))
                 self._velocity = jax.random.normal(key, self._values.shape) * jnp.sqrt(1 / self._mass * Constants.kb * temperature)
+            if self._sharding is not None:
+                self._velocity = jax.device_put(self._velocity, self._sharding)
     def get_velocity(self):
         if self._velocity is None:
             raise ValueError("Velocity is not set")
@@ -80,8 +89,9 @@ class Field:
         if self._values is None:
             raise ValueError("Field has no values. Set values before setting velocity.")
         else:
-            assert velocity.shape == self._values.shape
+            self.compare_shape(velocity, self._values)
             self._velocity = velocity 
+
     ## setter and getter methods for forces
     def zero_force(self):
         if self._values is None:
@@ -92,19 +102,34 @@ class Field:
         if self._values is None:
             raise ValueError("Field has no values. Set values before setting forces.")
         else:
-            assert force.shape == self._values.shape
+            self.compare_shape(force, self._values)
             self._force = force
     def accumulate_force(self, force):
         if self._force is None:
             raise ValueError("Gradients do not exist. Set or zero forces before accumulating.")
         else:
-            assert force.shape == self._force.shape
+            self.compare_shape(force, self._force)
             self._force += force
     def get_force(self):
         if self._force is None:
             raise ValueError("Force do not exist")
         else:
             return self._force
+
+    def to_multi_devs(self, mesh: DeviceMesh):
+        sharding = mesh.partition_sharding()
+        if self._values is None:
+            raise ValueError("Field has no values. Set values before put the array to multiple devices.")
+        else:
+            self._values = jax.device_put(self._values, sharding)
+            self._sharding = sharding
+        if self._mass is not None:
+            self._mass = jax.device_put(self._mass, sharding)
+        if self._velocity is not None:
+            self._velocity = jax.device_put(self._velocity, sharding)
+        if self._force is not None:
+            self._force = jax.device_put(self._force, sharding)
+
 
 
 class FieldRn(Field):
@@ -190,3 +215,25 @@ class GlobalStrain(Field):
         self.dim = 1
         self._values = jnp.zeros((6))
         self.unit = unit
+
+    # def accumulate_force(self, force):
+
+    #     if self._force is None:
+    #         raise ValueError("Gradients do not exist. Set or zero forces before accumulating.")
+    #     else:
+    #         if self._force.sharding != force.sharding:
+    #             force = jax.device_put(force, self._force.sharding)
+    #         self._force += force
+    def to_multi_devs(self, mesh: DeviceMesh):
+        sharding = mesh.replicate_sharding()
+        if self._values is None:
+            raise ValueError("Field has no values. Set values before put the array to multiple devices.")
+        else:
+            self._values = jax.device_put(self._values, sharding)
+            self._sharding = sharding
+        if self._mass is not None:
+            self._mass = jax.device_put(self._mass, sharding)
+        if self._velocity is not None:
+            self._velocity = jax.device_put(self._velocity, sharding)
+        if self._force is not None:
+            self._force = jax.device_put(self._force, sharding)

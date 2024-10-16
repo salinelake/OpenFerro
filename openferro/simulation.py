@@ -159,7 +159,7 @@ class SimulationNPTLangevin(SimulationNVTLangevin):
     def _step(self, key, profile=False):
         dt = self.dt
         self.system.update_force(profile=profile)
-        all_fields = [ field for field in self.system.get_all_fields() ]
+        all_fields = [ field for field in self.system.get_all_fields()]
         keys = jax.random.split(key, len(all_fields))
         for field, subkey in zip(all_fields, keys):
             if profile:
@@ -170,7 +170,9 @@ class SimulationNPTLangevin(SimulationNVTLangevin):
             x0 = field.get_values()
             v0 += dt * a0
             x0 += 0.5 * dt * v0
-            gaussian = jax.random.normal(subkey, v0.shape)  # slow
+            gaussian = jax.random.normal(subkey, v0.shape) 
+            if field._sharding != gaussian.sharding:
+                gaussian = jax.device_put(gaussian, field._sharding)
             if isinstance(field, GlobalStrain):
                 v0 = self.z1P * v0 + self.z2P * gaussian * (self.kbT/ mass)**0.5
             else:
