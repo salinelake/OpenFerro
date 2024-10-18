@@ -8,14 +8,14 @@ import json
 from openferro.parallelism import DeviceMesh
 jax.config.update("jax_enable_x64", True)
 
-gpu_mesh = DeviceMesh(num_rows=2, num_cols=2)
+# gpu_mesh = DeviceMesh(num_rows=2, num_cols=2)
 # gpu_mesh = DeviceMesh(jax.devices()[:2], num_rows=2, num_cols=1)
 
 ##########################################################################################
 ## Define the lattice, order parameters, and the Hamiltonian
 ##########################################################################################
 
-L = 250
+L = 100
 N = L**3
 hydropres =  -4.8e4
 config = json.load(open('BaTiO3.json'))
@@ -27,7 +27,7 @@ bto = of.System(latt, pbc=True)
 dipole_field = bto.add_field(name="dipole", ftype="Rn", dim=3, value=0.1, mass = 1)
 # lstrain_field = bto.add_field(name="lstrain", ftype="local_strain", value=0.0, mass = 40)
 gstrain_field = bto.add_field(name="gstrain", ftype="global_strain", value=jnp.array([0.01,0.01,0.01,0,0,0]), mass = 100 *  L**3)
-bto.move_fields_to_multi_devs(gpu_mesh)
+# bto.move_fields_to_multi_devs(gpu_mesh)
 ## define Hamiltonian
 bto.add_self_interaction('self_onsite', 
                          field_name="dipole", 

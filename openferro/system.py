@@ -257,23 +257,29 @@ class System:
 
     def update_force(self, profile=False):
         for field in self.get_all_fields():
+            if profile:
+                t0 = timer()
             field.zero_force()
+            if profile:
+                jax.block_until_ready(field.get_force())
+                t1 = timer()
+                print('time for zeroing force of %s:' % field.name, t1-t0)
         for interaction_name in self._self_interaction_dict:
             if profile:
                 t0 = timer()
-                print('process self interaction: ', interaction_name)
+                # print('process self interaction: ', interaction_name)
             interaction = self._self_interaction_dict[interaction_name]
             field = self.get_field_by_name(interaction.field_name)
             force = interaction.calc_force(field)
             field.accumulate_force(force)
             if profile:
+                jax.block_until_ready(field.get_force())
                 t1 = timer()
-                jax.block_until_ready(force)
                 print('time for updating force from %s:' % interaction_name, t1-t0)
         for interaction_name in self._mutual_interaction_dict:
             if profile:
                 t0 = timer()
-                print('process mutual interaction: ', interaction_name)
+                # print('process mutual interaction: ', interaction_name)
             interaction = self.get_interaction_by_name(interaction_name)
             field1 = self.get_field_by_name(interaction.field_name1)
             field2 = self.get_field_by_name(interaction.field_name2)
@@ -281,8 +287,8 @@ class System:
             field1.accumulate_force(force1)
             field2.accumulate_force(force2)
             if profile:
+                jax.block_until_ready(field2.get_force())
                 t1 = timer()
-                jax.block_until_ready(force2)
                 print('time for updating force from %s:' % interaction_name, t1-t0)
         return
 
