@@ -8,6 +8,7 @@ import numpy as np
 import jax
 import jax.numpy as jnp
 from jax import grad, jit, vmap
+from functools import partial
 from openferro.units import Constants
 from openferro.field import GlobalStrain
 class MDMinimize:
@@ -99,7 +100,19 @@ class SimulationNVTLangevin(SimulationNVE):
         self.gamma = 1.0 / tau
         self.z1 = jnp.exp(-dt * self.gamma)
         self.z2 = jnp.sqrt(1 - jnp.exp(-2 * dt * self.gamma))
- 
+
+    @partial(jit, static_argnums=(0,))
+    def _substep_1(self, x ,v, a, dt):
+        v += dt * a
+        x += 0.5 * dt * v
+        return x, v
+    
+    @partial(jit, static_argnums=(0,))
+    def _substep_2(self, x ,v, noise, dt, z1, z2):
+        v = z1 * v + z2 * noise
+        x += 0.5 * dt * v
+        return x, v
+
     def _step(self, key, profile=False):
         dt = self.dt
         self.system.update_force(profile=profile)
@@ -112,16 +125,15 @@ class SimulationNVTLangevin(SimulationNVE):
             a0 = field.get_force() / mass
             v0 = field.get_velocity()
             x0 = field.get_values()
-            v0 += dt * a0
-            x0 += 0.5 * dt * v0
+            x0, v0 = self._substep_1(x0, v0, a0, dt)
             gaussian = jax.random.normal(subkey, v0.shape)
-            v0 = self.z1 * v0 + self.z2 * gaussian * (self.kbT/ mass)**0.5
-            x0 += 0.5 * dt * v0
+            gaussian *= (self.kbT/ mass)**0.5
+            x0, v0 = self._substep_2(x0, v0, gaussian, dt, self.z1, self.z2)
             field.set_values(x0)
             field.set_velocity(v0)
             if profile:
-                t3 = timer()
                 jax.block_until_ready(field.get_values())
+                t3 = timer()
                 print('time for updating field %s:' % type(field), t3-t2)
         return
 
@@ -133,6 +145,7 @@ class SimulationNVTLangevin(SimulationNVE):
                 t0 = timer()
             self._step(subkey, profile)
             if profile:
+                jax.block_until_ready(self.system.get_all_fields()[-1].get_values())
                 t1 = timer()
                 print('time for one step:', t1-t0)
         return
@@ -155,33 +168,38 @@ class SimulationNPTLangevin(SimulationNVTLangevin):
         self.z2 = ( 1 - jnp.exp( -2 * dt * self.gamma ))**0.5
         self.z1P = jnp.exp( -dt * self.gammaP )
         self.z2P = ( 1 - jnp.exp( -2 * dt * self.gammaP ))**0.5
-         
+    
+
     def _step(self, key, profile=False):
         dt = self.dt
         self.system.update_force(profile=profile)
         all_fields = [ field for field in self.system.get_all_fields()]
         keys = jax.random.split(key, len(all_fields))
         for field, subkey in zip(all_fields, keys):
+            ## for global strain field, the damping is different
+            if isinstance(field, GlobalStrain):
+                z1 = self.z1P
+                z2 = self.z2P
+            else:
+                z1 = self.z1
+                z2 = self.z2
+            ##
             if profile:
                 t2 = timer()
             mass = field.get_mass()
             a0 = field.get_force() / mass
             v0 = field.get_velocity()
             x0 = field.get_values()
-            v0 += dt * a0
-            x0 += 0.5 * dt * v0
+            x0, v0 = self._substep_1(x0, v0, a0, dt)
             gaussian = jax.random.normal(subkey, v0.shape) 
             if field._sharding != gaussian.sharding:
                 gaussian = jax.device_put(gaussian, field._sharding)
-            if isinstance(field, GlobalStrain):
-                v0 = self.z1P * v0 + self.z2P * gaussian * (self.kbT/ mass)**0.5
-            else:
-                v0 = self.z1 * v0 + self.z2 * gaussian * (self.kbT/ mass)**0.5
-            x0 += 0.5 * dt * v0
+            gaussian *= (self.kbT/ mass)**0.5
+            x0, v0 = self._substep_2(x0, v0, gaussian, dt, z1, z2)
             field.set_values(x0)
             field.set_velocity(v0)
             if profile:
-                t3 = timer()
                 jax.block_until_ready(field.get_values())
-                print('time for updating field %s:' % type(field), t3-t2)
+                t3 = timer()
+                print('total time for updating field %s:' % type(field), t3-t2)
         return
