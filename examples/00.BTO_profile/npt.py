@@ -1,3 +1,4 @@
+import jax
 import openferro as of
 from openferro.interaction import *
 from openferro.simulation import *
@@ -5,14 +6,15 @@ from openferro.engine import *
 from openferro.ewald import get_dipole_dipole_ewald
 from matplotlib import pyplot as plt
 import json
-from time import time as timer
+from time import time as get_time
+jax.config.update("jax_enable_x64", True)
 
 
 ##########################################################################################
 ## Define the lattice, order parameters, and the Hamiltonian
 ##########################################################################################
 
-L = 200
+L = 12
 N = L**3
 hydropres =  -4.8e4
 config = json.load(open('BaTiO3.json'))
@@ -86,6 +88,16 @@ gs_history = []
 temperature = 300
 simulation = SimulationNPTLangevin(bto, dt=dt, temperature=temperature, pressure=-4.8e4, tau=0.1, tauP = 1)
 simulation.init_velocity(mode='gaussian')
-simulation.step(10, profile=True)
+
+t0 = get_time()
+jax.block_until_ready(simulation.step(1, profile=False))
+t1 = get_time()
+print(f"initialization takes: {t1-t0} seconds")
+
+t0 = get_time()
+# simulation.step(500, profile=False)
+jax.block_until_ready(simulation.step(500, profile=False))
+t1 = get_time()
+print(f"500 steps takes: {t1-t0} seconds")
  
  

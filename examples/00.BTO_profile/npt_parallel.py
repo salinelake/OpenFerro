@@ -6,6 +6,7 @@ from openferro.engine import *
 from openferro.ewald import get_dipole_dipole_ewald
 import json
 from openferro.parallelism import DeviceMesh
+from time import time as get_time
 jax.config.update("jax_enable_x64", True)
 
 # gpu_mesh = DeviceMesh(num_rows=2, num_cols=2)
@@ -89,10 +90,16 @@ gs_history = []
 temperature = 300
 simulation = SimulationNPTLangevin(bto, dt=dt, temperature=temperature, pressure=-4.8e4, tau=0.1, tauP = 1)
 simulation.init_velocity(mode='gaussian')
-# print(bto.get_field_by_name("dipole")._values.sharding)
-# print(bto.get_field_by_name("dipole")._velocity.sharding)
-# print(bto.get_field_by_name("gstrain")._values.sharding)
 
-simulation.step(10, profile=True)
+t0 = get_time()
+jax.block_until_ready(simulation.step(1, profile=False))
+t1 = get_time()
+print(f"initialization takes: {t1-t0} seconds")
+
+t0 = get_time()
+# simulation.step(500, profile=False)
+jax.block_until_ready(simulation.step(500, profile=False))
+t1 = get_time()
+print(f"500 steps takes: {t1-t0} seconds")
  
  
