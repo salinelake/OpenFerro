@@ -28,12 +28,6 @@ class interaction_base:
         self.parameters = paras
     def get_parameters(self):
         return self.parameters
-    # def set_parameter_by_name(self, name, value):
-    #     self.parameters[name] = value
-    # def get_parameter_by_name(self, name):
-    #     if name not in self.parameters:
-    #         raise ValueError("Parameter with this name does not exist. Existing parameters: ", self.parameters.keys())
-    #     return self.parameters[name]
     def set_energy_engine(self, energy_engine, enable_jit=True):
         if enable_jit:
             self.energy_engine = jit(energy_engine)

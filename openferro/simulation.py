@@ -173,7 +173,7 @@ class SimulationNPTLangevin(SimulationNVTLangevin):
     def _step(self, key, profile=False):
         dt = self.dt
         self.system.update_force(profile=profile)
-        all_fields = [ field for field in self.system.get_all_fields()]
+        all_fields = self.system.get_all_fields() 
         keys = jax.random.split(key, len(all_fields))
         for field, subkey in zip(all_fields, keys):
             ## for global strain field, the damping is different
