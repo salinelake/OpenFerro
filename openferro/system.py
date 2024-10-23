@@ -12,6 +12,7 @@ from openferro.interaction import *
 from openferro.units import Constants
 from openferro.engine import pV_energy
 from openferro.parallelism import DeviceMesh
+from openferro.ewald import get_dipole_dipole_ewald
 import warnings
 
 class System:
@@ -47,43 +48,28 @@ class System:
         """
         for name in self._fields_dict.keys():
             self._fields_dict[name].to_multi_devs(mesh)
-        
-    def add_field(self, name, ftype='scalar', dim=None, unit=None, value=None, mass=1.0):
+    
+    def add_field(self, name, ftype='scalar', dim=None, value=None, mass=1.0):
         """
         Add a field to the system.
-        TODO: clean up
         """
+        ## sanity check
         if name in self._fields_dict:
             raise ValueError("Field with this name already exists. Pick another name")
         if name == 'gstrain':
-            assert ftype == 'global_strain', "The name 'gstrain' is only compatible with global strain field"
-        if ftype == 'global_strain':
-            if name != 'gstrain':
-                warnings.warn("The name of global strain has to be 'gstrain'. The name you entered is discarded. ")
-                name = 'gstrain'
-            if value is not None:
-                assert len(value) == 6, "Global strain must be a 6D vector"
-                init = jnp.array(value, dtype=jnp.float32)
-            else:
-                init = jnp.zeros(6, dtype=jnp.float32)
-            self._fields_dict[name] = GlobalStrain(self.lattice, name)
-            self._fields_dict[name].set_values(jnp.zeros((1,1,1, 6)) + init)
-            self.add_pressure(0)
-        elif ftype == 'scalar':
-            init = value if value is not None else 0.0
-            self._fields_dict[name] = FieldScalar(self.lattice, name, unit)
-            self._fields_dict[name].set_values(jnp.zeros(self.lattice.size) + init)
-        elif ftype == 'Rn':
-            init = jnp.array(value, dtype=jnp.float32) if value is not None else jnp.zeros(dim, dtype=jnp.float32)
-            self._fields_dict[name] = FieldRn(self.lattice, name, dim, unit)
+            raise ValueError("The name 'gstrain' is reserved for global strain field. Please pick another name.")
+        ## add field
+        if ftype == 'Rn':
+            init = jnp.array(value) if value is not None else jnp.zeros(dim)
+            self._fields_dict[name] = FieldRn(self.lattice, name, dim)
             self._fields_dict[name].set_values(jnp.zeros((self.lattice.size[0], self.lattice.size[1], self.lattice.size[2], dim)) + init)
         elif ftype == 'SO3':
-            init = jnp.array(value, dtype=jnp.float32) if value is not None else jnp.zeros(2, dtype=jnp.float32)
+            init = jnp.array(value) if value is not None else jnp.array([0,0,1.0])
             self._fields_dict[name] = FieldSO3(self.lattice, name)
-            self._fields_dict[name].set_values(jnp.zeros((self.lattice.size[0], self.lattice.size[1], self.lattice.size[2], 2)) + init)
-        elif ftype == 'local_strain':
-            init = jnp.array(value, dtype=jnp.float32) if value is not None else jnp.zeros(3, dtype=jnp.float32)
-            self._fields_dict[name] = LocalStrain(self.lattice, name)
+            self._fields_dict[name].set_values(jnp.zeros((self.lattice.size[0], self.lattice.size[1], self.lattice.size[2], 3)) + init)
+        elif ftype == 'LocalStrain3D':
+            init = jnp.array(value) if value is not None else jnp.zeros(3)
+            self._fields_dict[name] = LocalStrain3D(self.lattice, name)
             self._fields_dict[name].set_values(jnp.zeros((self.lattice.size[0], self.lattice.size[1], self.lattice.size[2], 3)) + init)
         else:
             raise ValueError("Unknown field type. ")
@@ -91,7 +77,22 @@ class System:
             self._fields_dict[name].set_mass(mass)
         return self._fields_dict[name]
 
-
+    def add_global_strain(self, value=None, mass=1):
+        """
+        Allow variable cell
+        """
+        name = 'gstrain'
+        if value is not None:
+            assert len(value) == 6, "Global strain must be a 6D vector"
+            init = jnp.array(value)
+        else:
+            init = jnp.zeros(6)
+        self._fields_dict[name] = GlobalStrain(self.lattice, name)
+        self._fields_dict[name].set_values(jnp.zeros((  6)) + init)
+        self.add_pressure(0.0)
+        self._fields_dict[name].set_mass(mass)
+        return self._fields_dict[name]
+    
     """
     Methods for interactions
     """
@@ -111,14 +112,14 @@ class System:
         elif interaction_name in self._mutual_interaction_dict:
             return self._mutual_interaction_dict[interaction_name]
         else:
-            raise ValueError("Interaction with this name does not exist. Existing interactions: ", 
-                self._self_interaction_dict.keys(), self._mutual_interaction_dict.keys())
+            raise ValueError("Interaction with name {} does not exist. Existing interactions: {} {}".format(interaction_name, 
+                self._self_interaction_dict.keys(), self._mutual_interaction_dict.keys()))
  
     def _add_interaction_sanity_check(self, name):
         if name == 'pV':
             raise ValueError("The interaction name 'pV' is internal. The term pV in the Hamiltonian will be added automatically when you add a global strain.")
         if name in self.interaction_dict:
-            raise ValueError("Interaction with this name already exists. Pick another name.")
+            raise ValueError("Interaction with name {} already exists. Pick another name.".format(name))
         return
 
     def add_self_interaction(self, name, field_name, energy_engine, parameters=None, enable_jit=True):
@@ -137,6 +138,20 @@ class System:
         interaction.create_force_engine(enable_jit=enable_jit)
         if parameters is not None:
             interaction.set_parameters(parameters)
+        self._self_interaction_dict[name] = interaction
+        return interaction
+
+    def add_dipole_dipole_interaction(self, name, field_name, prefactor=1.0, enable_jit=True):
+        """
+        Add a dipole-dipole interaction term to the Hamiltonian.
+        """
+        self._add_interaction_sanity_check(name)
+        field = self.get_field_by_name(field_name)
+        interaction = self_interaction( field_name)
+        energy_engine = get_dipole_dipole_ewald(field.lattice, sharding=field._sharding)
+        interaction.set_energy_engine(energy_engine, enable_jit=enable_jit)
+        interaction.create_force_engine(enable_jit=enable_jit)
+        interaction.set_parameters([prefactor])
         self._self_interaction_dict[name] = interaction
         return interaction
 
@@ -223,8 +238,8 @@ class System:
             field3 = self.get_field_by_name(interaction.field_name3)
             energy = interaction.calc_energy(field1, field2, field3)
         else:
-            raise ValueError("Interaction with this name does not exist. Existing interactions: ", 
-                self._self_interaction_dict.keys(), self._mutual_interaction_dict.keys())
+            raise ValueError("Interaction with name {} does not exist. Existing interactions: {} {}".format(interaction_name, 
+                self._self_interaction_dict.keys(), self._mutual_interaction_dict.keys()))
         return energy            
 
     def calc_force_by_name(self, interaction_name):
@@ -260,53 +275,29 @@ class System:
     def calc_total_potential_energy(self):
         return self.calc_total_self_energy() + self.calc_total_mutual_interaction() + self.calc_total_triple_interaction()
 
-    def calc_kinetic_energy(self):
+    def calc_total_kinetic_energy(self):
         """
-        Calculate the kinetic energy of the system. 
-        TODO: move energy calculation to field class
+        Calculate the total kinetic energy of the system. 
         """
         kinetic_energy = 0.0
         for field in self.get_all_fields():
-            velocity = field.get_velocity()
-            mass = field.get_mass()
-            kinetic_energy += 0.5 * jnp.sum(mass * velocity**2)
+            kinetic_energy += field.get_kinetic_energy()
         return kinetic_energy
 
     def calc_temp_by_name(self, name):
         """
         Calculate the temperature of a field.
-        TODO: move temperature calculation to field class
         """
         field = self.get_field_by_name(name)
-        velocity = field.get_velocity()
-        mass = field.get_mass()
-        return jnp.mean(mass * velocity**2) / ( Constants.kb)
+        return field.get_temperature()
 
     def calc_excess_stress(self):
         '''
         Get instantaneous stress - applied stress (e.g. from hydrostatic pressure)
-        TODO: move stress calculation to gstrain class
         '''
         field = self.get_field_by_name('gstrain')
-        field.zero_force()
-        for interaction_name in self._self_interaction_dict:
-            interaction = self._self_interaction_dict[interaction_name]
-            if interaction.field_name == 'gstrain':
-                force = interaction.calc_force(field)
-                field.accumulate_force(force)
-        for interaction_name in self._mutual_interaction_dict:
-            interaction = self.get_interaction_by_name(interaction_name)
-            if interaction.field_name1 == 'gstrain':
-                assert (interaction.field_name2 != 'gstrain')
-                field2 = self.get_field_by_name(interaction.field_name2)
-                force1, force2 = interaction.calc_force(field, field2)
-                field.accumulate_force(force1)
-            elif interaction.field_name2 == 'gstrain':
-                field1 = self.get_field_by_name(interaction.field_name1)
-                force1, force2 = interaction.calc_force(field1, field)
-                field.accumulate_force(force2)
-        return field.get_force() / self.lattice.ref_volume / Constants.bar 
-    
+        return field.get_excess_stress()
+
     """
     Methods for updating the gradient force 
     """
@@ -363,7 +354,7 @@ class System:
             if profile:
                 jax.block_until_ready(field3.get_force())
                 print('time for updating force from %s:' % interaction_name, timer()-t0)
-
+        return
 
     def update_force(self, profile=False):
         """

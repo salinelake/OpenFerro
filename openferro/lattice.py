@@ -11,6 +11,7 @@ class BravaisLattice3D:
     A class to represent a 3D Bravais lattice
     """
     def __init__(self, l1, l2, l3, a1=None, a2=None, a3=None):
+        self.dim = 3
         self.size = jnp.array([l1, l2, l3])
         self.a1 = jnp.array([1.0, 0.0, 0.0]) if a1 is None else a1
         self.a2 = jnp.array([0.0, 1.0, 0.0]) if a2 is None else a2
@@ -74,6 +75,7 @@ class BravaisLattice2D:
     A class to represent a 2D Bravais lattice
     """
     def __init__(self, l1, l2, a1=None, a2=None):
+        self.dim = 2
         self.size = jnp.array([l1, l2])
         self.a1 = jnp.array([1.0, 0.0]) if a1 is None else a1
         self.a2 = jnp.array([0.0, 1.0]) if a2 is None else a2

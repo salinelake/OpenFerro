@@ -9,7 +9,7 @@ import jax.numpy as jnp
 from openferro.units import Constants
 
 
-def get_dipole_dipole_ewald(latt):
+def get_dipole_dipole_ewald(latt, sharding=None):
     """
     Returns the function to calculate the energy of dipole-dipole interaction.
     Implemented according to Sec.5.3 of 
@@ -44,8 +44,24 @@ def get_dipole_dipole_ewald(latt):
         jnp.arange(0, l2) / l2 * b[1],
         jnp.arange(0, l3) / l3 * b[2],
         indexing='ij'), axis=-1)   # (l1, l2, l3, 3)
+    # UkGG = jnp.zeros((l1, l2, l3, 3, 3))
+    # if sharding is not None:
+    #     G_grid_1stBZ = jax.device_put(G_grid_1stBZ, sharding)
+    #     UkGG = jax.device_put(UkGG, sharding)
+    # for i1 in range(-n1,n1):
+    #     for i2 in range(-n2,n2):
+    #         for i3 in range(-n3,n3):
+    #             G_grid = G_grid_1stBZ + jnp.array([i1*b[0], i2*b[1], i3*b[2]]).reshape(1,1,1,3) # (l1, l2, l3, 3)
+    #             Uk_coef = jnp.exp( - 0.5 * sigma**2 * jnp.sum(G_grid**2, axis=-1) ) / jnp.sum(G_grid**2, axis=-1)   # (l1, l2, l3)
+    #             if i1==0 and i2==0 and i3==0:
+    #                 Uk_coef = Uk_coef.at[0,0,0].set(0.0)
+    #             UkGG += G_grid[:,:,:,None,:] * G_grid[:,:,:,:,None] * Uk_coef[:,:,:,None,None]
 
-    UkGG = jnp.zeros((l1, l2, l3, 3, 3))
+    # ## memory-saving version.  
+    UkGG = jnp.zeros((l1, l2, l3, 6))  ## voigt notation of a symmetric 3X3 matrix
+    if sharding is not None:
+        G_grid_1stBZ = jax.device_put(G_grid_1stBZ, sharding)
+        UkGG = jax.device_put(UkGG, sharding)
     for i1 in range(-n1,n1):
         for i2 in range(-n2,n2):
             for i3 in range(-n3,n3):
@@ -53,10 +69,53 @@ def get_dipole_dipole_ewald(latt):
                 Uk_coef = jnp.exp( - 0.5 * sigma**2 * jnp.sum(G_grid**2, axis=-1) ) / jnp.sum(G_grid**2, axis=-1)   # (l1, l2, l3)
                 if i1==0 and i2==0 and i3==0:
                     Uk_coef = Uk_coef.at[0,0,0].set(0.0)
-                UkGG += G_grid[:,:,:,None,:] * G_grid[:,:,:,:,None] * Uk_coef[:,:,:,None,None]
+                addition = jnp.stack(
+                    [G_grid[...,0]**2 * Uk_coef, 
+                     G_grid[...,1]**2 * Uk_coef, 
+                     G_grid[...,2]**2 * Uk_coef,
+                     G_grid[..., 1] * G_grid[..., 2] * Uk_coef,  # Voigt notation of entry-(1,2)
+                     G_grid[..., 0] * G_grid[..., 2] * Uk_coef,  # Voigt notation of entry-(0,2)
+                     G_grid[..., 0] * G_grid[..., 1] * Uk_coef],   # Voigt notation of entry-(0,1)
+                    axis=-1)
+                UkGG += addition
+                
     G_grid_1stBZ = None
     G_grid = None
     Uk_coef = None
+
+    # def _ewald_ksum(F_fft3, UkGG):
+    #     F_real = F_fft3.real
+    #     F_imag = F_fft3.imag
+    #     ewald_ksum = (F_real[..., 0]**2 + F_imag[..., 0]**2) * UkGG[..., 0, 0]
+    #     ewald_ksum += (F_real[..., 1]**2 + F_imag[..., 1]**2) * UkGG[..., 1, 1]
+    #     ewald_ksum += (F_real[..., 2]**2 + F_imag[..., 2]**2) * UkGG[..., 2, 2]
+    #     ewald_ksum += 2 * ((F_real[..., 0] * F_real[..., 1] + F_imag[..., 0] * F_imag[..., 1]) * UkGG[..., 0, 1])
+    #     ewald_ksum += 2 * ((F_real[..., 0] * F_real[..., 2] + F_imag[..., 0] * F_imag[..., 2]) * UkGG[..., 0, 2])
+    #     ewald_ksum += 2 * ((F_real[..., 1] * F_real[..., 2] + F_imag[..., 1] * F_imag[..., 2]) * UkGG[..., 1, 2])
+    #     return ewald_ksum.sum()
+
+    def _ewald_ksum(F_fft3, UkGG):
+        """
+        Getting ewald summation over the k-space with UkGG in Voigt notation.
+        """
+        F_real = F_fft3.real
+        F_imag = F_fft3.imag
+        ewald_ksum = (F_real[..., 0]**2 + F_imag[..., 0]**2) * UkGG[..., 0]
+        ewald_ksum += (F_real[..., 1]**2 + F_imag[..., 1]**2) * UkGG[..., 1]
+        ewald_ksum += (F_real[..., 2]**2 + F_imag[..., 2]**2) * UkGG[..., 2]
+        ewald_ksum += 2 * ((F_real[..., 0] * F_real[..., 1] + F_imag[..., 0] * F_imag[..., 1]) * UkGG[..., 5])
+        ewald_ksum += 2 * ((F_real[..., 0] * F_real[..., 2] + F_imag[..., 0] * F_imag[..., 2]) * UkGG[..., 4])
+        ewald_ksum += 2 * ((F_real[..., 1] * F_real[..., 2] + F_imag[..., 1] * F_imag[..., 2]) * UkGG[..., 3])
+        return ewald_ksum.sum()
+
+    def _ewald_rsum(field):
+        """
+        Getting ewald summation over the real space.
+        """
+        return jnp.sum(field**2)
+    
+    ewald_ksum_func = jax.jit(_ewald_ksum)
+    ewald_rsum_func = jax.jit(_ewald_rsum)
 
     def energy_engine(field, parameters):
         """
@@ -67,18 +126,12 @@ def get_dipole_dipole_ewald(latt):
         Returns:
             jax.numpy array, shape=(1,)
         """
-        Z = parameters[0]
-        epsilon_inf = parameters[1]
-
-        ## calculate reciprocal space sum
+        prefactor = parameters[0]
+        ## calculate reciprocal space sum. UkGG is a symmetric (l1, l2, l3, 3, 3) matrix, so we only need to calculate half of it.
         F_fft3 = jnp.fft.fftn(field, axes=(0,1,2))  # (l1, l2, l3, 3)
-        ewald_ksum = (F_fft3.real[:,:,:,None,:] * F_fft3.real[:,:,:,:,None] * UkGG).sum()
-        ewald_ksum += (F_fft3.imag[:,:,:,None,:] * F_fft3.imag[:,:,:,:,None] * UkGG).sum()
-        ewald_ksum = coef_ksum * ewald_ksum
-
-        ## calculate real space sum
-        ewald_rsum = - coef_rsum * jnp.sum(field**2)
-        return (ewald_ksum + ewald_rsum) * Z**2 / epsilon_inf
+        ewald_ksum = ewald_ksum_func(F_fft3, UkGG)
+        ewald_rsum = ewald_rsum_func(field)
+        return (coef_ksum * ewald_ksum - coef_rsum * ewald_rsum) * prefactor
     return energy_engine
 
 

@@ -13,7 +13,9 @@ def test_ewald():
     E1 = dipole_dipole_ewald_plain(field,  paras)
     ## dipole-dipole interaction energy from approximate Ewald summation
     dipole_dipole_ewald_engine = jit(get_dipole_dipole_ewald(latt))
-    E2 = dipole_dipole_ewald_engine(field,  paras)
+    E2 = dipole_dipole_ewald_engine(field,  [paras['Z_star'] ** 2/ paras['epsilon_inf']])
+    print('Plain Ewald summation: ', E1)
+    print('Fast Ewald summation: ', E2)
     assert abs(E1 - E2) <  (abs(E1) / 100)
  
 # ## check dipole-dipole interaction force calculation
