@@ -6,7 +6,6 @@ Functions that define a term in the Hamiltonian. They will be added into <class 
 
 import numpy as np
 import jax.numpy as jnp
-from jax import grad, jit, vmap
 from openferro.field import LocalStrain3D
 
 
@@ -194,7 +193,6 @@ def short_range_2ednn_isotropic(field, parameters):
 
     return energy
 
-## TODO: reduce memory usage
 def short_range_3rdnn_isotropic(field, parameters):
     """
     Returns the short-range interaction of nearest neighbors for a R^3 field defined on a lattice with periodic boundary conditions.

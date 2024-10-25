@@ -19,9 +19,9 @@ class System:
     """
     A class to define a physical system. A system is a lattice with fields and a Hamiltonian.
     """
-    def __init__(self, lattice, pbc=True ):
+    def __init__(self, lattice ):
         self.lattice = lattice
-        self.pbc = pbc
+        self.pbc = lattice.pbc
         self._fields_dict = {}
         self._self_interaction_dict = {}
         self._mutual_interaction_dict = {}
@@ -122,6 +122,23 @@ class System:
             raise ValueError("Interaction with name {} already exists. Pick another name.".format(name))
         return
 
+    def add_dipole_dipole_interaction(self, name, field_name, prefactor=1.0, enable_jit=True):
+        """
+        Add a dipole-dipole interaction term to the Hamiltonian.
+        """
+        self._add_interaction_sanity_check(name)
+        field = self.get_field_by_name(field_name)
+        interaction = self_interaction( field_name)
+        energy_engine = get_dipole_dipole_ewald(field.lattice, sharding=field._sharding)
+        interaction.set_energy_engine(energy_engine, enable_jit=enable_jit)
+        interaction.create_force_engine(enable_jit=enable_jit)
+        interaction.set_parameters([prefactor])
+        self._self_interaction_dict[name] = interaction
+        return interaction
+
+    # def add_exchange_interaction_1st_shell(self, name, field_name, coupling, enable_jit=True):
+    #     self._add_interaction_sanity_check(name)
+
     def add_self_interaction(self, name, field_name, energy_engine, parameters=None, enable_jit=True):
         '''
         Add a self-interaction term to the Hamiltonian.
@@ -140,21 +157,7 @@ class System:
             interaction.set_parameters(parameters)
         self._self_interaction_dict[name] = interaction
         return interaction
-
-    def add_dipole_dipole_interaction(self, name, field_name, prefactor=1.0, enable_jit=True):
-        """
-        Add a dipole-dipole interaction term to the Hamiltonian.
-        """
-        self._add_interaction_sanity_check(name)
-        field = self.get_field_by_name(field_name)
-        interaction = self_interaction( field_name)
-        energy_engine = get_dipole_dipole_ewald(field.lattice, sharding=field._sharding)
-        interaction.set_energy_engine(energy_engine, enable_jit=enable_jit)
-        interaction.create_force_engine(enable_jit=enable_jit)
-        interaction.set_parameters([prefactor])
-        self._self_interaction_dict[name] = interaction
-        return interaction
-
+    
     def add_mutual_interaction(self, name, field_name1, field_name2, energy_engine,  parameters=None, enable_jit=True):
         '''
         Add a mutual interaction term to the Hamiltonian.
@@ -379,7 +382,7 @@ class RingPolymerSystem(System):
     """
     A class to define a ring polymer system for path-integral molecular dynamics simulations.
     """
-    def __init__(self, lattice, nbeads=1, pbc=True):
-        super().__init__(lattice, name)
+    def __init__(self, lattice, nbeads=1):
+        super().__init__(lattice)
         self.nbeads = nbeads
         raise NotImplementedError("Ring polymer system is not implemented yet.")

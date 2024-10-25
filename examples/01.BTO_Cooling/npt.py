@@ -9,7 +9,7 @@ from time import time as timer
 
 
 ##########################################################################################
-## Define the lattice, order parameters, and the Hamiltonian
+## Define the lattice 
 ##########################################################################################
 
 L = 12
@@ -18,15 +18,17 @@ hydropres =  -4.8e4
 config = json.load(open('BaTiO3.json'))
 latt_vecs = jnp.eye(3) * config['lattice']['a1']
 latt = of.BravaisLattice3D(L, L, L, latt_vecs[0], latt_vecs[1], latt_vecs[2])
-bto = of.System(latt, pbc=True)
+bto = of.System(latt)
 
-## define fields
+##########################################################################################
+## Define the fields
+##########################################################################################
 dipole_field = bto.add_field(name="dipole", ftype="Rn", dim=3, value=0.1, mass = 1.0)
 # lstrain_field = bto.add_field(name="lstrain", ftype="LocalStrain3D", value=0.0, mass = 40)
 gstrain  = bto.add_global_strain(value=jnp.array([0.01,0.01,0.01,0,0,0]), mass = 200.0 *  L**3)
 
 ##########################################################################################
-## define Hamiltonian
+## Define the Hamiltonian
 ##########################################################################################
 bto.add_self_interaction('self_onsite', 
                          field_name="dipole", 
@@ -62,7 +64,7 @@ bto.add_mutual_interaction('homo_strain_dipole',
 # bto.add_mutual_interaction('inhomo_strain_dipole', field_name1="lstrain", field_name2="dipole", energy_engine=inhomo_strain_dipole_interaction, parameters=config["elastic_dipole"])
 
 ##########################################################################################
-## structure relaxation
+## Structure relaxation
 ##########################################################################################
 minimizer = MDMinimize(bto, max_iter=1000, tol=1e-5, dt=0.01)
 minimizer.minimize(variable_cell=True, pressure=hydropres)
@@ -88,7 +90,7 @@ print('|polarization|={}C/m^2'.format((polarization**2).sum()**0.5))
 ##########################################################################################
 
 log_freq = 100
-total_time = 500
+total_time = 1000
 dt = 0.002
 relax_steps = int(50/dt)
 total_steps = int(total_time / dt)

@@ -8,23 +8,25 @@ from openferro.parallelism import DeviceMesh
 from time import time as timer
 
 ##########################################################################################
-## Define the lattice, order parameters, and the Hamiltonian
+## Define the lattice 
 ##########################################################################################
 L = 250
 N = L**3
 hydropres =  -4.8e4
 config = json.load(open('BaTiO3.json'))
 latt_vecs = jnp.eye(3) * config['lattice']['a1']
-latt = of.BravaisLattice3D(L, L, L, latt_vecs[0], latt_vecs[1], latt_vecs[2])
-bto = of.System(latt, pbc=True)
+latt = of.SimpleCubic3D(L, L, L, latt_vecs[0], latt_vecs[1], latt_vecs[2])
+bto = of.System(latt)
 
-## define fields
+##########################################################################################
+## Define the fields
+##########################################################################################
 dipole_field = bto.add_field(name="dipole", ftype="Rn", dim=3, value=0.1, mass = 1.0)
 # lstrain_field = bto.add_field(name="lstrain", ftype="LocalStrain3D", value=0.0, mass = 40)
 gstrain  = bto.add_global_strain(value=jnp.array([0.01,0.01,0.01,0,0,0]), mass = 10.0 *  L**3)
  
 ##########################################################################################
-## define Hamiltonian
+## Define the Hamiltonian
 ##########################################################################################
 bto.add_self_interaction('self_onsite', 
                          field_name="dipole", 
