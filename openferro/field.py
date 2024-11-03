@@ -3,12 +3,10 @@ Classes which define the fields on the lattice.
 """
 # This file is part of OpenFerro.
 
-from time import time as timer
 import numpy as np
 import jax
 import jax.numpy as jnp
 from openferro.units import Constants
-from openferro.lattice import BravaisLattice3D
 from openferro.parallelism import DeviceMesh
 from openferro.integrator import *
 
@@ -30,7 +28,9 @@ class Field:
         self._velocity = None
         self._force = None
         self._sharding = None
+        self.integrator = None
         self.integrator_class = None
+
 
     """
     These methods are used to handle the values of the field.
@@ -178,14 +178,21 @@ class Field:
             self._force = jax.device_put(self._force, sharding)
 
     """
-    These methods are used to handle the time evolution of the field.
+    These methods are used to handle the integrator of the field.
     """
-    def step(self, dt):
+    def set_integrator(self, integrator_class, dt, **kwargs):
+        """
+        Set the integrator according to the given integrator class.  Set the time step.
+        To be implemented by the subclasses.
+        """
         pass
+
+    def set_custom_integrator(self, integrator):
+        self.integrator = integrator
 
 class FieldRn(Field):
     """
-    R^n field. Values are stored as n-dimensional vectors. 
+    R^n field on a lattice. Values are stored as n-dimensional vectors. 
     """
     def __init__(self, lattice, name, dim, unit=None):
         super().__init__(lattice, name)
@@ -220,6 +227,27 @@ class FieldRn(Field):
         self._values[loc] = value
         return
 
+    def set_integrator(self, integrator_class, dt, temp=None, tau=None):
+        """
+        Set the integrator according to the given integrator class.  Set the time step.
+        Args:
+            integrator_class: str, integrator class.
+            dt: float, time step.
+            temp: float, temperature for the isothermal integrator.
+            tau: float, relaxation time for the Langevin integrator.
+        """
+        if integrator_class not in self.integrator_class:
+            raise ValueError(f"Integrator class {integrator_class} is not supported for this field.")
+        else:
+            if integrator_class == 'isothermal':
+                if temp is None or tau is None:
+                    raise ValueError("Temperature and relaxation time must be specified for the isothermal integrator.")
+                else:
+                    integrator = self.integrator_class[integrator_class](dt, temp, tau)
+            else:
+                integrator = self.integrator_class[integrator_class](dt)
+            self.integrator = integrator
+        return
 
 class FieldScalar(FieldRn):
     """
@@ -245,9 +273,9 @@ class FieldSO3(FieldRn):
     def __init__(self, lattice, name, unit=None):
         super().__init__(lattice, name, dim=3, unit=unit)
         self._magnitude = jnp.ones(self.shape[:-1])
-        self.integrator_class = {'optimization': LLIntegrator,
-                                 'adiabatic': ConservativeLLIntegrator,
-                                 'isothermal': LLLangevinIntegrator}
+        self.integrator_class = {'optimization': LLSIBIntegrator,
+                                 'adiabatic': ConservativeLLSIBIntegrator,
+                                 'isothermal': LLSIBLangevinIntegrator}
 
     def set_magnitude(self, magnitude):
         if self._values is None:
@@ -258,12 +286,20 @@ class FieldSO3(FieldRn):
             self._magnitude = magnitude
         else:
             raise ValueError("Magnitude must be a scalar or an array of the same size as the all but the last dimension of the field values.")
+        self.normalize()
 
     def get_magnitude(self):
         if self._magnitude is None:
             raise ValueError("Magnitude is not set")
         else:
             return self._magnitude
+        
+    def perturb(self, sigma):
+        key = jax.random.PRNGKey(np.random.randint(0, 1000000))
+        self._values = self._values / jnp.linalg.norm(self._values, axis=-1, keepdims=True)
+        self._values += jax.random.normal(key, self._values.shape) * sigma
+        self.normalize()
+        return
     
     def normalize(self):
         if self._values is None:
@@ -274,6 +310,9 @@ class FieldSO3(FieldRn):
             self._values = self._values / jnp.linalg.norm(self._values, axis=-1, keepdims=True) * self._magnitude[..., None]
         return
     
+    def init_velocity(self, mode='zero',  temperature=None):
+        pass
+
     def to_multi_devs(self, mesh: DeviceMesh):
         sharding = mesh.replicate_sharding()
         if self._values is None:
@@ -291,6 +330,34 @@ class FieldSO3(FieldRn):
             self._force = jax.device_put(self._force, sharding)
         return
 
+
+    def set_integrator(self, integrator_class, dt, temp=None, alpha=None):
+        """
+        Set the integrator according to the given integrator class.  Set the time step.
+        Args:
+            integrator_class: str, integrator class.
+            dt: float, time step.
+            temp: float, temperature for the isothermal integrator. Only required for the isothermal integrator.
+            alpha: float, Gilbert damping constant. Required for Landau-Lifshitz equation of motion. Not required for adiabatic spin precession.
+        """
+        if integrator_class not in self.integrator_class:
+            raise ValueError(f"Integrator class {integrator_class} is not supported for this field.")
+        else:
+            if integrator_class == 'adiabatic':
+                integrator = self.integrator_class[integrator_class](dt)
+            elif integrator_class == 'optimization':
+                if alpha is None:
+                    raise ValueError("Gilbert damping constant must be specified for the optimization integrator.")
+                else:
+                    integrator = self.integrator_class[integrator_class](dt, alpha)
+            elif integrator_class == 'isothermal':
+                if alpha is None or temp is None:
+                    raise ValueError("Gilbert damping constant and temperature must be specified for the isothermal integrator.")
+                else:
+                    integrator = self.integrator_class[integrator_class](dt, temp, alpha)
+            self.integrator = integrator
+        return
+        
 class LocalStrain3D(FieldRn):
     """
     Strain field on 3D lattice are separated into local contribution (local strain field) and global contribution (homogeneous strain associated to the supercell). 
@@ -347,3 +414,25 @@ class GlobalStrain(Field):
 
     def get_excess_stress(self):
         return self.get_force() / self.lattice.ref_volume / Constants.bar 
+
+    def set_integrator(self, integrator_class, dt, temp=None, tau=None):
+        """
+        Set the integrator according to the given integrator class.  Set the time step.
+        Args:
+            integrator_class: str, integrator class.
+            dt: float, time step.
+            temp: float, temperature for the isothermal integrator.
+            tau: float, relaxation time for the Langevin integrator.
+        """
+        if integrator_class not in self.integrator_class:
+            raise ValueError(f"Integrator class {integrator_class} is not supported for this field.")
+        else:
+            if integrator_class == 'isothermal':
+                if temp is None or tau is None:
+                    raise ValueError("Temperature and relaxation time must be specified for the isothermal integrator.")
+                else:
+                    integrator = self.integrator_class[integrator_class](dt, temp, tau)
+            else:
+                integrator = self.integrator_class[integrator_class](dt)
+            self.integrator = integrator
+        return

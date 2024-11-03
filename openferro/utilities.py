@@ -1,7 +1,11 @@
+"""
+Utility functions.
+"""
+# This file is part of OpenFerro.
+
 import numpy as np
 import jax
 import jax.numpy as jnp
-
 
 def SO3_rotation(B: jnp.ndarray, dt: float):
     """
@@ -15,15 +19,22 @@ def SO3_rotation(B: jnp.ndarray, dt: float):
         B: the magnetic field (shape=(*, 3))
         dt : the time step
     Returns:
-
+        rotation_matrix: the rotation matrix (shape=(*, 3, 3))
     """
     theta = jnp.linalg.norm(B, axis=-1)
-    u = B / theta[..., None]
+    b = B / theta[..., None]
+    bx = b[..., 0]
+    by = b[..., 1]
+    bz = b[..., 2]
     theta = theta * dt
-    rotation_matrix = jnp.cos(theta)[..., None, None] * jnp.eye(3)
-    rotation_matrix += (1-jnp.cos(theta))[..., None, None] * u[..., None, :] * u[..., :, None]
-    rotation_matrix += jnp.sin(theta)[..., None, None] * jnp.array(
-        [[0, -u[..., 2], u[..., 1]], 
-         [u[..., 2], 0, -u[..., 0]], 
-         [-u[..., 1], u[..., 0], 0]])
+    cos_theta = jnp.cos(theta)
+    sin_theta = jnp.sin(theta)
+    u = 1 - cos_theta
+    ## initialize the rotation matrix
+    rotation_matrix = jnp.stack([
+        bx*bx*u + cos_theta, bx*by*u-bz*sin_theta, bx*bz*u+by*sin_theta,
+        bx*by*u+bz*sin_theta, by*by*u + cos_theta, by*bz*u-bx*sin_theta,
+        bx*bz*u-by*sin_theta, by*bz*u+bx*sin_theta, bz*bz*u + cos_theta
+        ], axis=-1)
+    rotation_matrix = rotation_matrix.reshape(B.shape[:-1] + (3, 3))
     return rotation_matrix

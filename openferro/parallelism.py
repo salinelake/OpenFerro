@@ -1,4 +1,8 @@
-from jax.experimental import mesh_utils
+"""
+Classes for multi-GPU parallelism.
+"""
+# This file is part of OpenFerro.
+
 from jax.sharding import Mesh, PartitionSpec, NamedSharding
 import numpy as np
 import jax
@@ -6,7 +10,7 @@ import jax
 class DeviceMesh:
     def __init__(self, devices=None, num_rows=None, num_cols=None):
         """
-        Initialize the parallelism of the system. Get the mesh of the devices.
+        Initialize the single-host multi-device parallelism. Get the mesh of the devices.
         """
         if devices is None:
             devices = np.array(jax.devices())
@@ -35,9 +39,16 @@ class DeviceMesh:
         self.mesh = Mesh(devices=devices, axis_names=('x', 'y'))
 
     def partition_sharding(self):
+        """
+        Produce a NamedSharding object to distribute a value across devices, partitioning along the x and y axes.
+        """
         sharding = NamedSharding(self.mesh, PartitionSpec('x', 'y'))
         return sharding
     
     def replicate_sharding(self):
+        """
+        Produce a NamedSharding object to replicate a value across devices. 
+        Used for broadcasting values that do not need to be partitioned.
+        """
         sharding = NamedSharding(self.mesh, PartitionSpec())
         return sharding

@@ -2,7 +2,8 @@ import jax
 import openferro as of
 from openferro.interaction import *
 from openferro.simulation import *
-from openferro.engine import *
+from openferro.engine.elastic import *
+from openferro.engine.ferroelectric import *
 import json
 from openferro.parallelism import DeviceMesh
 from time import time as get_time
@@ -68,7 +69,7 @@ bto.add_mutual_interaction('homo_strain_dipole',
 # bto.add_mutual_interaction('elastic', field_name1="lstrain", field_name2="gstrain", energy_engine=elastic_energy, parameters=config["elastic"], enable_jit=True)
 # bto.add_mutual_interaction('inhomo_strain_dipole', field_name1="lstrain", field_name2="dipole", energy_engine=inhomo_strain_dipole_interaction, parameters=config["elastic_dipole"], enable_jit=True)
 
- 
+
 ##########################################################################################
 ## NPT simulation
 ##########################################################################################
@@ -79,7 +80,7 @@ simulation = SimulationNPTLangevin(bto, dt=dt, temperature=temperature, pressure
 simulation.init_velocity(mode='gaussian')
 
 t0 = get_time()
-jax.block_until_ready(simulation.step(1, profile=True))
+jax.block_until_ready(simulation.run(1, profile=True))
 t1 = get_time()
 print(f"initialization takes: {t1-t0} seconds")
 
@@ -88,5 +89,5 @@ print(f"initialization takes: {t1-t0} seconds")
 # t1 = get_time()
 # print(f"500 steps takes: {t1-t0} seconds")
  
-simulation.step(5, profile=True)
+simulation.run(5, profile=True)
  

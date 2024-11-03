@@ -2,31 +2,45 @@
 Classes which define the time evolution of physical systems. 
 """
 # This file is part of OpenFerro.
+
 from time import time as timer
 import numpy as np
 import jax
 import jax.numpy as jnp
-from jax import grad, jit, vmap
 from functools import partial
 from openferro.units import Constants
 from openferro.field import GlobalStrain
+
+
+
 class MDMinimize:
-    def __init__(self, system, max_iter=100, tol=1e-5, dt=0.01):
+    def __init__(self, system, max_iter=100, tol=1e-5 ):
         self.system = system
         self.max_iter = max_iter
         self.tol = tol
-        self.dt = dt
         self.all_fields = self.system.get_all_fields()
-        self.all_integrators = [ field.integrator_class['optimization'](dt) for field in self.all_fields ]
-        
-    def _step(self, variable_cell):
-        self.system.update_force()
-        for field, integrator in zip(self.all_fields, self.all_integrators):
-            if (variable_cell is False) and isinstance(field, GlobalStrain):
-                    continue
-            integrator.step(field)
             
-    def minimize(self, variable_cell=True, pressure=None):
+    def _step(self, variable_cell):
+        """
+        Update the field by one time step.
+        """
+        SO3_fields = self.system.get_all_SO3_fields()
+        non_SO3_fields = self.system.get_all_non_SO3_fields()
+        if len(non_SO3_fields) > 0:
+            ## update the force for all fields. 
+            ## Force will not be updated again while integrating each non-SO3 field with simple explicit integrator. 
+            self.system.update_force()
+            for field in non_SO3_fields:
+                if (variable_cell is False) and isinstance(field, GlobalStrain):
+                    continue
+                field.integrator.step(field)
+        if len(SO3_fields) > 0:
+            ## Force updater will be passed to the integrator of each SO3 fields because implicit methods are used.
+            ## So the force will not be updated here. 
+            for field in SO3_fields:
+                field.integrator.step(field, force_updater=self.system.update_force)
+            
+    def run(self, variable_cell=True, pressure=None):
         ## sanity check
         if variable_cell:
             if pressure is None:
@@ -37,9 +51,15 @@ class MDMinimize:
                 pV_param = self.system.get_interaction_by_name('pV').get_parameters()
                 pV_param_new = [pressure * Constants.bar, pV_param[1]]
                 self.system.get_interaction_by_name('pV').set_parameters(pV_param_new)
+            for field in self.all_fields:
+                if field.integrator is None:
+                    raise ValueError('Please set the integrator for the field %s for variable-cell structural minimization' % type(field))
         else:
             if pressure is not None:
                 raise ValueError('Specifying pressure is not allowed for fixed-cell structural minimization')
+            for field in [field for field in self.all_fields if not isinstance(field, GlobalStrain)]:
+                if field.integrator is None:
+                    raise ValueError('Please set the integrator for the field %s for fixed-cell structural minimization' % type(field))
         ## structural relaxation
         for i in range(self.max_iter):
             self._step(variable_cell)
@@ -56,56 +76,90 @@ class SimulationNVE:
     """
     The base class to define a simulation. A simulation describes the time evolution of a system.
     """
-    def __init__(self, system, dt=0.01, temperature=0.0):
+    def __init__(self, system):
         self.system = system
-        self.dt = dt
-        self.temperature = temperature
-        self.kbT = Constants.kb * temperature
-        self.all_fields = [ field for field in self.system.get_all_fields() if not isinstance(field, GlobalStrain) ]
-        self.all_integrators = [ field.integrator_class['adiabatic'](dt) for field in self.all_fields ]
-        
-    def init_velocity(self, mode='zero'):
+        ## get all fields, excluding the global strain field
+        self.SO3_fields = self.system.get_all_SO3_fields()
+        self.non_SO3_fields = [field for field in self.system.get_all_non_SO3_fields() if not isinstance(field, GlobalStrain)]
+        self.all_fields = self.SO3_fields + self.non_SO3_fields
+        self.nfields = len(self.all_fields)
         for field in self.all_fields:
-            field.init_velocity(mode=mode, temperature=self.temperature)
+            if field.integrator is None:
+                raise ValueError('Please set the integrator for %s for dynamical simulation' % type(field))
     
-    def step(self, nsteps=1):
+    def init_velocity(self, mode='zero', temp=None):
+        for field in self.all_fields:
+            field.init_velocity(mode=mode, temperature=temp)
+    
+    def _step(self, profile=False):
+        """
+        Update the field by one step.
+        """
+        if len(self.non_SO3_fields) > 0:
+            ## update the force for all fields. 
+            ## Force will not be updated again while integrating each non-SO3 field with simple explicit integrator. 
+            self.system.update_force(profile=profile)
+            for field in self.non_SO3_fields:
+                if profile:
+                    t0 = timer()
+                field.integrator.step(field)
+                if profile:
+                    jax.block_until_ready(field.get_values())
+                    print('time for updating field %s:' % type(field), timer()-t0)
+        if len(self.SO3_fields) > 0:
+            ## Force updater will be passed to the integrator of each SO3 fields because implicit methods are used.
+            ## So the force will not be updated here. 
+            for field in self.SO3_fields:
+                if profile:
+                    t0 = timer()
+                field.integrator.step(field, force_updater=self.system.update_force)
+                if profile:
+                    jax.block_until_ready(field.get_values())
+                    print('time for updating field %s:' % type(field), timer()-t0)
+    def run(self, nsteps=1, profile=False):
         for i in range(nsteps):
-            self.system.update_force()
-            for field, integrator in zip(self.all_fields, self.all_integrators):
-                integrator.step(field)
-
+            self._step(profile=profile)
 
 class SimulationNVTLangevin(SimulationNVE):
     """
     A class to define a simulation using the Langevin equation. A Langevin simulation evolves the system in time using the Langevin equation.
     """
-    def __init__(self, system, dt=0.01, temperature=0.0, tau=0.1):
-        super().__init__(system, dt, temperature)
-        self.gamma = 1.0 / tau
-        self.z1 = jnp.exp(-dt * self.gamma)
-        self.z2 = jnp.sqrt(1 - jnp.exp(-2 * dt * self.gamma))
-        self.all_fields = [ field for field in self.system.get_all_fields() if not isinstance(field, GlobalStrain) ]
-        self.all_integrators = [ field.integrator_class['isothermal'](dt, temperature, tau) for field in self.all_fields ]
+    def __init__(self, system):
+        super().__init__(system)
 
-    def _step(self, key, profile=False):
-        self.system.update_force(profile=profile)
-        keys = jax.random.split(key, len(self.all_fields))
-        for field, integrator, subkey in zip(self.all_fields, self.all_integrators, keys):
-            if profile:
-                t0 = timer()
-            integrator.step(subkey, field)
-            if profile:
-                jax.block_until_ready(field.get_values())
-                print('time for updating field %s:' % type(field), timer()-t0)
+    def _step(self, keys, profile=False):
+        keys_SO3 = keys[:len(self.SO3_fields)]
+        keys_non_SO3 = keys[len(self.SO3_fields):]
+        if len(self.non_SO3_fields) > 0:
+            self.system.update_force(profile=profile)
+            for field, subkey in zip(self.non_SO3_fields, keys_non_SO3):
+                if profile:
+                    t0 = timer()
+                field.integrator.step(subkey, field)
+                if profile:
+                    jax.block_until_ready(field.get_values())
+                    print('time for updating field %s:' % type(field), timer()-t0)
+        if len(self.SO3_fields) > 0:
+            for field, subkey in zip(self.SO3_fields, keys_SO3):
+                if profile:
+                    t0 = timer()
+                field.integrator.step(subkey, field, force_updater=self.system.update_force)
+                if profile:
+                    jax.block_until_ready(field.get_values())
+                    print('time for updating field %s:' % type(field), timer()-t0)
         return
 
-    def step(self, nsteps=1, profile=False):
+    def run(self, nsteps=1, profile=False):
+        """
+        Update the field by n steps.
+        """
         key = jax.random.PRNGKey(np.random.randint(0, 1000000))
-        keys = jax.random.split(key, nsteps)
-        for subkey in keys:
+        keys = jax.random.split(key, nsteps * self.nfields)
+        for id_step in range(nsteps):
             if profile:
                 t0 = timer()
-            self._step(subkey, profile)
+            subkeys = keys[id_step * self.nfields:(id_step+1) * self.nfields]
+            self._step(subkeys, profile)
             if profile:
                 print('Total time for one step:', timer()-t0)
         return
@@ -114,18 +168,19 @@ class SimulationNPTLangevin(SimulationNVTLangevin):
     """
     A class to define a simulation using the Langevin equation. A Langevin simulation evolves the system in time using the Langevin equation.
     """
-    def __init__(self, system, dt=0.01, temperature=0.0, pressure=0.0, tau=0.1, tauP=1.0):
-        super().__init__(system, dt, temperature)
+    def __init__(self, system, pressure=0.0):
+        super().__init__(system)
         ## set pressure
         self.pressure = pressure
         pV_param = self.system.get_interaction_by_name('pV').get_parameters()
         pV_param_new = [pressure * Constants.bar, pV_param[1]]
         self.system.get_interaction_by_name('pV').set_parameters(pV_param_new)
-        ## set integrators
-        self.all_fields = self.system.get_all_fields()
-        self.all_integrators = []
+        ## get all fields, including the global strain field
+        self.SO3_fields = self.system.get_all_SO3_fields()
+        self.non_SO3_fields = self.system.get_all_non_SO3_fields()
+        self.all_fields = self.SO3_fields + self.non_SO3_fields
+        self.nfields = len(self.all_fields)
         for field in self.all_fields:
-            if isinstance(field, GlobalStrain):
-                self.all_integrators.append(field.integrator_class['isothermal'](dt, temperature, tauP))
-            else:
-                self.all_integrators.append(field.integrator_class['isothermal'](dt, temperature, tau))
+            if field.integrator is None:
+                raise ValueError('Please set the integrator for %s for dynamical simulation' % type(field))
+    

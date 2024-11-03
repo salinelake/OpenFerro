@@ -5,7 +5,7 @@ Classes to define the Bravais lattices
 
 import numpy as np
 import jax.numpy as jnp
-from jax import jit
+
 class BravaisLattice3D:
     """
     A class to represent a 3D Bravais lattice
@@ -58,41 +58,53 @@ class SimpleCubic3D(BravaisLattice3D):
     """
     def __init__(self, l1, l2, l3, a1=None, a2=None, a3=None, pbc=True):
         super().__init__(l1, l2, l3, a1, a2, a3, pbc)
-        self.first_shell_roller = [ jit(x) for x in self._first_shell_roller()]
-        self.second_shell_roller = [ jit(x) for x in self._second_shell_roller()]
-        self.third_shell_roller = [ jit(x) for x in self._third_shell_roller()]
+        self.first_shell_roller = [ x for x in self._1st_shell_roller()]
+        self.second_shell_roller = [ x for x in self._2nd_shell_roller()]
+        self.third_shell_roller = [ x for x in self._3rd_shell_roller()]
 
-    def _first_shell_roller(self):
+    def _1st_shell_roller(self):
         """
         Return a list of rolling functions for moving a site to all sites in the first shell of the lattice. 
         The number of rolling functions is half the shell coordination number.
         This will come useful when we want to calculate the interaction between a site and its neighbours.
         """
-        roller = [lambda x: jnp.roll(x, 1, axis=i) for i in range(3)]
+        roller = [
+            lambda x: jnp.roll(x, 1, axis=0),
+            lambda x: jnp.roll(x, 1, axis=1),
+            lambda x: jnp.roll(x, 1, axis=2)
+        ]
         return roller
     
-    def _second_shell_roller(self):
+    def _2nd_shell_roller(self):
         """
         Return a list of rolling functions for moving a site to all sites in the second shell of the lattice. 
         The number of rolling functions is half the shell coordination number.
         This will come useful when we want to calculate the interaction between a site and its neighbours.
         """
-        roller = []
-        for axis_pair in [(0,1), (0,2), (1,2)]:
-            roller.append(lambda x: jnp.roll(x, (1, 1), axis=axis_pair))
-            roller.append(lambda x: jnp.roll(x, (-1,1), axis=axis_pair))
+        roller = [
+            lambda x: jnp.roll(x, (1, 1), axis=(0,1)),
+            lambda x: jnp.roll(x, (-1,1), axis=(0,1)),
+
+            lambda x: jnp.roll(x, (1, 1), axis=(0,2)),
+            lambda x: jnp.roll(x, (-1,1), axis=(0,2)),
+
+            lambda x: jnp.roll(x, (1, 1), axis=(1,2)),
+            lambda x: jnp.roll(x, (-1,1), axis=(1,2)),
+        ]
         return roller
     
-    def _third_shell_roller(self):
+    def _3rd_shell_roller(self):
         """
         Return a list of rolling functions for moving a site to all sites in the third shell of the lattice. 
         The number of rolling functions is half the shell coordination number.
         This will come useful when we want to calculate the interaction between a site and its neighbours.
         """
-        roller = [lambda x: jnp.roll(x, (1, 1, 1), axis=(0,1,2)),
-                 lambda x: jnp.roll(x, (-1, 1, 1), axis=(0,1,2)),
-                 lambda x: jnp.roll(x, (1, -1, 1), axis=(0,1,2)),
-                 lambda x: jnp.roll(x, (-1, -1, 1), axis=(0,1,2))]
+        roller = [
+            lambda x: jnp.roll(x, (1, 1, 1), axis=(0,1,2)),
+            lambda x: jnp.roll(x, (-1, 1, 1), axis=(0,1,2)),
+            lambda x: jnp.roll(x, (1, -1, 1), axis=(0,1,2)),
+            lambda x: jnp.roll(x, (-1, -1, 1), axis=(0,1,2))
+        ]
         return roller
 
 
@@ -105,25 +117,29 @@ class BodyCenteredCubic3D(SimpleCubic3D):
     """
     def __init__(self, l1, l2, l3, a1=None, a2=None, a3=None, pbc=True):
         super().__init__(l1, l2, l3, a1, a2, a3, pbc)
-        self.a1 = jnp.array(0.5 *[-1.0, 1.0, 1.0]) if a1 is None else a1
-        self.a2 = jnp.array(0.5 *[ 1.0,-1.0, 1.0]) if a2 is None else a2
-        self.a3 = jnp.array(0.5 *[ 1.0, 1.0,-1.0]) if a3 is None else a3
-        self.first_shell_roller = [ jit(x) for x in self._first_shell_roller()]
-        self.second_shell_roller = [ jit(x) for x in self._second_shell_roller()]
-        self.third_shell_roller = [ jit(x) for x in self._third_shell_roller()]
-        self.fourth_shell_roller = [ jit(x) for x in self._fourth_shell_roller()]
+        self.a1 = 0.5 * jnp.array([-1.0, 1.0, 1.0]) if a1 is None else a1
+        self.a2 = 0.5 * jnp.array([ 1.0,-1.0, 1.0]) if a2 is None else a2
+        self.a3 = 0.5 * jnp.array([ 1.0, 1.0,-1.0]) if a3 is None else a3
+        self.first_shell_roller = [ x for x in self._1st_shell_roller()]
+        self.second_shell_roller = [ x for x in self._2nd_shell_roller()]
+        self.third_shell_roller = [ x for x in self._3rd_shell_roller()]
+        self.fourth_shell_roller = [ x for x in self._4th_shell_roller()]
 
-    def _first_shell_roller(self):
+    def _1st_shell_roller(self):
         """
         Return a list of rolling functions for moving a site to all sites in the first shell of the lattice.
         The number of rolling functions is half the shell coordination number.
         This will come useful when we want to calculate the interaction between a site and its neighbours.
         """
-        roller = [lambda x: jnp.roll(x, 1, axis=i) for i in range(3)]   # (-0.5, 0.5, 0.5), (0.5, -0.5, 0.5), (0.5, 0.5, -0.5)
-        roller.append(lambda x: jnp.roll(x, (1, 1, 1), axis=(0,1,2)))  # (0.5, 0.5, 0.5)
+        roller = [
+            lambda x: jnp.roll(x, 1, axis=0),  # (-0.5, 0.5, 0.5)
+            lambda x: jnp.roll(x, 1, axis=1),  # (0.5, -0.5, 0.5)
+            lambda x: jnp.roll(x, 1, axis=2),  # (0.5, 0.5, -0.5)
+            lambda x: jnp.roll(x, (1, 1, 1), axis=(0,1,2)),  # (0.5, 0.5, 0.5)
+        ]
         return roller
 
-    def _second_shell_roller(self):
+    def _2nd_shell_roller(self):
         """
         Return a list of rolling functions for moving a site to all sites in the second shell of the lattice.
         The number of rolling functions is half the shell coordination number.
@@ -136,7 +152,7 @@ class BodyCenteredCubic3D(SimpleCubic3D):
         ]
         return roller
     
-    def _third_shell_roller(self):
+    def _3rd_shell_roller(self):
         """
         Return a list of rolling functions for moving a site to all sites in the third shell of the lattice.
         The number of rolling functions is half the shell coordination number.
@@ -148,18 +164,18 @@ class BodyCenteredCubic3D(SimpleCubic3D):
             lambda x: jnp.roll(x, (1,1,2), axis=(0,1,2)),   # (1,1,0)
             lambda x: jnp.roll(x, (-1,1), axis=(0,2)),      # (-1,0,1)
             lambda x: jnp.roll(x, (1,-1), axis=(1,2)),      # (0,-1,1)
-            lambda x: jnp.roll(x, (1,-1), axis=(0,1)),      # (1,-1,0)
+            lambda x: jnp.roll(x, (1,-1), axis=(0,1)),      # (-1,1,0)
         ]
         return roller
 
-    def _fourth_shell_roller(self):
+    def _4th_shell_roller(self):
         """
         Return a list of rolling functions for moving a site to all sites in the fourth shell of the lattice.
         The number of rolling functions is half the shell coordination number.
         This will come useful when we want to calculate the interaction between a site and its neighbours.
         """
         roller = [
-            lambda x: jnp.roll(x, (1,2,2), axis=(0,1,2)),   # (1.5,0.5,0.5)
+            lambda x: jnp.roll(x, (1,2,2), axis=(0,1,2)),  # (1.5,0.5,0.5)
             lambda x: jnp.roll(x, (2,1), axis=(1,2)),  # (1.5,-0.5,0.5)
             lambda x: jnp.roll(x, (1,2), axis=(1,2)),  # (1.5,0.5,-0.5)
             lambda x: jnp.roll(x, (-1,1,1), axis=(0,1,2)), # (1.5,-0.5,-0.5)
@@ -247,11 +263,11 @@ class SimpleSquare2D(BravaisLattice2D):
     """
     def __init__(self, l1, l2, a1=None, a2=None, pbc=True):
         super().__init__(l1, l2, a1, a2, pbc)
-        self.first_shell_roller = [ jit(x) for x in self._first_shell_roller()]
-        self.second_shell_roller = [ jit(x) for x in self._second_shell_roller()]
-        self.third_shell_roller = [ jit(x) for x in self._third_shell_roller()]
+        self.first_shell_roller = [ x for x in self._1st_shell_roller()]
+        self.second_shell_roller = [ x for x in self._2nd_shell_roller()]
+        self.third_shell_roller = [ x for x in self._3rd_shell_roller()]
 
-    def _first_shell_roller(self):
+    def _1st_shell_roller(self):
         """
         Return a list of rolling functions for moving a site to all sites in the first shell of the lattice.
         The number of rolling functions is half the shell coordination number.
@@ -260,7 +276,7 @@ class SimpleSquare2D(BravaisLattice2D):
         roller = [lambda x: jnp.roll(x, 1, axis=i) for i in range(2)]
         return roller
     
-    def _second_shell_roller(self):
+    def _2nd_shell_roller(self):
         """
         Return a list of rolling functions for moving a site to all sites in the second shell of the lattice.
         The number of rolling functions is half the shell coordination number.
@@ -272,7 +288,7 @@ class SimpleSquare2D(BravaisLattice2D):
         ]
         return roller
     
-    def _third_shell_roller(self):
+    def _3rd_shell_roller(self):
         """
         Return a list of rolling functions for moving a site to all sites in the third shell of the lattice.
         The number of rolling functions is half the shell coordination number.

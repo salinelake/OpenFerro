@@ -2,7 +2,8 @@ import jax
 import openferro as of
 from openferro.interaction import *
 from openferro.simulation import *
-from openferro.engine import *
+from openferro.engine.elastic import *
+from openferro.engine.ferroelectric import *
 from matplotlib import pyplot as plt
 import json
 from time import time as timer
@@ -66,8 +67,10 @@ bto.add_mutual_interaction('homo_strain_dipole',
 ##########################################################################################
 ## Structure relaxation
 ##########################################################################################
-minimizer = MDMinimize(bto, max_iter=1000, tol=1e-5, dt=0.01)
-minimizer.minimize(variable_cell=True, pressure=hydropres)
+dipole_field.set_integrator('optimization', dt=0.01)
+gstrain.set_integrator('optimization', dt=0.01)
+minimizer = MDMinimize(bto, max_iter=1000, tol=1e-5)
+minimizer.run(variable_cell=True, pressure=hydropres)
 equilibrium_field = bto.get_field_by_name("dipole").get_values().copy()
 avg_field = equilibrium_field.mean((0,1,2))
 dipole2polar = config['born']['Z_star'] / latt.unit_volume * 16.0217646  # eA -> C/m^2
@@ -101,20 +104,24 @@ gs_history = []
 
 temp_list = np.array([140,150,160,170,180,190,200,210,220,230,240,250,260,270,280,290,300,310,320, 350, 400]).astype(int)
 temp_list = np.flip(temp_list)
-simulation = SimulationNPTLangevin(bto, dt=dt, temperature=temp_list[0], pressure=-4.8e4, tau=0.1, tauP = 1)
-simulation.init_velocity(mode='gaussian')
+dipole_field.set_integrator('isothermal', dt=dt, temp=temp_list[0], tau=0.1)
+gstrain.set_integrator('isothermal', dt=dt, temp=temp_list[0], tau=1)
+simulation = SimulationNPTLangevin(bto, pressure=-4.8e4)
+simulation.init_velocity(mode='gaussian', temp=temp_list[0])
 t1 = timer()
-simulation.step(relax_steps)
+simulation.run(relax_steps)
 t2 = timer()
 print('relaxation (50ps) time:', t2-t1)
 
 for temperature in temp_list:
     print('T={}K'.format(temperature))
-    simulation = SimulationNPTLangevin(bto, dt=dt, temperature=temperature, pressure=-4.8e4, tau=0.1, tauP = 1)
+    dipole_field.set_integrator('isothermal', dt=dt, temp=temperature, tau=0.1)
+    gstrain.set_integrator('isothermal', dt=dt, temp=temperature, tau=1)
+    simulation = SimulationNPTLangevin(bto, pressure=-4.8e4 )
     average_field = []
     global_strain = []
     for ii in range(niters):
-        simulation.step(log_freq)
+        simulation.run(log_freq)
         average_field.append(bto.get_field_by_name('dipole').get_values().mean((0,1,2)))
         global_strain.append(bto.get_field_by_name("gstrain").get_values().flatten())
         excess_pres = bto.calc_excess_stress()
