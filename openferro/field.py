@@ -314,7 +314,7 @@ class FieldSO3(FieldRn):
         pass
 
     def to_multi_devs(self, mesh: DeviceMesh):
-        sharding = mesh.replicate_sharding()
+        sharding = mesh.partition_sharding()
         if self._values is None:
             raise ValueError("Field has no values. Set values before put the array to multiple devices.")
         else:

@@ -10,16 +10,15 @@ OpenFerro is designed to minimize the effort required to build on-lattice Hamilt
 * **highly modularized**, easy to implement new interaction terms in an lattice Hamiltonian model, benefitted from auto-differentiation.
 
 # Milestones
-(1, 90% completed) Ferroelectric effective Hamiltonian 
+(1, 99% completed) Ferroelectric effective Hamiltonian 
 
 Ref: Zhong, W., David Vanderbilt, and K. M. Rabe. "First-principles theory of ferroelectric phase transitions for perovskites: The case of BaTiO3." Physical Review B 52.9 (1995): 6301.
 
-(2) Landau-Lifshitz-Gilbert equation 
+(2, 99% completed) Landau-Lifshitz-Gilbert equation 
 
 Ref: Eriksson, Olle, et al. Atomistic spin dynamics: foundations and applications. Oxford university press, 2017.
 
-
-(3) Multiferroic 
+(3, ongoing) Multiferroic 
 
 Ref: Kornev, I. A., Lisenkov, S., Haumont, R., Dkhil, B., & Bellaiche, L. (2007). Finite-temperature properties of multiferroic BiFeO3. Physical review letters, 99(22), 227602.
 
@@ -63,3 +62,9 @@ dipole = charge*Angstroms
 electric field = volts/Angstrom
 
 density = gram/cm^dim
+
+Magnetic dipole moment = Bohr magneton
+
+Magnetic field = eV / Bohr magneton
+
+
