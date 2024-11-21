@@ -367,11 +367,11 @@ class LocalStrain3D(FieldRn):
         super().__init__(lattice, name, dim=3)
 
     @staticmethod
-    def get_local_strain(values):
+    def get_local_strain_symmetric(values):
         '''
         Calculate the local strain field from the local displacement field.
         '''
-        padded_values = jnp.pad(values, ((1, 1), (1, 1), (1, 1), (0, 0)), mode='wrap')
+        padded_values = jnp.pad(values, ((1, 1), (1, 1), (1, 1), (0, 0)), mode='wrap') ## pad x,y,z axis with periodic boundary condition
         grad_0, grad_1, grad_2 = jnp.gradient(padded_values, axis=(0, 1, 2))
         grad_0 = grad_0[1:-1, 1:-1, 1:-1]
         grad_1 = grad_1[1:-1, 1:-1, 1:-1]
@@ -383,6 +383,49 @@ class LocalStrain3D(FieldRn):
         eta_4 = (grad_1[..., 2] + grad_2[..., 1]) / 2   # eta_yz
         eta_5 = (grad_0[..., 2] + grad_2[..., 0]) / 2   # eta_xz
         eta_6 = (grad_0[..., 1] + grad_1[..., 0]) / 2   # eta_xy
+        local_strain = jnp.stack([eta_1, eta_2, eta_3, eta_4, eta_5, eta_6], axis=-1)  # (l1, l2, l3, 6)
+        return local_strain
+
+    @staticmethod
+    def get_local_strain(values):
+        '''
+        Calculate the local strain field from the local displacement field.
+        Implemented accroding to Physical Review B 52.9 (1995): 6301.
+        '''
+        eta_1 = jnp.roll(values[..., 0], 1, axis=0) - values[..., 0]  # vx(R-dx) - vx(R)
+        eta_1 = eta_1 + jnp.roll(eta_1, 1, axis=1) + jnp.roll(eta_1, 1, axis=2) + jnp.roll(jnp.roll(eta_1, 1, axis=1), 1, axis=2)
+        eta_1 = eta_1 / 4.0
+
+        eta_2 = jnp.roll(values[..., 1], 1, axis=1) - values[..., 1]  # vy(R-dy) - vy(R)
+        eta_2 = eta_2 + jnp.roll(eta_2, 1, axis=0) + jnp.roll(eta_2, 1, axis=2) + jnp.roll(jnp.roll(eta_2, 1, axis=0), 1, axis=2)
+        eta_2 = eta_2 / 4.0
+
+        eta_3 = jnp.roll(values[..., 2], 1, axis=2) - values[..., 2]  # vz(R-dz) - vz(R)
+        eta_3 = eta_3 + jnp.roll(eta_3, 1, axis=0) + jnp.roll(eta_3, 1, axis=1) + jnp.roll(jnp.roll(eta_3, 1, axis=0), 1, axis=1)
+        eta_3 = eta_3 / 4.0
+
+        eta_xy = jnp.roll(values[..., 1], 1, axis=0) - values[..., 1]   # vy(R-dx) - vy(R)
+        eta_xy = eta_xy + jnp.roll(eta_xy, 1, axis=1) + jnp.roll(eta_xy, 1, axis=2) + jnp.roll(jnp.roll(eta_xy, 1, axis=1), 1, axis=2)
+        
+        eta_yx = jnp.roll(values[..., 0], 1, axis=1) - values[..., 0]  # vx(R-dy) - vx(R)
+        eta_yx = eta_yx + jnp.roll(eta_yx, 1, axis=0) + jnp.roll(eta_yx, 1, axis=2) + jnp.roll(jnp.roll(eta_yx, 1, axis=0), 1, axis=2)
+
+        eta_yz = jnp.roll(values[..., 2], 1, axis=1) - values[..., 2]   # vz(R-dy) - vz(R)
+        eta_yz = eta_yz + jnp.roll(eta_yz, 1, axis=0) + jnp.roll(eta_yz, 1, axis=2) + jnp.roll(jnp.roll(eta_yz, 1, axis=0), 1, axis=2)
+
+        eta_zy = jnp.roll(values[..., 1], 1, axis=2) - values[..., 1]   # vy(R-dz) - vy(R)
+        eta_zy = eta_zy + jnp.roll(eta_zy, 1, axis=0) + jnp.roll(eta_zy, 1, axis=1) + jnp.roll(jnp.roll(eta_zy, 1, axis=0), 1, axis=1)
+
+        eta_zx = jnp.roll(values[..., 0], 1, axis=2) - values[..., 0]   # vx(R-dz) - vx(R)
+        eta_zx = eta_zx + jnp.roll(eta_zx, 1, axis=0) + jnp.roll(eta_zx, 1, axis=1) + jnp.roll(jnp.roll(eta_zx, 1, axis=0), 1, axis=1)
+
+        eta_xz = jnp.roll(values[..., 2], 1, axis=0) - values[..., 2]   # vz(R-dx) - vz(R)
+        eta_xz = eta_xz + jnp.roll(eta_xz, 1, axis=1) + jnp.roll(eta_xz, 1, axis=2) + jnp.roll(jnp.roll(eta_xz, 1, axis=1), 1, axis=2)
+
+        eta_4 = (eta_yz + eta_zy) / 4.0
+        eta_5 = (eta_xz + eta_zx) / 4.0
+        eta_6 = (eta_xy + eta_yx) / 4.0
+
         local_strain = jnp.stack([eta_1, eta_2, eta_3, eta_4, eta_5, eta_6], axis=-1)  # (l1, l2, l3, 6)
         return local_strain
 

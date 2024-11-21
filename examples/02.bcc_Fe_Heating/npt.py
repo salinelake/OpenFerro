@@ -5,10 +5,11 @@ from openferro.simulation import *
 from openferro.engine import *
 from openferro.parallelism import DeviceMesh
 from openferro.units import Constants
-from openferro.magnetic_engine import *
+from openferro.engine.magnetic import *
 from time import time as timer
 from matplotlib import pyplot as plt
-
+import logging
+logging.basicConfig(level=logging.INFO, filename="simulation.log")
 ##########################################################################################
 ## Define the lattice 
 ##########################################################################################
@@ -49,7 +50,7 @@ for temp in temp_list:
     t0 = timer()
     jax.block_until_ready(simulation.run(1, profile=True))
     t1 = timer()
-    print(f"initialization takes: {t1-t0} seconds")
+    logging.info(f"initialization takes: {t1-t0} seconds")
     
     
     spin_traj = []
@@ -65,7 +66,7 @@ for temp in temp_list:
     M_avg = jnp.array(M_avg) # shape=(100, 3)
     theta = jnp.arccos( spin_traj[:, 2]  / Ms )
     pot_energy = jnp.array(pot_energy)
-    print("Temp={}K, M_avg = {} uB".format(temp, jnp.linalg.norm(M_avg, axis=-1)[10:].mean()))
+    logging.info("Temp={}K, M_avg = {} uB".format(temp, jnp.linalg.norm(M_avg, axis=-1)[10:].mean()))
     jnp.save(f"Mavg_{temp}.npy", M_avg)
     # fig, ax = plt.subplots(1,5, figsize=(15, 3))
     # ax[0].plot(spin_traj[:, 0], spin_traj[:, 1]  )

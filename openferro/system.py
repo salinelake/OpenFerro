@@ -5,6 +5,7 @@ Classes which define the physical system.
 
 from time import time as timer
 import warnings
+import logging
 
 import numpy as np
 import jax.numpy as jnp
@@ -13,11 +14,14 @@ from openferro.field import *
 from openferro.interaction import *
 from openferro.units import Constants
 ## import force engines
-from openferro.engine.elastic import pV_energy
+from openferro.engine.elastic import *
+from openferro.engine.ferroelectric import *
 from openferro.engine.magnetic import *
 from openferro.engine.ewald import get_dipole_dipole_ewald
 ## import parallelism modules
 from openferro.parallelism import DeviceMesh
+
+## TODO: change name to id
 
 class System:
     """
@@ -37,6 +41,7 @@ class System:
         self._self_interaction_dict = {}
         self._mutual_interaction_dict = {}
         self._triple_interaction_dict = {}
+        
     def __repr__(self):
         return f"System with lattice {self.lattice} and fields {self._fields_dict.keys()}"
     
@@ -179,6 +184,7 @@ class System:
     """
     Methods for adding pre-defined interactions to the Hamiltonian
     """
+    ## electric dipole-type interactions
     def add_dipole_dipole_interaction(self, name, field_name, prefactor=1.0, enable_jit=True):
         """
         Add the long-range dipole-dipole interaction term to the Hamiltonian.
@@ -198,6 +204,113 @@ class System:
         self._self_interaction_dict[name] = interaction
         return interaction
 
+    def add_dipole_onsite_interaction(self, name, field_name, K2, alpha, gamma, enable_jit=True):
+        self._add_interaction_sanity_check(name)
+        interaction = self_interaction(field_name)
+        interaction.set_energy_engine(self_energy_onsite_isotropic, enable_jit=enable_jit)
+        interaction.create_force_engine(enable_jit=enable_jit)
+        interaction.set_parameters([K2, alpha, gamma])
+        self._self_interaction_dict[name] = interaction
+        return interaction
+
+    def add_dipole_interaction_1st_shell(self, name, field_name, j1, j2, enable_jit=True):
+        self._add_interaction_sanity_check(name)
+        interaction = self_interaction(field_name)
+        interaction.set_energy_engine(short_range_1stnn_isotropic, enable_jit=enable_jit)
+        interaction.create_force_engine(enable_jit=enable_jit)
+        interaction.set_parameters([j1, j2])
+        self._self_interaction_dict[name] = interaction
+        return interaction
+    
+    def add_dipole_interaction_2nd_shell(self, name, field_name, j3, j4, j5, enable_jit=True):
+        self._add_interaction_sanity_check(name)
+        interaction = self_interaction(field_name)
+        interaction.set_energy_engine(short_range_2ednn_isotropic, enable_jit=enable_jit)
+        interaction.create_force_engine(enable_jit=enable_jit)
+        interaction.set_parameters([j3, j4, j5])
+        self._self_interaction_dict[name] = interaction
+        return interaction
+    
+    def add_dipole_interaction_3rd_shell(self, name, field_name, j6, j7, enable_jit=True):
+        self._add_interaction_sanity_check(name)
+        interaction = self_interaction(field_name)
+        energy_engine = get_short_range_3rdnn_isotropic()
+        interaction.set_energy_engine(energy_engine, enable_jit=enable_jit)
+        interaction.create_force_engine(enable_jit=enable_jit)
+        interaction.set_parameters([j6, j7])
+        self._self_interaction_dict[name] = interaction
+        return interaction
+    
+    ## elastic-type interactions
+    def add_homo_elastic_interaction(self, name, field_name, B11, B12, B44, enable_jit=True):
+        N = float(self.lattice.nsites)
+        self._add_interaction_sanity_check(name)
+        interaction = self_interaction(field_name)
+        interaction.set_energy_engine(homo_elastic_energy, enable_jit=enable_jit)
+        interaction.create_force_engine(enable_jit=enable_jit)
+        interaction.set_parameters([B11, B12, B44, N])
+        self._self_interaction_dict[name] = interaction
+        return interaction
+    
+    def add_inhomo_elastic_interaction(self, name, field_name, B11, B12, B44, enable_jit=True):
+        self._add_interaction_sanity_check(name)
+        interaction = self_interaction(field_name)
+        interaction.set_energy_engine(inhomo_elastic_energy, enable_jit=enable_jit)
+        interaction.create_force_engine(enable_jit=enable_jit)
+        interaction.set_parameters([B11, B12, B44])
+        self._self_interaction_dict[name] = interaction
+        return interaction
+
+    def add_pressure(self, pressure):
+        '''
+        Add a pressure term (pV) to the Hamiltonian. The name of the interaction is reserved as 'pV'. 
+        V is the volume of the system, which is calculated from the reference lattice vectors and the global strain.
+        Args:
+            pressure (float): pressure in bars
+        Returns:
+            Interaction (openferro.interaction): the pV interaction
+        '''
+        _pres = pressure * Constants.bar  # bar -> eV/Angstrom^3
+        ## interaction name sanity check
+        name = 'pV'
+        if name in self.interaction_dict:
+            raise ValueError("pV term already exists in the Hamiltonian.")
+        ## field name sanity check
+        field_name = 'gstrain'
+        field = self.get_field_by_name(field_name)
+        if not isinstance(field, GlobalStrain):
+            raise ValueError("I find a field named gstrain, but it is not a global strain field. Please rename the field or remove it. Then add the global strain field to the system.")
+        ## add the interaction
+        interaction = self_interaction(field_name)
+        interaction.set_energy_engine(energy_engine=pV_energy, enable_jit=True)
+        interaction.create_force_engine(enable_jit=True)
+        parameters = [_pres, self.lattice.ref_volume] 
+        interaction.set_parameters(parameters)
+        self._self_interaction_dict[name] = interaction
+        return interaction
+
+    ## elastic-dipole interactions
+    def add_homo_strain_dipole_interaction(self, name, field_name1, field_name2, B1xx, B1yy, B4yz,  enable_jit=True):
+        self._add_interaction_sanity_check(name)
+        interaction = mutual_interaction(field_name1, field_name2)
+        interaction.set_energy_engine(homo_strain_dipole_interaction, enable_jit=enable_jit)
+        interaction.create_force_engine(enable_jit=enable_jit)
+        interaction.set_parameters([B1xx, B1yy, B4yz])
+        self._mutual_interaction_dict[name] = interaction
+        return interaction
+    
+    def add_inhomo_strain_dipole_interaction(self, name, field_name1, field_name2, B1xx, B1yy, B4yz, enable_jit=True):
+        self._add_interaction_sanity_check(name)
+        interaction = mutual_interaction(field_name1, field_name2)
+        energy_engine = get_inhomo_strain_dipole_interaction(enable_jit=enable_jit)
+        interaction.set_energy_engine(energy_engine, enable_jit=enable_jit)
+        interaction.create_force_engine(enable_jit=enable_jit)
+        interaction.set_parameters([B1xx, B1yy, B4yz])
+        self._mutual_interaction_dict[name] = interaction
+        return interaction
+
+
+    ## atomistic spin-type interactions
     def add_cubic_anisotropy_interaction(self, name, field_name, K1, K2, enable_jit=True):
         """
         Add the cubic anisotropy interaction term.
@@ -263,35 +376,6 @@ class System:
         interaction = self._add_isotropic_exchange_interaction_by_rollers(
             name, field_name, coupling, self.lattice.fourth_shell_roller, enable_jit=enable_jit)
         return interaction
-
-    def add_pressure(self, pressure):
-        '''
-        Add a pressure term (pV) to the Hamiltonian. The name of the interaction is reserved as 'pV'. 
-        V is the volume of the system, which is calculated from the reference lattice vectors and the global strain.
-        Args:
-            pressure (float): pressure in bars
-        Returns:
-            Interaction (openferro.interaction): the pV interaction
-        '''
-        _pres = pressure * Constants.bar  # bar -> eV/Angstrom^3
-        ## interaction name sanity check
-        name = 'pV'
-        if name in self.interaction_dict:
-            raise ValueError("pV term already exists in the Hamiltonian.")
-        ## field name sanity check
-        field_name = 'gstrain'
-        field = self.get_field_by_name(field_name)
-        if not isinstance(field, GlobalStrain):
-            raise ValueError("I find a field named gstrain, but it is not a global strain field. Please rename the field or remove it. Then add the global strain field to the system.")
-        ## add the interaction
-        interaction = self_interaction(field_name)
-        interaction.set_energy_engine(energy_engine=pV_energy, enable_jit=True)
-        interaction.create_force_engine(enable_jit=True)
-        parameters = [_pres, self.lattice.ref_volume] 
-        interaction.set_parameters(parameters)
-        self._self_interaction_dict[name] = interaction
-        return interaction
-
     """
     Methods for adding custom interactions to the Hamiltonian. Energy engines should be provided by the user.
     """
@@ -486,8 +570,8 @@ class System:
             field.accumulate_force(force)
             if profile:
                 jax.block_until_ready(field.get_force())
-                print('time for updating force from %s:' % interaction_name, timer()-t0)
-                print("energy from %s:" % interaction_name, interaction.calc_energy(field))
+                logging.info('Time for updating force from {}: {:.8f}s'.format(interaction_name, timer()-t0))
+                # print("energy from %s:" % interaction_name, interaction.calc_energy(field))
         return
     
     def update_force_from_mutual_interaction(self, profile=False):
@@ -505,7 +589,7 @@ class System:
             field2.accumulate_force(force2)
             if profile:
                 jax.block_until_ready(field2.get_force())
-                print('time for updating force from %s:' % interaction_name, timer()-t0)
+                logging.info('Time for updating force from {}: {:.8f}s'.format(interaction_name, timer()-t0))
         return
     
     def update_force_from_triple_interaction(self, profile=False):
@@ -525,7 +609,7 @@ class System:
             field3.accumulate_force(force3)
             if profile:
                 jax.block_until_ready(field3.get_force())
-                print('time for updating force from %s:' % interaction_name, timer()-t0)
+                logging.info('Time for updating force from {}: {:.8f}s'.format(interaction_name, timer()-t0))
         return
 
     def update_force(self, profile=False):
@@ -539,14 +623,14 @@ class System:
             field.zero_force()
             if profile:
                 jax.block_until_ready(field.get_force())
-                print('time for zeroing force of %s:' % field.name, timer()-t0)
+                logging.info('Time for zeroing force of {}: {:.8f}s'.format(field.name, timer()-t0))
 
         ## update force from all interactions
         self.update_force_from_self_interaction(profile=profile)
         self.update_force_from_mutual_interaction(profile=profile)
         self.update_force_from_triple_interaction(profile=profile)
         return
-
+     
 class RingPolymerSystem(System):
     """
     A class to define a ring polymer system for path-integral molecular dynamics simulations. 

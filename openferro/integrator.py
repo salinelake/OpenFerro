@@ -10,6 +10,7 @@ import jax.numpy as jnp
 from openferro.units import Constants
 from openferro.utilities import SO3_rotation
 import warnings
+import logging
 
 class Integrator:
     """
@@ -343,7 +344,8 @@ class ConservativeLLSIBIntegrator(Integrator):
             if normalized_diff_avg < self.tol:
                 break
             if i == self.max_iter - 1:
-                warnings.warn("SIB integrator for field '{}' does not converge: fixed-point iterations for step 1 exceed {}. The current tolerance for convergence is {} (in terms of |M_new - M_old|/Ms, averaged over lattice).".format(field.name, self.max_iter, self.tol))
+                logging.warning("SIB integrator for field '{}' does not converge: fixed-point iterations for step 1 exceed {}. The current tolerance for convergence is {} (in terms of |M_new - M_old|/Ms, averaged over lattice).".format(field.name, self.max_iter, self.tol))
+                logging.warning("If this warning happens frequently, consider decreasing the time step.")
         ## set the current configuration as the auxiliary configuration Y, then update the force
         field.set_values( (Y + M)/2 )
         force_updater()
@@ -354,7 +356,8 @@ class ConservativeLLSIBIntegrator(Integrator):
             if normalized_diff_avg < self.tol:
                 break
             if i == self.max_iter - 1:
-                warnings.warn("SIB integrator for field '{}' does not converge: fixed-point iterations for step 2 exceed {}. The current tolerance for convergence is {} (in terms of |M_new - M_old|/Ms, averaged over lattice).".format(field.name, self.max_iter, self.tol))
+                logging.warning("SIB integrator for field '{}' does not converge: fixed-point iterations for step 2 exceed {}. The current tolerance for convergence is {} (in terms of |M_new - M_old|/Ms, averaged over lattice).".format(field.name, self.max_iter, self.tol))
+                logging.warning("If this warning happens frequently, consider decreasing the time step dt.")
         field.set_values(Y)
         return field
 
@@ -436,7 +439,8 @@ class LLSIBIntegrator(Integrator):
             if normalized_diff_avg < self.tol:
                 break
             if i == self.max_iter - 1:
-                warnings.warn("SIB integrator for field '{}' does not converge: fixed-point iterations for step 1 exceed {}. The current tolerance for convergence is {} (in terms of |M_new - M_old|/Ms, averaged over lattice).".format(field.name, self.max_iter, self.tol))
+                logging.warning("SIB integrator for field '{}' does not converge: fixed-point iterations for step 1 exceed {}. The current tolerance for convergence is {} (in terms of |M_new - M_old|/Ms, averaged over lattice).".format(field.name, self.max_iter, self.tol))
+                logging.warning("If this warning happens frequently, consider decreasing the time step.")
         ## set the current configuration as the auxiliary configuration Y, then update the force
         field.set_values( (Y + M)/2 )
         force_updater()
@@ -448,7 +452,8 @@ class LLSIBIntegrator(Integrator):
             if normalized_diff_avg < self.tol:
                 break
             if i == self.max_iter - 1:
-                warnings.warn("SIB integrator for field '{}' does not converge: fixed-point iterations for step 2 exceed {}. The current tolerance for convergence is {} (in terms of |M_new - M_old|/Ms, averaged over lattice).".format(field.name, self.max_iter, self.tol))
+                logging.warning("SIB integrator for field '{}' does not converge: fixed-point iterations for step 2 exceed {}. The current tolerance for convergence is {} (in terms of |M_new - M_old|/Ms, averaged over lattice).".format(field.name, self.max_iter, self.tol))
+                logging.warning("If this warning happens frequently, consider decreasing the time step.")
         field.set_values(Y)
         return field
 
@@ -513,7 +518,8 @@ class LLSIBLangevinIntegrator(LLSIBIntegrator):
             if normalized_diff_avg < self.tol:
                 break
             if i == self.max_iter - 1:
-                warnings.warn("SIB integrator for field '{}' does not converge: fixed-point iterations for step 1 exceed {}. The current tolerance for convergence is {} (in terms of |M_new - M_old|/Ms, averaged over lattice).".format(field.name, self.max_iter, self.tol))
+                logging.warning("SIB integrator for field '{}' does not converge: fixed-point iterations for step 1 exceed {}. The current tolerance for convergence is {} (in terms of |M_new - M_old|/Ms, averaged over lattice).".format(field.name, self.max_iter, self.tol))
+                logging.warning("If this warning happens frequently, consider decreasing the time step.")
         ## set the current configuration as the auxiliary configuration Y
         field.set_values( (Y + M)/2 )
         ## get the effective magnetic field for step 2
@@ -527,6 +533,7 @@ class LLSIBLangevinIntegrator(LLSIBIntegrator):
             if normalized_diff_avg < self.tol:
                 break
             if i == self.max_iter - 1:
-                warnings.warn("SIB integrator for field '{}' does not converge: fixed-point iterations for step 2 exceed {}. The current tolerance for convergence is {} (in terms of |M_new - M_old|/Ms, averaged over lattice).".format(field.name, self.max_iter, self.tol))
+                logging.warning("SIB integrator for field '{}' does not converge: fixed-point iterations for step 2 exceed {}. The current tolerance for convergence is {} (in terms of |M_new - M_old|/Ms, averaged over lattice).".format(field.name, self.max_iter, self.tol))
+                logging.warning("If this warning happens frequently, consider decreasing the time step.")
         field.set_values(Y)
         return field

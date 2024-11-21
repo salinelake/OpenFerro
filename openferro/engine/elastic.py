@@ -17,10 +17,6 @@ def homo_elastic_energy(global_strain, parameters):
     Returns:
         jnp.array, the homogeneous elastic energy
     """
-    # B11 = parameters['B11'] 
-    # B12 = parameters['B12']
-    # B44 = parameters['B44']
-    # N = parameters['N']
     B11, B12, B44, N = parameters
 
     ## get the homogeneous strain energy 
@@ -50,9 +46,9 @@ def pV_energy(global_strain, parameters):
     pV = ( gs[:3].sum()) * pres * vol_ref
     return pV
 
-def elastic_energy(local_displacement, global_strain, parameters):
+def inhomo_elastic_energy(local_displacement, parameters):
     """
-    Returns the elastic energy of a strain field.
+    Returns the inhomogeneous elastic energy of a strain field.
 
     Args: 
         local_displacement: jnp.array, shape=(nx, ny, nz, 3), the local displacement field
@@ -65,22 +61,11 @@ def elastic_energy(local_displacement, global_strain, parameters):
     Returns:
         jnp.array, the total elastic energy (homogeneous + inhomogeneous)
     """
-    # B11 = parameters['B11'] 
-    # B12 = parameters['B12']
-    # B44 = parameters['B44']
     B11, B12, B44 = parameters
     g11 = B11 / 4
     g12 = B12 / 8
-    g44 = B44 / 8
+    g44 = B44 / 8 # TODO: check if this should be g44 = B44 / 4
 
-    ## get the homogeneous strain energy 
-    gs = global_strain
-    N = local_displacement.shape[0] * local_displacement.shape[1] * local_displacement.shape[2]
-    homo_elastic_energy = 0.5 * B11 * jnp.sum(gs[:3]**2)
-    homo_elastic_energy += B12 * (gs[0]*gs[1]+gs[1]*gs[2]+gs[2]*gs[0])
-    homo_elastic_energy += 0.5 * B44 * jnp.sum(gs[3:]**2)
-    homo_elastic_energy *= N
-    
     ## get the inhomogeneous strain energy
     ls = local_displacement
     grad_0 = ls - jnp.roll( ls, 1, axis=0)     # v(R)-v(R-x)
@@ -124,5 +109,5 @@ def elastic_energy(local_displacement, global_strain, parameters):
     inhomo_elastic_energy +=  g44 * jnp.sum((vyz_p+vzy_m)**2)
     inhomo_elastic_energy +=  g44 * jnp.sum((vyz_m+vzy_p)**2)
     inhomo_elastic_energy +=  g44 * jnp.sum((vyz_p+vzy_p)**2)
-    return homo_elastic_energy + inhomo_elastic_energy
+    return inhomo_elastic_energy
 

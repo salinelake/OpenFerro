@@ -6,6 +6,7 @@ Classes for multi-GPU parallelism.
 from jax.sharding import Mesh, PartitionSpec, NamedSharding
 import numpy as np
 import jax
+import logging
 
 class DeviceMesh:
     def __init__(self, devices=None, num_rows=None, num_cols=None):
@@ -32,8 +33,8 @@ class DeviceMesh:
             num_cols = int(num_cols)
             if num_rows * num_cols != num_devices:
                 raise ValueError("The number of devices does not match the configuration.")
-        print('The number of devices is {}'.format(num_devices))
-        print('The configuration of the devices is ({} x {})'.format(num_rows, num_cols))
+        logging.info('The number of devices is {}'.format(num_devices))
+        logging.info('The configuration of the devices is ({} x {})'.format(num_rows, num_cols))
         devices = devices.reshape(num_rows, num_cols)
         # Create a Mesh object to distribute a value across devices:
         self.mesh = Mesh(devices=devices, axis_names=('x', 'y'))

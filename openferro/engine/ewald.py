@@ -9,36 +9,6 @@ from jax import jit
 import jax.numpy as jnp
 from openferro.units import Constants
 
-## Helper functions
-def _ewald_ksum(F_fft3, UkGG):
-    """
-    Getting ewald summation over the k-space with UkGG in Voigt notation.
-    Args:
-        F_fft3: jax.numpy array, shape=(l1, l2, l3, 3). Fast Fourier Transform of the field.
-        UkGG: jax.numpy array, shape=(l1, l2, l3, 6). UkGG in Voigt notation.
-    Returns:
-        jax.numpy array, shape=(1,)
-    """
-    F_real = F_fft3.real
-    F_imag = F_fft3.imag
-    ewald_ksum = (F_real[..., 0]**2 + F_imag[..., 0]**2) * UkGG[..., 0]
-    ewald_ksum += (F_real[..., 1]**2 + F_imag[..., 1]**2) * UkGG[..., 1]
-    ewald_ksum += (F_real[..., 2]**2 + F_imag[..., 2]**2) * UkGG[..., 2]
-    ewald_ksum += 2 * ((F_real[..., 0] * F_real[..., 1] + F_imag[..., 0] * F_imag[..., 1]) * UkGG[..., 5])
-    ewald_ksum += 2 * ((F_real[..., 0] * F_real[..., 2] + F_imag[..., 0] * F_imag[..., 2]) * UkGG[..., 4])
-    ewald_ksum += 2 * ((F_real[..., 1] * F_real[..., 2] + F_imag[..., 1] * F_imag[..., 2]) * UkGG[..., 3])
-    return ewald_ksum.sum()
-
-def _ewald_rsum(field):
-    """
-    Getting ewald summation over the real space.
-    Args:
-        field: jax.numpy array, shape=(l1, l2, l3, 3). The values of the field.
-    Returns:
-        jax.numpy array, shape=(1,)
-    """
-    return jnp.sum(field**2)
-
 def get_dipole_dipole_ewald(latt, sharding=None):
     """
     Returns the function to calculate the energy of dipole-dipole interaction.
@@ -90,7 +60,8 @@ def get_dipole_dipole_ewald(latt, sharding=None):
     #             UkGG += G_grid[:,:,:,None,:] * G_grid[:,:,:,:,None] * Uk_coef[:,:,:,None,None]
 
     ## memory-saving version of UkGG with Voigt notation
-    ## Voigt notation of a symmetric 3X3 matrix: Six elements are respectively (0,0), (1,1), (2,2), (1,2), (0,2), (0,1)-entry of a symmetric 3X3 matrix
+    ## Voigt notation of a symmetric 3X3 matrix: Six elements are respectively (0,0), (1,1), (2,2), (1,2), (0,2), (0,1)-entry of a symmetric 3X3 matrix. 
+    ## Slightly different from the original Voigt notation. We do not double count the fourth, fifth, and sixth elements here. 
     UkGG = jnp.zeros((l1, l2, l3, 6)) 
     if sharding is not None:
         G_grid_1stBZ = jax.device_put(G_grid_1stBZ, sharding)
@@ -116,10 +87,41 @@ def get_dipole_dipole_ewald(latt, sharding=None):
     G_grid = None
     Uk_coef = None
 
-    ## jit the functions
+    ## define the computationally intensive functions to be jitted. 
+    def _ewald_ksum(F_fft3):
+        """
+        Getting ewald summation over the k-space with UkGG in Voigt notation.
+        Args:
+            F_fft3: jax.numpy array, shape=(l1, l2, l3, 3). Fast Fourier Transform of the field.
+            UkGG: jax.numpy array, shape=(l1, l2, l3, 6). UkGG in Voigt notation.
+        Returns:
+            jax.numpy array, shape=(1,)
+        """
+        F_real = F_fft3.real
+        F_imag = F_fft3.imag
+        ewald_ksum = (F_real[..., 0]**2 + F_imag[..., 0]**2) * UkGG[..., 0]
+        ewald_ksum += (F_real[..., 1]**2 + F_imag[..., 1]**2) * UkGG[..., 1]
+        ewald_ksum += (F_real[..., 2]**2 + F_imag[..., 2]**2) * UkGG[..., 2]
+        ewald_ksum += 2 * ((F_real[..., 0] * F_real[..., 1] + F_imag[..., 0] * F_imag[..., 1]) * UkGG[..., 5])
+        ewald_ksum += 2 * ((F_real[..., 0] * F_real[..., 2] + F_imag[..., 0] * F_imag[..., 2]) * UkGG[..., 4])
+        ewald_ksum += 2 * ((F_real[..., 1] * F_real[..., 2] + F_imag[..., 1] * F_imag[..., 2]) * UkGG[..., 3])
+        return ewald_ksum.sum()
+
+    ## define the computationally intensive functions to be jitted.  
+    def _ewald_rsum(field):
+        """
+        Getting ewald summation over the real space.
+        Args:
+            field: jax.numpy array, shape=(l1, l2, l3, 3). The values of the field.
+        Returns:
+            jax.numpy array, shape=(1,)
+        """
+        return jnp.sum(field**2)
+
     ewald_ksum_func = jit(_ewald_ksum)
     ewald_rsum_func = jit(_ewald_rsum)
 
+    ##  The main function of energy engine will not be jitted. jitting jnp.fft.fftn seems to lead to error.
     def energy_engine(field, parameters):
         """
         Calculate the energy of dipole-dipole interaction using Ewald summation.
@@ -132,10 +134,46 @@ def get_dipole_dipole_ewald(latt, sharding=None):
         prefactor = parameters[0]
         ## calculate reciprocal space sum. UkGG is a symmetric (l1, l2, l3, 3, 3) matrix, so we only need to calculate half of it.
         F_fft3 = jnp.fft.fftn(field, axes=(0,1,2))  # (l1, l2, l3, 3)
-        ewald_ksum = ewald_ksum_func(F_fft3, UkGG)
+        ######### compute the summation over k-space
+        # ewald_ksum = ewald_ksum_func(F_fft3, UkGG)
+        ewald_ksum = ewald_ksum_func(F_fft3)
+
+        ######### compute the summation over real space
         ewald_rsum = ewald_rsum_func(field)
         return (coef_ksum * ewald_ksum - coef_rsum * ewald_rsum) * prefactor
     return energy_engine
+
+
+# ## Helper functions
+# def _ewald_ksum(F_fft3, UkGG):  ## warning on too long constant folding because UkGG is in the argument when jitted
+#     """
+#     Getting ewald summation over the k-space with UkGG in Voigt notation.
+#     Args:
+#         F_fft3: jax.numpy array, shape=(l1, l2, l3, 3). Fast Fourier Transform of the field.
+#         UkGG: jax.numpy array, shape=(l1, l2, l3, 6). UkGG in Voigt notation.
+#     Returns:
+#         jax.numpy array, shape=(1,)
+#     """
+#     F_real = F_fft3.real
+#     F_imag = F_fft3.imag
+#     ewald_ksum = (F_real[..., 0]**2 + F_imag[..., 0]**2) * UkGG[..., 0]
+#     ewald_ksum += (F_real[..., 1]**2 + F_imag[..., 1]**2) * UkGG[..., 1]
+#     ewald_ksum += (F_real[..., 2]**2 + F_imag[..., 2]**2) * UkGG[..., 2]
+#     ewald_ksum += 2 * ((F_real[..., 0] * F_real[..., 1] + F_imag[..., 0] * F_imag[..., 1]) * UkGG[..., 5])
+#     ewald_ksum += 2 * ((F_real[..., 0] * F_real[..., 2] + F_imag[..., 0] * F_imag[..., 2]) * UkGG[..., 4])
+#     ewald_ksum += 2 * ((F_real[..., 1] * F_real[..., 2] + F_imag[..., 1] * F_imag[..., 2]) * UkGG[..., 3])
+#     return ewald_ksum.sum()
+
+# def _ewald_rsum(field):
+#     """
+#     Getting ewald summation over the real space.
+#     Args:
+#         field: jax.numpy array, shape=(l1, l2, l3, 3). The values of the field.
+#     Returns:
+#         jax.numpy array, shape=(1,)
+#     """
+#     return jnp.sum(field**2)
+
 
 """
 Archived versions of Ewald summation with higher memory usage. For testing purpose only.

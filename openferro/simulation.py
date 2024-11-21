@@ -4,6 +4,7 @@ Classes which define the time evolution of physical systems.
 # This file is part of OpenFerro.
 
 from time import time as timer
+import logging
 import numpy as np
 import jax
 import jax.numpy as jnp
@@ -11,7 +12,7 @@ from functools import partial
 from openferro.units import Constants
 from openferro.field import GlobalStrain
 
-
+## TODO: add reporter of energy, average field and dump of field values/velocity.
 
 class MDMinimize:
     def __init__(self, system, max_iter=100, tol=1e-5 ):
@@ -105,7 +106,7 @@ class SimulationNVE:
                 field.integrator.step(field)
                 if profile:
                     jax.block_until_ready(field.get_values())
-                    print('time for updating field %s:' % type(field), timer()-t0)
+                    logging.info('Time for updating field {}: {:.8f}s'.format(type(field), timer()-t0))
         if len(self.SO3_fields) > 0:
             ## Force updater will be passed to the integrator of each SO3 fields because implicit methods are used.
             ## So the force will not be updated here. 
@@ -115,7 +116,7 @@ class SimulationNVE:
                 field.integrator.step(field, force_updater=self.system.update_force)
                 if profile:
                     jax.block_until_ready(field.get_values())
-                    print('time for updating field %s:' % type(field), timer()-t0)
+                    logging.info('Time for updating field {}: {:.8f}s'.format(type(field), timer()-t0))
     def run(self, nsteps=1, profile=False):
         for i in range(nsteps):
             self._step(profile=profile)
@@ -138,7 +139,7 @@ class SimulationNVTLangevin(SimulationNVE):
                 field.integrator.step(subkey, field)
                 if profile:
                     jax.block_until_ready(field.get_values())
-                    print('time for updating field %s:' % type(field), timer()-t0)
+                    logging.info('Time for updating field {}: {:.8f}s'.format(type(field), timer()-t0))
         if len(self.SO3_fields) > 0:
             for field, subkey in zip(self.SO3_fields, keys_SO3):
                 if profile:
@@ -146,7 +147,7 @@ class SimulationNVTLangevin(SimulationNVE):
                 field.integrator.step(subkey, field, force_updater=self.system.update_force)
                 if profile:
                     jax.block_until_ready(field.get_values())
-                    print('time for updating field %s:' % type(field), timer()-t0)
+                    logging.info('Time for updating field {}: {:.8f}s'.format(type(field), timer()-t0))
         return
 
     def run(self, nsteps=1, profile=False):
@@ -161,7 +162,7 @@ class SimulationNVTLangevin(SimulationNVE):
             subkeys = keys[id_step * self.nfields:(id_step+1) * self.nfields]
             self._step(subkeys, profile)
             if profile:
-                print('Total time for one step:', timer()-t0)
+                logging.info('Total time for one step: {:.8f}s'.format(timer()-t0))
         return
 
 class SimulationNPTLangevin(SimulationNVTLangevin):

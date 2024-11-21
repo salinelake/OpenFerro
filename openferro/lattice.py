@@ -23,6 +23,12 @@ class BravaisLattice3D:
     def __repr__(self):
         return f"Bravais lattice with size {self.size} and primitive vectors {self.a1}, {self.a2}, {self.a3}"    
     
+    ## total number of sites
+    @property
+    def nsites(self):
+        return jnp.prod(self.size)
+
+
     @property
     def unit_volume(self):
         """
