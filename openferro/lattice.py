@@ -113,9 +113,6 @@ class SimpleCubic3D(BravaisLattice3D):
         ]
         return roller
 
-
-
-
 class BodyCenteredCubic3D(SimpleCubic3D):
     """
     A class to represent a body-centered cubic lattice. Coordination number is 8. 

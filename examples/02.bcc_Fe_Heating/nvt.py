@@ -9,6 +9,7 @@ from openferro.engine.magnetic import *
 from time import time as timer
 from matplotlib import pyplot as plt
 import logging
+
 logging.basicConfig(level=logging.INFO, filename="simulation.log")
 ##########################################################################################
 ## Define the lattice 
@@ -22,37 +23,31 @@ Fe_bcc = of.System(latt)
 ## Define the fields
 ##########################################################################################
 Ms = 2.23   #in muB
-spin_field = Fe_bcc.add_field(name="spin", ftype="SO3", value=jnp.array([0,0,1]))
+spin_field = Fe_bcc.add_field(ID="spin", ftype="SO3", value=jnp.array([0,0,1]))
 spin_field.set_magnitude(Ms)
+
 ##########################################################################################
 ## Define the Hamiltonian
 ##########################################################################################
 ## getting these parameters from PRL 95, 087207 (2005)
 couplings = jnp.array([1.33767484769984, 0.75703576545650, -0.05975437643846, -0.08819834160658])  # in mRy, SPR-KKR convention
 J1, J2, J3, J4 = couplings * Constants.mRy / Ms**2  # convert to our convention (eV / muB^2)
-Fe_bcc.add_isotropic_exchange_interaction_1st_shell(name="exchange_1st_shell", field_name="spin", coupling=J1)
-Fe_bcc.add_isotropic_exchange_interaction_2nd_shell(name="exchange_2nd_shell", field_name="spin", coupling=J2)
-Fe_bcc.add_isotropic_exchange_interaction_3rd_shell(name="exchange_3rd_shell", field_name="spin", coupling=J3)
-Fe_bcc.add_isotropic_exchange_interaction_4th_shell(name="exchange_4th_shell", field_name="spin", coupling=J4)
-# Fe_bcc.add_cubic_anisotropy_interaction(name="cubic_anisotropy", field_name="spin", K1=K1, K2=K2)
-
+Fe_bcc.add_isotropic_exchange_interaction_1st_shell(ID="exchange_1st_shell", field_ID="spin", coupling=J1)
+Fe_bcc.add_isotropic_exchange_interaction_2nd_shell(ID="exchange_2nd_shell", field_ID="spin", coupling=J2)
+Fe_bcc.add_isotropic_exchange_interaction_3rd_shell(ID="exchange_3rd_shell", field_ID="spin", coupling=J3)
+Fe_bcc.add_isotropic_exchange_interaction_4th_shell(ID="exchange_4th_shell", field_ID="spin", coupling=J4)
+# Fe_bcc.add_cubic_anisotropy_interaction(ID="cubic_anisotropy", field_ID="spin", K1=K1, K2=K2)
 
 ##########################################################################################
 ## NPT simulation
 ##########################################################################################
-
 dt = 0.0002
 temp_list = [10, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950, 1000, 1050, 1100, 1150, 1200, 1250, 1300, 1350, 1400, 1450, 1500]
-for temp in temp_list:
-    spin_field.set_integrator('isothermal', dt=dt, temp=temp, alpha=0.5)
-    simulation = SimulationNVTLangevin(Fe_bcc )
+simulation = SimulationNVTLangevin(Fe_bcc )
 
-    t0 = timer()
-    jax.block_until_ready(simulation.run(1, profile=True))
-    t1 = timer()
-    logging.info(f"initialization takes: {t1-t0} seconds")
-    
-    
+for temp in temp_list:
+    logging.info("Temp={}K, NVT Simulation".format(temp))
+    spin_field.set_integrator('isothermal', dt=dt, temp=temp, alpha=0.5)
     spin_traj = []
     M_avg = []
     pot_energy = []

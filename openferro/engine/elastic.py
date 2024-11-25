@@ -111,3 +111,4 @@ def inhomo_elastic_energy(local_displacement, parameters):
     inhomo_elastic_energy +=  g44 * jnp.sum((vyz_p+vzy_p)**2)
     return inhomo_elastic_energy
 
+ 

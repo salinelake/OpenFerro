@@ -59,9 +59,9 @@ class self_interaction(interaction_base):
     """
     A class to specify the self-interaction of a field.
     """
-    def __init__(self, field_name, parameters=None):
+    def __init__(self, field_ID, parameters=None):
         super().__init__( parameters)
-        self.field_name = field_name
+        self.field_ID = field_ID
     def create_force_engine(self, enable_jit=True):
         """
         Derive the force engine of the interaction from the energy engine through automatic differentiation.
@@ -102,10 +102,10 @@ class mutual_interaction(interaction_base):
     """
     A class to specify the  mutual interaction between two fields.
     """
-    def __init__(self, field_name1, field_name2, parameters=None):
+    def __init__(self, field_1_ID, field_2_ID, parameters=None):
         super().__init__( parameters)
-        self.field_name1 = field_name1
-        self.field_name2 = field_name2
+        self.field_1_ID = field_1_ID
+        self.field_2_ID = field_2_ID
     def create_force_engine(self, enable_jit=True):
         """
         Derive the force engine of the interaction from the energy engine through automatic differentiation.
@@ -148,11 +148,11 @@ class triple_interaction:
     """
     A class to specify the  mutual interaction between three fields.
     """
-    def __init__(self, field_name1, field_name2, field_name3, parameters=None):
+    def __init__(self, field_1_ID, field_2_ID, field_3_ID, parameters=None):
         super().__init__( parameters)
-        self.field_name1 = field_name1
-        self.field_name2 = field_name2
-        self.field_name3 = field_name3
+        self.field_1_ID = field_1_ID
+        self.field_2_ID = field_2_ID
+        self.field_3_ID = field_3_ID
     def create_force_engine(self, enable_jit=True):
         """
         Derive the force engine of the interaction from the energy engine through automatic differentiation.

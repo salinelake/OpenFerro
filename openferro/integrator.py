@@ -55,6 +55,20 @@ class GradientDescentIntegrator(Integrator):
         field.set_values(x0)
         return field
 
+class GradientDescentIntegrator_Strain(GradientDescentIntegrator):
+    """
+    Gradient descent integrator for global strain.
+    """
+    def __init__(self, dt, freeze_x=False, freeze_y=False, freeze_z=False):
+        super().__init__(dt)
+        if (not freeze_x) and (not freeze_y) and (not freeze_z):
+            self.mask = jnp.ones((6,))
+        else:
+            self.mask = jnp.array([int(not freeze_x), int(not freeze_y), int(not freeze_z), 0, 0, 0])
+        def _step_x(x, f, m, dt):
+            return x + f / m * dt * self.mask
+        self.step_x = jit(_step_x)
+    
 class LeapFrogIntegrator(Integrator):
     """
     Leapfrog integrator.
@@ -78,7 +92,24 @@ class LeapFrogIntegrator(Integrator):
         field.set_values(x0)
         field.set_velocity(v0)
         return field
-    
+
+class LeapFrogIntegrator_Strain(LeapFrogIntegrator):
+    """
+    Leapfrog integrator for global strain.
+    """
+    def __init__(self, dt, freeze_x=False, freeze_y=False, freeze_z=False):
+        super().__init__(dt)
+        if (not freeze_x) and (not freeze_y) and (not freeze_z):
+            self.mask = jnp.ones((6,))
+        else:
+            self.mask = jnp.array([int(not freeze_x), int(not freeze_y), int(not freeze_z), 0, 0, 0])
+        def _step_xp(x, v, f, m, dt):
+            v += f / m * dt
+            v *= self.mask
+            x += v * dt
+            return x, v
+        self.step_xp = jit(_step_xp)
+
 class LangevinIntegrator(Integrator):
     """
     Langevin integrator as in J. Phys. Chem. A 2019, 123, 28, 6056-6079. 
@@ -136,6 +167,33 @@ class LangevinIntegrator(Integrator):
         field.set_velocity(v0)
         return field
 
+class LangevinIntegrator_Strain(LangevinIntegrator):
+    """
+    Langevin integrator for global strain.
+    """
+    def __init__(self, dt, temp, tau, freeze_x=False, freeze_y=False, freeze_z=False):
+        super().__init__(dt, temp, tau)
+        if (not freeze_x) and (not freeze_y) and (not freeze_z):
+            self.mask = jnp.ones((6,))
+        else:
+            self.mask = jnp.array([int(not freeze_x), int(not freeze_y), int(not freeze_z), 0, 0, 0])
+        def _step_p(v, f, m, dt):
+            v += f / m * dt
+            v *= self.mask
+            return v
+
+        def _step_x(x, v, dt):
+            x += 0.5 * v * dt
+            return x
+
+        def _step_t(v, noise, z1, z2):
+            v = z1 * v + z2 * noise
+            v *= self.mask
+            return v 
+        self.step_p = jit(_step_p)
+        self.step_x = jit(_step_x)
+        self.step_t = jit(_step_t)
+    
 class OverdampedLangevinIntegrator(Integrator):
     """
     Overdamped Langevin integrator.
@@ -344,7 +402,7 @@ class ConservativeLLSIBIntegrator(Integrator):
             if normalized_diff_avg < self.tol:
                 break
             if i == self.max_iter - 1:
-                logging.warning("SIB integrator for field '{}' does not converge: fixed-point iterations for step 1 exceed {}. The current tolerance for convergence is {} (in terms of |M_new - M_old|/Ms, averaged over lattice).".format(field.name, self.max_iter, self.tol))
+                logging.warning("SIB integrator for field '{}' does not converge: fixed-point iterations for step 1 exceed {}. The current tolerance for convergence is {} (in terms of |M_new - M_old|/Ms, averaged over lattice).".format(field.ID, self.max_iter, self.tol))
                 logging.warning("If this warning happens frequently, consider decreasing the time step.")
         ## set the current configuration as the auxiliary configuration Y, then update the force
         field.set_values( (Y + M)/2 )
@@ -356,7 +414,7 @@ class ConservativeLLSIBIntegrator(Integrator):
             if normalized_diff_avg < self.tol:
                 break
             if i == self.max_iter - 1:
-                logging.warning("SIB integrator for field '{}' does not converge: fixed-point iterations for step 2 exceed {}. The current tolerance for convergence is {} (in terms of |M_new - M_old|/Ms, averaged over lattice).".format(field.name, self.max_iter, self.tol))
+                logging.warning("SIB integrator for field '{}' does not converge: fixed-point iterations for step 2 exceed {}. The current tolerance for convergence is {} (in terms of |M_new - M_old|/Ms, averaged over lattice).".format(field.ID, self.max_iter, self.tol))
                 logging.warning("If this warning happens frequently, consider decreasing the time step dt.")
         field.set_values(Y)
         return field
@@ -439,7 +497,7 @@ class LLSIBIntegrator(Integrator):
             if normalized_diff_avg < self.tol:
                 break
             if i == self.max_iter - 1:
-                logging.warning("SIB integrator for field '{}' does not converge: fixed-point iterations for step 1 exceed {}. The current tolerance for convergence is {} (in terms of |M_new - M_old|/Ms, averaged over lattice).".format(field.name, self.max_iter, self.tol))
+                logging.warning("SIB integrator for field '{}' does not converge: fixed-point iterations for step 1 exceed {}. The current tolerance for convergence is {} (in terms of |M_new - M_old|/Ms, averaged over lattice).".format(field.ID, self.max_iter, self.tol))
                 logging.warning("If this warning happens frequently, consider decreasing the time step.")
         ## set the current configuration as the auxiliary configuration Y, then update the force
         field.set_values( (Y + M)/2 )
@@ -452,7 +510,7 @@ class LLSIBIntegrator(Integrator):
             if normalized_diff_avg < self.tol:
                 break
             if i == self.max_iter - 1:
-                logging.warning("SIB integrator for field '{}' does not converge: fixed-point iterations for step 2 exceed {}. The current tolerance for convergence is {} (in terms of |M_new - M_old|/Ms, averaged over lattice).".format(field.name, self.max_iter, self.tol))
+                logging.warning("SIB integrator for field '{}' does not converge: fixed-point iterations for step 2 exceed {}. The current tolerance for convergence is {} (in terms of |M_new - M_old|/Ms, averaged over lattice).".format(field.ID, self.max_iter, self.tol))
                 logging.warning("If this warning happens frequently, consider decreasing the time step.")
         field.set_values(Y)
         return field
@@ -518,7 +576,7 @@ class LLSIBLangevinIntegrator(LLSIBIntegrator):
             if normalized_diff_avg < self.tol:
                 break
             if i == self.max_iter - 1:
-                logging.warning("SIB integrator for field '{}' does not converge: fixed-point iterations for step 1 exceed {}. The current tolerance for convergence is {} (in terms of |M_new - M_old|/Ms, averaged over lattice).".format(field.name, self.max_iter, self.tol))
+                logging.warning("SIB integrator for field '{}' does not converge: fixed-point iterations for step 1 exceed {}. The current tolerance for convergence is {} (in terms of |M_new - M_old|/Ms, averaged over lattice).".format(field.ID, self.max_iter, self.tol))
                 logging.warning("If this warning happens frequently, consider decreasing the time step.")
         ## set the current configuration as the auxiliary configuration Y
         field.set_values( (Y + M)/2 )
@@ -533,7 +591,7 @@ class LLSIBLangevinIntegrator(LLSIBIntegrator):
             if normalized_diff_avg < self.tol:
                 break
             if i == self.max_iter - 1:
-                logging.warning("SIB integrator for field '{}' does not converge: fixed-point iterations for step 2 exceed {}. The current tolerance for convergence is {} (in terms of |M_new - M_old|/Ms, averaged over lattice).".format(field.name, self.max_iter, self.tol))
+                logging.warning("SIB integrator for field '{}' does not converge: fixed-point iterations for step 2 exceed {}. The current tolerance for convergence is {} (in terms of |M_new - M_old|/Ms, averaged over lattice).".format(field.ID, self.max_iter, self.tol))
                 logging.warning("If this warning happens frequently, consider decreasing the time step.")
         field.set_values(Y)
         return field

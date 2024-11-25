@@ -14,15 +14,15 @@ class Field:
     """
     Template class to define a field on a lattice. 
     """
-    def __init__(self, lattice, name: str):
+    def __init__(self, lattice, ID: str):
         """
         Initialize a field.
         Args:
             lattice: BravaisLattice3D object.
-            name: str, name of the field.
+            ID: str, ID of the field.
         """
         self.lattice = lattice
-        self.name = name
+        self.ID = ID
         self._values = None
         self._mass = None
         self._velocity = None
@@ -194,8 +194,8 @@ class FieldRn(Field):
     """
     R^n field on a lattice. Values are stored as n-dimensional vectors. 
     """
-    def __init__(self, lattice, name, dim, unit=None):
-        super().__init__(lattice, name)
+    def __init__(self, lattice, ID, dim, unit=None):
+        super().__init__(lattice, ID)
         self.fdim = dim
         self.ldim = lattice.dim
         self.shape = [lattice.size[i] for i in range(self.ldim)] + [self.fdim]
@@ -254,24 +254,24 @@ class FieldScalar(FieldRn):
     Scalar field. Values are stored as scalars. 
     Example: mass, density, any onsite constant, etc.
     """
-    def __init__(self, lattice, name, unit=None):
-        super().__init__(lattice, name, dim=1, unit=unit)
+    def __init__(self, lattice, ID, unit=None):
+        super().__init__(lattice, ID, dim=1, unit=unit)
 
 class FieldR3(FieldRn):
     """
     3D vector field. Values are stored as 3-dimensional vectors. 
     Example: flexible dipole moment.
     """
-    def __init__(self, lattice, name, unit=None):
-        super().__init__(lattice, name, dim=3, unit=unit)
+    def __init__(self, lattice, ID, unit=None):
+        super().__init__(lattice, ID, dim=3, unit=unit)
 
 class FieldSO3(FieldRn):
     """
     3D vector field with fixed magnitude and flexible orientation. Values are stored as 3-dimensional vectors. 
     Example: rigid atomistic spin, molecular orientation, etc.
     """
-    def __init__(self, lattice, name, unit=None):
-        super().__init__(lattice, name, dim=3, unit=unit)
+    def __init__(self, lattice, ID, unit=None):
+        super().__init__(lattice, ID, dim=3, unit=unit)
         self._magnitude = jnp.ones(self.shape[:-1])
         self.integrator_class = {'optimization': LLSIBIntegrator,
                                  'adiabatic': ConservativeLLSIBIntegrator,
@@ -363,8 +363,8 @@ class LocalStrain3D(FieldRn):
     Strain field on 3D lattice are separated into local contribution (local strain field) and global contribution (homogeneous strain associated to the supercell). 
     The local strain field is encoded by the local displacement vector v_i(R)/a_i (a_i: the lattice vector) associated with each lattice site at R.
     """
-    def __init__(self, lattice, name):
-        super().__init__(lattice, name, dim=3)
+    def __init__(self, lattice, ID):
+        super().__init__(lattice, ID, dim=3)
 
     @staticmethod
     def get_local_strain_symmetric(values):
@@ -434,12 +434,12 @@ class GlobalStrain(Field):
     """
     The homogeneous strain is represented by the strain tensor with Voigt convention, which is a 6-dimensional vector.
     """
-    def __init__(self, lattice, name):
-        super().__init__(lattice, name)
+    def __init__(self, lattice, ID):
+        super().__init__(lattice, ID)
         self._values = jnp.zeros((6))
-        self.integrator_class = {'optimization': GradientDescentIntegrator,
-                                 'adiabatic': LeapFrogIntegrator,
-                                 'isothermal': LangevinIntegrator}
+        self.integrator_class = {'optimization': GradientDescentIntegrator_Strain,
+                                 'adiabatic': LeapFrogIntegrator_Strain,
+                                 'isothermal': LangevinIntegrator_Strain}
 
     def to_multi_devs(self, mesh: DeviceMesh):
         sharding = mesh.replicate_sharding()
@@ -458,7 +458,7 @@ class GlobalStrain(Field):
     def get_excess_stress(self):
         return self.get_force() / self.lattice.ref_volume / Constants.bar 
 
-    def set_integrator(self, integrator_class, dt, temp=None, tau=None):
+    def set_integrator(self, integrator_class, dt, temp=None, tau=None, freeze_x=False, freeze_y=False, freeze_z=False):
         """
         Set the integrator according to the given integrator class.  Set the time step.
         Args:
@@ -466,6 +466,9 @@ class GlobalStrain(Field):
             dt: float, time step.
             temp: float, temperature for the isothermal integrator.
             tau: float, relaxation time for the Langevin integrator.
+            freeze_x: bool, whether to freeze the x-component of the strain.
+            freeze_y: bool, whether to freeze the y-component of the strain.
+            freeze_z: bool, whether to freeze the z-component of the strain.
         """
         if integrator_class not in self.integrator_class:
             raise ValueError(f"Integrator class {integrator_class} is not supported for this field.")
@@ -474,8 +477,8 @@ class GlobalStrain(Field):
                 if temp is None or tau is None:
                     raise ValueError("Temperature and relaxation time must be specified for the isothermal integrator.")
                 else:
-                    integrator = self.integrator_class[integrator_class](dt, temp, tau)
+                    integrator = self.integrator_class[integrator_class](dt, temp, tau, freeze_x, freeze_y, freeze_z)
             else:
-                integrator = self.integrator_class[integrator_class](dt)
+                integrator = self.integrator_class[integrator_class](dt, freeze_x, freeze_y, freeze_z)
             self.integrator = integrator
         return

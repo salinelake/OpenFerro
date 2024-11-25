@@ -47,11 +47,11 @@ class MDMinimize:
             if pressure is None:
                 raise ValueError('Please specify pressure for variable-cell structural minimization')
             else:
-                # self.system.get_interaction_by_name('pV').set_parameter_by_name(
+                # self.system.get_interaction_by_ID('pV').set_parameter_by_ID(
                 #     'p', pressure * Constants.bar)  # bar -> eV/Angstrom^3
-                pV_param = self.system.get_interaction_by_name('pV').get_parameters()
+                pV_param = self.system.get_interaction_by_ID('pV').get_parameters()
                 pV_param_new = [pressure * Constants.bar, pV_param[1]]
-                self.system.get_interaction_by_name('pV').set_parameters(pV_param_new)
+                self.system.get_interaction_by_ID('pV').set_parameters(pV_param_new)
             for field in self.all_fields:
                 if field.integrator is None:
                     raise ValueError('Please set the integrator for the field %s for variable-cell structural minimization' % type(field))
@@ -84,10 +84,7 @@ class SimulationNVE:
         self.non_SO3_fields = [field for field in self.system.get_all_non_SO3_fields() if not isinstance(field, GlobalStrain)]
         self.all_fields = self.SO3_fields + self.non_SO3_fields
         self.nfields = len(self.all_fields)
-        for field in self.all_fields:
-            if field.integrator is None:
-                raise ValueError('Please set the integrator for %s for dynamical simulation' % type(field))
-    
+
     def init_velocity(self, mode='zero', temp=None):
         for field in self.all_fields:
             field.init_velocity(mode=mode, temperature=temp)
@@ -118,6 +115,11 @@ class SimulationNVE:
                     jax.block_until_ready(field.get_values())
                     logging.info('Time for updating field {}: {:.8f}s'.format(type(field), timer()-t0))
     def run(self, nsteps=1, profile=False):
+        ## sanity check
+        for field in self.all_fields:
+            if field.integrator is None:
+                raise ValueError('Please set the integrator for the field %s before running the simulation' % type(field))
+        ## run the simulation
         for i in range(nsteps):
             self._step(profile=profile)
 
@@ -154,8 +156,14 @@ class SimulationNVTLangevin(SimulationNVE):
         """
         Update the field by n steps.
         """
+        ## sanity check
+        for field in self.all_fields:
+            if field.integrator is None:
+                raise ValueError('Please set the integrator for the field %s before running the simulation' % type(field))
+        ## generate all the needed random keys in advance
         key = jax.random.PRNGKey(np.random.randint(0, 1000000))
         keys = jax.random.split(key, nsteps * self.nfields)
+        ## run the simulation
         for id_step in range(nsteps):
             if profile:
                 t0 = timer()
@@ -173,15 +181,11 @@ class SimulationNPTLangevin(SimulationNVTLangevin):
         super().__init__(system)
         ## set pressure
         self.pressure = pressure
-        pV_param = self.system.get_interaction_by_name('pV').get_parameters()
+        pV_param = self.system.get_interaction_by_ID('pV').get_parameters()
         pV_param_new = [pressure * Constants.bar, pV_param[1]]
-        self.system.get_interaction_by_name('pV').set_parameters(pV_param_new)
+        self.system.get_interaction_by_ID('pV').set_parameters(pV_param_new)
         ## get all fields, including the global strain field
         self.SO3_fields = self.system.get_all_SO3_fields()
         self.non_SO3_fields = self.system.get_all_non_SO3_fields()
         self.all_fields = self.SO3_fields + self.non_SO3_fields
         self.nfields = len(self.all_fields)
-        for field in self.all_fields:
-            if field.integrator is None:
-                raise ValueError('Please set the integrator for %s for dynamical simulation' % type(field))
-    

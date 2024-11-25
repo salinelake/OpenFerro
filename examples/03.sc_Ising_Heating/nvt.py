@@ -9,6 +9,8 @@ from openferro.engine.magnetic import *
 from time import time as timer
 from matplotlib import pyplot as plt
 import logging
+logging.basicConfig(level=logging.INFO, filename="simulation.log")
+
 ##########################################################################################
 ## Define the lattice 
 ##########################################################################################
@@ -16,12 +18,12 @@ L = 20
 N = L**3
 latt = of.SimpleCubic3D(L, L, L)
 Fe_bcc = of.System(latt)
-logging.basicConfig(level=logging.INFO, filename="simulation.log")
+
 ##########################################################################################
 ## Define the fields
 ##########################################################################################
 Ms = 1.5   #in muB
-spin_field = Fe_bcc.add_field(name="spin", ftype="SO3", value=jnp.array([0,0,1]))
+spin_field = Fe_bcc.add_field(ID="spin", ftype="SO3", value=jnp.array([0,0,1]))
 spin_field.set_magnitude(Ms)
 
 ##########################################################################################
@@ -29,7 +31,7 @@ spin_field.set_magnitude(Ms)
 ##########################################################################################
 J1 = 6.72e-21 # Joule/link, without double counting ij and ji, from [https://vampire.york.ac.uk/tutorials/simulation/curie-temperature/]. Theoretical Tc is around 700K. 
 J1  = J1 / 2 * Constants.Joule / Ms**2  # convert to our convention and in unit of (eV / muB^2)
-Fe_bcc.add_isotropic_exchange_interaction_1st_shell(name="exchange_1st_shell", field_name="spin", coupling=J1)
+Fe_bcc.add_isotropic_exchange_interaction_1st_shell(ID="exchange_1st_shell", field_ID="spin", coupling=J1)
 
 ##########################################################################################
 ## NVT simulation
@@ -37,13 +39,12 @@ Fe_bcc.add_isotropic_exchange_interaction_1st_shell(name="exchange_1st_shell", f
 
 dt = 0.0002 # in ps
 temp_list = np.linspace(50, 900, 18)
+simulation = SimulationNVTLangevin(Fe_bcc )
 
 for temp in temp_list:
     spin_field.set_integrator('isothermal', dt=dt, temp=temp, alpha=1)
-    simulation = SimulationNVTLangevin(Fe_bcc )
     logging.info(f"Relaxing at {temp}K")
     simulation.run(2000, profile=False)
-    
     logging.info("Sampling...")
     M_avg = []
     for i in range(100):

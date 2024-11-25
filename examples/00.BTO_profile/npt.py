@@ -22,45 +22,22 @@ bto = of.System(latt)
 ##########################################################################################
 ## Define the fields
 ##########################################################################################
-dipole_field = bto.add_field(name="dipole", ftype="Rn", dim=3, value=0.1, mass = 1.0)
-# lstrain_field = bto.add_field(name="lstrain", ftype="LocalStrain3D", value=0.0, mass = 40)
+dipole_field = bto.add_field(ID="dipole", ftype="Rn", dim=3, value=0.1, mass = 1.0)
+# lstrain_field = bto.add_field(ID="lstrain", ftype="LocalStrain3D", value=0.0, mass = 40)
 gstrain  = bto.add_global_strain(value=jnp.array([0.01,0.01,0.01,0,0,0]), mass = 10.0 *  L**3)
  
 ##########################################################################################
 ## Define the Hamiltonian
 ##########################################################################################
-bto.add_self_interaction('self_onsite', 
-                         field_name="dipole", 
-                         energy_engine=self_energy_onsite_isotropic, 
-                         parameters=[config["onsite"]["k2"],config["onsite"]["alpha"], config["onsite"]["gamma"], config["onsite"]["offset"]])
-bto.add_self_interaction('short_range_1', 
-                         field_name="dipole", 
-                         energy_engine=short_range_1stnn_isotropic, 
-                         parameters=[config["short_range"]["j1"], config["short_range"]["j2"], config["short_range"]["offset"]])
-bto.add_self_interaction('short_range_2', 
-                         field_name="dipole", 
-                         energy_engine=short_range_2ednn_isotropic, 
-                         parameters=[config["short_range"]["j3"], config["short_range"]["j4"], config["short_range"]["j5"], config["short_range"]["offset"]])
-bto.add_self_interaction('short_range_3', 
-                         field_name="dipole", 
-                         energy_engine=short_range_3rdnn_isotropic, 
-                         parameters=[config["short_range"]["j6"], config["short_range"]["j7"], config["short_range"]["offset"]],)
-
-bto.add_dipole_dipole_interaction('dipole_ewald', field_name="dipole", prefactor = config["born"]["Z_star"]**2 / config["born"]["epsilon_inf"] )
-
-bto.add_self_interaction('homo_elastic', 
-                         field_name="gstrain", 
-                         energy_engine=homo_elastic_energy, 
-                         parameters= [config["elastic"]["B11"], config["elastic"]["B12"], config["elastic"]["B44"], float(N)])
-
-bto.add_mutual_interaction('homo_strain_dipole', 
-                         field_name1="gstrain", 
-                         field_name2="dipole", 
-                         energy_engine=homo_strain_dipole_interaction, 
-                         parameters= [config["elastic_dipole"]["B1xx"], config["elastic_dipole"]["B1yy"], config["elastic_dipole"]["B4yz"], config["elastic_dipole"]["offset"]])
-
-# bto.add_mutual_interaction('elastic', field_name1="lstrain", field_name2="gstrain", energy_engine=elastic_energy, parameters=config["elastic"])
-# bto.add_mutual_interaction('inhomo_strain_dipole', field_name1="lstrain", field_name2="dipole", energy_engine=inhomo_strain_dipole_interaction, parameters=config["elastic_dipole"])
+bto.add_dipole_onsite_interaction('self_onsite', field_ID="dipole", K2=config["onsite"]["k2"], alpha=config["onsite"]["alpha"], gamma=config["onsite"]["gamma"])
+bto.add_dipole_interaction_1st_shell('short_range_1', field_ID="dipole", j1=config["short_range"]["j1"], j2=config["short_range"]["j2"])
+bto.add_dipole_interaction_2nd_shell('short_range_2', field_ID="dipole", j3=config["short_range"]["j3"], j4=config["short_range"]["j4"], j5=config["short_range"]["j5"])
+bto.add_dipole_interaction_3rd_shell('short_range_3', field_ID="dipole", j6=config["short_range"]["j6"], j7=config["short_range"]["j7"])
+bto.add_dipole_dipole_interaction('dipole_ewald', field_ID="dipole", prefactor = config["born"]["Z_star"]**2 / config["born"]["epsilon_inf"] )
+bto.add_homo_elastic_interaction('homo_elastic', field_ID="gstrain", B11=config["elastic"]["B11"], B12=config["elastic"]["B12"], B44=config["elastic"]["B44"])
+bto.add_homo_strain_dipole_interaction('homo_strain_dipole', field_1_ID="gstrain", field_2_ID="dipole", B1xx=config["elastic_dipole"]["B1xx"], B1yy=config["elastic_dipole"]["B1yy"], B4yz=config["elastic_dipole"]["B4yz"])
+# bto.add_inhomo_elastic_interaction('inhomo_elastic', field_ID="lstrain", B11=config["elastic"]["B11"], B12=config["elastic"]["B12"], B44=config["elastic"]["B44"])
+# bto.add_inhomo_strain_dipole_interaction('inhomo_strain_dipole', field_1_ID="lstrain", field_2_ID="dipole", B1xx=config["elastic_dipole"]["B1xx"], B1yy=config["elastic_dipole"]["B1yy"], B4yz=config["elastic_dipole"]["B4yz"])
 
  
 ##########################################################################################
@@ -82,10 +59,10 @@ jax.block_until_ready(simulation.run(1, profile=True))
 t1 = timer()
 print(f"initialization takes: {t1-t0} seconds")
 
-# t0 = timer()
-# jax.block_until_ready(simulation.step(500, profile=False))
-# t1 = timer()
-# print(f"500 steps takes: {t1-t0} seconds")
+t0 = timer()
+jax.block_until_ready(simulation.run(500, profile=False))
+t1 = timer()
+print(f"500 steps takes: {t1-t0} seconds")
  
-simulation.run(5, profile=True)
+# simulation.run(5, profile=True)
  
