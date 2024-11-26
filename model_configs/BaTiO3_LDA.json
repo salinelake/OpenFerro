@@ -1,5 +1,6 @@
 
 {
+    "name": "BTO-LDA",
     "lattice": {
         "a1": 3.95,
         "a2": 3.95,

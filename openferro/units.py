@@ -10,7 +10,7 @@ class Constants(object):
     """
     ## physical constants
     kb = 8.6173303e-5  # eV/K
-    amu = 1.0 # atomic mass unit 1 amu = 1 g/mol
+    amu = 0.0001035 # atomic mass unit 1 amu = eV/(A/ps)^2
     epsilon0 = 5.526349406e-3  # e^2(eV*Angstrom)^-1
     elementary_charge = 1.0 # electron charge
 

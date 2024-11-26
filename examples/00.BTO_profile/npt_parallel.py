@@ -25,8 +25,8 @@ bto = of.System(latt)
 ## Define the fields
 ##########################################################################################
 dipole_field = bto.add_field(ID="dipole", ftype="Rn", dim=3, value=0.1, mass = 1.0)
-lstrain_field = bto.add_field(ID="lstrain", ftype="LocalStrain3D", value=0.0, mass = 40)
-gstrain  = bto.add_global_strain(value=jnp.array([0.01,0.01,0.01,0,0,0]), mass = 10.0 *  latt.nsites)
+lstrain_field = bto.add_field(ID="lstrain", ftype="LocalStrain3D", value=0.0, mass = 1.0)
+gstrain  = bto.add_global_strain(value=jnp.array([0.01,0.01,0.01,0,0,0]), mass = 1.0 *  latt.nsites)
 
 ##########################################################################################
 ## move fields to multi-GPUs

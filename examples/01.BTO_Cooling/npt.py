@@ -4,6 +4,7 @@ from openferro.interaction import *
 from openferro.simulation import *
 from openferro.engine.elastic import *
 from openferro.engine.ferroelectric import *
+from openferro.units import Constants
 from matplotlib import pyplot as plt
 import json
 from time import time as timer
@@ -23,10 +24,12 @@ bto = of.System(latt)
 ##########################################################################################
 ## Define the fields
 ##########################################################################################
-dipole_field = bto.add_field(ID="dipole", ftype="Rn", dim=3, value=0.1, mass = 1.0)
-lstrain_field = bto.add_field(ID="lstrain", ftype="LocalStrain3D", value=0.0, mass = 40)
-gstrain  = bto.add_global_strain(value=jnp.array([0.01,0.01,0.01,0,0,0]), mass = 200.0 *  L**3)
-
+# dipole_field = bto.add_field(ID="dipole", ftype="Rn", dim=3, value=0.1, mass = 1.0)
+# lstrain_field = bto.add_field(ID="lstrain", ftype="LocalStrain3D", value=0.0, mass = 40)
+# gstrain  = bto.add_global_strain(value=jnp.array([0.01,0.01,0.01,0,0,0]), mass = 200.0 *  L**3)
+dipole_field = bto.add_field(ID="dipole", ftype="Rn", dim=3, value=0.0, mass = 200 * Constants.amu)
+lstrain_field = bto.add_field(ID="lstrain", ftype="LocalStrain3D", value=0.0, mass = 200 * Constants.amu)
+gstrain  = bto.add_global_strain(value=jnp.array([0.01,0.01,0.01,0,0,0]), mass = 200 * Constants.amu * L**3)
 ##########################################################################################
 ## Define the Hamiltonian
 ##########################################################################################
@@ -44,19 +47,18 @@ bto.add_inhomo_strain_dipole_interaction('inhomo_strain_dipole', field_1_ID="lst
 ## Structure relaxation
 ##########################################################################################
 logging.info('Structure relaxation')
-dipole_field.set_integrator('optimization', dt=0.01)
-gstrain.set_integrator('optimization', dt=0.01)
-lstrain_field.set_integrator('optimization', dt=0.01)
+dipole_field.set_integrator('optimization', dt=0.0001)
+gstrain.set_integrator('optimization', dt=0.0001)
+lstrain_field.set_integrator('optimization', dt=0.0001)
 minimizer = MDMinimize(bto, max_iter=1000, tol=1e-5)
 minimizer.run(variable_cell=True, pressure=hydropres)
- 
 ##########################################################################################
 ## NPT cooling simulation
 ##########################################################################################
 log_freq = 100
-total_time = 1000
+total_time = 100
 dt = 0.002
-relax_steps = int(50/dt)
+relax_steps = int(10/dt)
 total_steps = int(total_time / dt)
 niters = total_steps // log_freq
 

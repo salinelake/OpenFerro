@@ -240,6 +240,15 @@ class System:
         self._self_interaction_dict[ID] = interaction
         return interaction
     
+    def add_dipole_efield_interaction(self, ID, field_ID, E, enable_jit=True):
+        self._add_interaction_sanity_check(ID)
+        interaction = self_interaction(field_ID)
+        interaction.set_energy_engine(dipole_efield_interaction, enable_jit=enable_jit)
+        interaction.create_force_engine(enable_jit=enable_jit)
+        interaction.set_parameters(jnp.array(E))
+        self._self_interaction_dict[ID] = interaction
+        return interaction
+
     ## elastic-type interactions
     def add_homo_elastic_interaction(self, ID, field_ID, B11, B12, B44, enable_jit=True):
         N = float(self.lattice.nsites)
