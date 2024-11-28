@@ -1,35 +1,34 @@
-JAX-based framework for Lattice Hamiltonian simulation
+<p align="center" >
+  <img width="60%" src="/docs/openferro_logo.png" />
+</p>
+
+A universal framework for on-lattice atomistic dynamics simulation
 
 # About OpenFerro
-OpenFerro is a Python package for Lattice Hamiltonian simulation. OpenFerro is largely based on [JAX](https://github.com/google/jax), a high-performance linear algebra package supporting auto-differentiation and painless GPU executation.
-OpenFerro is designed to minimize the effort required to build on-lattice Hamiltonian models, and to perform molecular dynamics (MD) simulations. 
+OpenFerro is a Python package for on-lattice atomistic dynamics simulation. OpenFerro is largely based on [JAX](https://github.com/google/jax), a high-performance linear algebra package supporting auto-differentiation and painless GPU acceleration.
+OpenFerro is designed to minimize the effort required to build on-lattice Hamiltonian models, and to perform molecular dynamics (MD) and Landau-Lifshitz-Gilbert simulations. 
  
 
 # Highlighted features
 * **GPU supports**, making it highly efficient for large-scale simulations.
-* **highly modularized**, easy to implement new interaction terms in an lattice Hamiltonian model, benefitted from auto-differentiation.
-
-# Milestones
-(1, 99% completed) Ferroelectric effective Hamiltonian 
-
-Ref: Zhong, W., David Vanderbilt, and K. M. Rabe. "First-principles theory of ferroelectric phase transitions for perovskites: The case of BaTiO3." Physical Review B 52.9 (1995): 6301.
-
-(2, 99% completed) Landau-Lifshitz-Gilbert equation 
-
-Ref: Eriksson, Olle, et al. Atomistic spin dynamics: foundations and applications. Oxford university press, 2017.
-
-(3, ongoing) Multiferroic 
-
-Ref: Kornev, I. A., Lisenkov, S., Haumont, R., Dkhil, B., & Bellaiche, L. (2007). Finite-temperature properties of multiferroic BiFeO3. Physical review letters, 99(22), 227602.
+* **highly modularized**, easy to implement new interaction terms in a lattice Hamiltonian model, benefitted from auto-differentiation.
 
 # Credits
 
 # OpenFerro in a nutshell
 
+## Crystalline system and Lattice Hamiltonian
+
+## Generic molecular dynamics and Landau-Lishiftz-Gilbert equations
+
 # Installation
 Clone the package and pip install.
 
 # Use OpenFerro
+
+## Code structure
+
+## Examples
 
 ## Units
 
