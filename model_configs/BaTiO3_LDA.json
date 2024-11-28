@@ -1,6 +1,6 @@
 
 {
-    "name": "BTO-LDA",
+    "name": "BTO-LDA-Physical Review B 52.9 (1995): 6301",
     "lattice": {
         "a1": 3.95,
         "a2": 3.95,
@@ -12,8 +12,7 @@
     "onsite": {
         "k2": 5.502,
         "alpha":110.4,
-        "gamma":-163.1,
-        "offset":0
+        "gamma":-163.1
     },
     "short_range": {
         "j1": -2.648,
@@ -22,8 +21,7 @@
         "j4": -0.789,
         "j5": 0.562,
         "j6": 0.358,
-        "j7": 0.179,
-        "offset": 0
+        "j7": 0.179
     },
     "elastic": {
         "B11": 126,
@@ -33,8 +31,7 @@
     "elastic_dipole": {
         "B1xx": -211,
         "B1yy": -19.3,
-        "B4yz": -7.75,
-        "offset": 0
+        "B4yz": -7.75
     },
     "born": {
         "Z_star": 9.956,
