@@ -11,6 +11,7 @@ class BravaisLattice3D:
     A class to represent a 3D Bravais lattice
     """
     def __init__(self, l1, l2, l3, a1=None, a2=None, a3=None, pbc=True):
+        self.name = 'BravaisLattice3D'
         self.dim = 3
         self.size = jnp.array([l1, l2, l3])
         self.a1 = jnp.array([1.0, 0.0, 0.0]) if a1 is None else a1
@@ -64,6 +65,7 @@ class SimpleCubic3D(BravaisLattice3D):
     """
     def __init__(self, l1, l2, l3, a1=None, a2=None, a3=None, pbc=True):
         super().__init__(l1, l2, l3, a1, a2, a3, pbc)
+        self.name = 'SimpleCubic3D'
         self.first_shell_roller = [ x for x in self._1st_shell_roller()]
         self.second_shell_roller = [ x for x in self._2nd_shell_roller()]
         self.third_shell_roller = [ x for x in self._3rd_shell_roller()]
@@ -120,6 +122,7 @@ class BodyCenteredCubic3D(SimpleCubic3D):
     """
     def __init__(self, l1, l2, l3, a1=None, a2=None, a3=None, pbc=True):
         super().__init__(l1, l2, l3, a1, a2, a3, pbc)
+        self.name = 'BodyCenteredCubic3D'
         self.a1 = 0.5 * jnp.array([-1.0, 1.0, 1.0]) if a1 is None else a1
         self.a2 = 0.5 * jnp.array([ 1.0,-1.0, 1.0]) if a2 is None else a2
         self.a3 = 0.5 * jnp.array([ 1.0, 1.0,-1.0]) if a3 is None else a3
@@ -201,6 +204,7 @@ class FaceCenteredCubic3D(BodyCenteredCubic3D):
     """
     def __init__(self, l1, l2, l3, a1=None, a2=None, a3=None, pbc=True):
         super().__init__(l1, l2, l3, a1, a2, a3, pbc)
+        self.name = 'FaceCenteredCubic3D'
         self.a1 = jnp.array(0.5 *[1.0, 1.0, 0.0]) if a1 is None else a1
         self.a2 = jnp.array(0.5 *[1.0, 0.0, 1.0]) if a2 is None else a2
         self.a3 = jnp.array(0.5 *[0.0, 1.0, 1.0]) if a3 is None else a3
@@ -212,6 +216,7 @@ class Hexagonal3D(BravaisLattice3D):
     """
     def __init__(self, l1, l2, l3, a1=None, a2=None, a3=None, pbc=True):
         super().__init__(l1, l2, l3, a1, a2, a3, pbc)
+        self.name = 'Hexagonal3D'
         self.a1 = jnp.array([jnp.sqrt(3)/2, 0.5, 0.0]) if a1 is None else a1
         self.a2 = jnp.array([jnp.sqrt(3)/2, -0.5, 0.0]) if a2 is None else a2
         self.a3 = jnp.array([0.0, 0.0, 1.0]) if a3 is None else a3
@@ -221,6 +226,7 @@ class BravaisLattice2D:
     A class to represent a 2D Bravais lattice
     """
     def __init__(self, l1, l2, a1=None, a2=None, pbc=True):
+        self.name = 'BravaisLattice2D'
         self.dim = 2
         self.size = jnp.array([l1, l2])
         self.a1 = jnp.array([1.0, 0.0]) if a1 is None else a1
@@ -266,6 +272,7 @@ class SimpleSquare2D(BravaisLattice2D):
     """
     def __init__(self, l1, l2, a1=None, a2=None, pbc=True):
         super().__init__(l1, l2, a1, a2, pbc)
+        self.name = 'SimpleSquare2D'
         self.first_shell_roller = [ x for x in self._1st_shell_roller()]
         self.second_shell_roller = [ x for x in self._2nd_shell_roller()]
         self.third_shell_roller = [ x for x in self._3rd_shell_roller()]
@@ -306,6 +313,7 @@ class Hexagonal2D(SimpleSquare2D):
     """
     def __init__(self, l1, l2, a1=None, a2=None):
         super().__init__(l1, l2, a1, a2)
+        self.name = 'Hexagonal2D'
         self.a1 = jnp.array([1.0, 0.0]) if a1 is None else a1
         self.a2 = jnp.array([-0.5, jnp.sqrt(3)/2]) if a2 is None else a2
         raise NotImplementedError("Hexagonal lattice has not been implemented yet.")

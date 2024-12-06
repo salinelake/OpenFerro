@@ -43,7 +43,7 @@ Fe_bcc.add_isotropic_exchange_interaction_4th_shell(ID="exchange_4th_shell", fie
 ##########################################################################################
 dt = 0.0002
 temp_list = [10, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950, 1000, 1050, 1100, 1150, 1200, 1250, 1300, 1350, 1400, 1450, 1500]
-simulation = SimulationNVTLangevin(Fe_bcc )
+simulation = SimulationNVTLangevin(Fe_bcc)
 
 for temp in temp_list:
     logging.info("Temp={}K, NVT Simulation".format(temp))
