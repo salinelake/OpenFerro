@@ -19,8 +19,6 @@ class Thermo_Reporter:
 
     def initialize(self, system):
         ## make the directory if not exists
-        if os.path.exists(os.path.dirname(self.file)) is False:
-            os.makedirs(os.path.dirname(self.file))
         so3_fields = system.get_all_SO3_fields()
         other_fields = system.get_all_non_SO3_fields()
         all_fields = so3_fields + other_fields
@@ -48,10 +46,12 @@ class Thermo_Reporter:
             ## write the start time
             f.write(f"# Log file for OpenFerro Simulation started at: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())}\n")
             f.write(f"# Lattice Type: {system.lattice.name}, Lattice Size: {system.lattice.size}\n")
-            f.write(f"# Lattice Constants: {system.lattice.a}, {system.lattice.b}, {system.lattice.c}\n")
+            f.write(f"# Lattice Vectors: {system.lattice.a1}, {system.lattice.a2}, {system.lattice.a3}\n")
             f.write(f"# Current Time Step: {self.counter+1}\n")
             ## write the report items
-            f.write(f"# {', '.join(self.item_list)}\n")
+            f.write("# ")
+            f.write(", ".join(self.item_list))
+            f.write("\n")
 
     def step(self, system):
         self.counter += 1
@@ -79,11 +79,14 @@ class Thermo_Reporter:
                 for field in other_fields:
                     values.append(field.get_temperature().tolist())
             with open(self.file, 'a') as f:
-                f.write(", ".join(map(str, values)) + "\n")
+                f.write(", ".join(map(str, values)))
+                f.write("\n")
 
 class Field_Reporter:
-    def __init__(self, field_id, log_interval=100, field_average=True, dump_field=False):
-        self.field_id = field_id
+    def __init__(self, file_prefix, field_ID, log_interval=100, field_average=True, dump_field=False):
+        self.file_prefix = file_prefix
+        self.file_avg_name = '{}_avg.log'.format(self.file_prefix)
+        self.field_ID = field_ID
         self.log_interval = log_interval
         self.report_field_average = field_average
         self.dump_field = dump_field
@@ -91,28 +94,34 @@ class Field_Reporter:
         self.counter = -1
     
     def initialize(self, system):
-        field = system.get_field_by_ID(self.field_id)  ## check if the field exists
+        field = system.get_field_by_ID(self.field_ID)  ## check if the field exists
         dim = field
         if self.report_field_average:
-            file_name = '{}_average.log'.format(self.field_id)
-            self.item_list = ['Step', 'Average']
-            ## make the directory if not exists
-            if os.path.exists(os.path.dirname(file_name)) is False:
-                os.makedirs(os.path.dirname(file_name))
-            with open(file_name, 'a') as f:
+            self.item_list = ['Step', 'Average(Vector)']
+            with open(self.file_avg_name, 'a') as f:
                 ## write the start time
-                f.write(f"# Log file for the average of field [{self.field_id}] started at: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())}\n")
+                f.write(f"# Log file for the average of field [{self.field_ID}] started at: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())}\n")
                 f.write(f"# Lattice Type: {system.lattice.name}, Lattice Size: {system.lattice.size}\n")
-                f.write(f"# Lattice Constants: {system.lattice.a}, {system.lattice.b}, {system.lattice.c}\n")
+                f.write(f"# Lattice Vectors: {system.lattice.a1}, {system.lattice.a2}, {system.lattice.a3}\n")
                 f.write(f"# Current Time Step: {self.counter+1}\n")
                 ## write the report items
-                f.write(f"# {', '.join(self.item_list)}\n")
+                f.write("# ")
+                f.write(", ".join(self.item_list))
+                f.write("\n")
     
     def step(self, system):
         self.counter += 1
-        if self.counter % self.dump_interval == 0:
-            field = system.get_field_by_ID(self.field_id)
+        if self.counter % self.log_interval == 0:
+            field = system.get_field_by_ID(self.field_ID)
             values = field.get_values()
-            file_name = '{}_{}.npy'.format(self.field_id, self.counter)
-            jnp.save(file_name, values)
+            dim = len(values.shape)
+            if self.report_field_average:
+                over_axes = tuple(range(dim-1))
+                with open(self.file_avg_name, 'a') as f:
+                    f.write("{}, ".format(self.counter))
+                    f.write(", ".join(map(str, values.mean(over_axes))))
+                    f.write("\n")
+            if self.dump_field:
+                file_name = '{}_dump_{}.npy'.format(self.file_prefix, self.counter)
+                jnp.save(file_name, values)
             
