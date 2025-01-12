@@ -12,7 +12,6 @@ from functools import partial
 from openferro.units import Constants
 from openferro.field import GlobalStrain
 from openferro.reporter import Thermo_Reporter, Field_Reporter
-## TODO: add reporter of energy, average field and dump of field values/velocity.
 
 class Simulation:
     """
@@ -44,6 +43,9 @@ class Simulation:
         """
         for reporter in self.reporters:
             reporter.initialize(self.system)
+
+    def remove_all_reporters(self):
+        self.reporters = []
 
     def reset_reporters(self):
         """

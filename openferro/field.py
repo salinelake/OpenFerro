@@ -139,18 +139,23 @@ class Field:
     """
     def get_kinetic_energy(self):
         if self._velocity is None:
-            raise ValueError("Velocity is not set")
+            # raise ValueError("Velocity is not set")
+            return 0.0
         elif self._mass is None:
-            raise ValueError("Mass is not set")
+            # raise ValueError("Mass is not set")
+            return 0.0
         else:
             return 0.5 * jnp.sum(self._mass * jnp.square(self._velocity))
 
     def get_temperature(self):
         if self._velocity is None:
-            raise ValueError("Velocity is not set")
+            # raise ValueError("Velocity is not set")
+            return 0.0
         elif self._mass is None:
-            raise ValueError("Mass is not set")
-        return jnp.mean(self._mass * jnp.square(self._velocity)) / Constants.kb
+            # raise ValueError("Mass is not set")
+            return 0.0
+        else:
+            return jnp.mean(self._mass * jnp.square(self._velocity)) / Constants.kb
 
     """
     Utility methods

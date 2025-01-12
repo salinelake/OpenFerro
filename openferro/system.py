@@ -521,7 +521,7 @@ class System:
         for interaction_ID in self._self_interaction_dict:
             energy += self.calc_energy_by_ID(interaction_ID)
             e = self.calc_energy_by_ID(interaction_ID)
-            logging.info('Energy from {}: {}'.format(interaction_ID, e))
+            # logging.info('Energy from {}: {}'.format(interaction_ID, e))
         return energy
 
     def calc_total_mutual_interaction(self):
@@ -532,7 +532,7 @@ class System:
         for interaction_ID in self._mutual_interaction_dict:
             energy += self.calc_energy_by_ID(interaction_ID)
             e = self.calc_energy_by_ID(interaction_ID)
-            logging.info('Energy from {}: {}'.format(interaction_ID, e))
+            # logging.info('Energy from {}: {}'.format(interaction_ID, e))
         return energy
 
     def calc_total_triple_interaction(self):

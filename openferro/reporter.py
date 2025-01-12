@@ -6,7 +6,7 @@ import os
 import time
 import jax.numpy as jnp
 class Thermo_Reporter:
-    def __init__(self, file='thermo.log', log_interval=100, global_strain=True, volume=True, potential_energy=False, kinetic_energy=False, temperature=False):
+    def __init__(self, file='thermo.log', log_interval=100, global_strain=False, volume=True, potential_energy=False, kinetic_energy=False, temperature=False):
         self.file = file
         self.counter = -1
         self.log_interval = log_interval
@@ -19,9 +19,7 @@ class Thermo_Reporter:
 
     def initialize(self, system):
         ## make the directory if not exists
-        so3_fields = system.get_all_SO3_fields()
-        other_fields = system.get_all_non_SO3_fields()
-        all_fields = so3_fields + other_fields
+        all_fields = system.get_all_fields()
         self.item_list = ['Step']
         if self.report_global_strain:
             self.item_list.append('Strain-1')
@@ -33,13 +31,12 @@ class Thermo_Reporter:
         if self.report_volume:
             self.item_list.append('Volume')
         if self.report_potential_energy:
-            for field in all_fields:
-                self.item_list.append('Potential-{}'.format(field.ID))
+            self.item_list.append('Total_Potential_Energy')
         if self.report_kinetic_energy:
-            for field in other_fields:
+            for field in all_fields:
                 self.item_list.append('Kinetic-{}'.format(field.ID))
         if self.report_temperature:
-            for field in other_fields:
+            for field in all_fields:
                 self.item_list.append('Temperature-{}'.format(field.ID))
         ## write the header: system lattice constants, lattice type, lattice size, etc.
         with open(self.file, 'a') as f:
@@ -61,23 +58,22 @@ class Thermo_Reporter:
                 gs = system.get_field_by_ID('gstrain').get_values().flatten().tolist()
                 values.extend(gs)
             if self.report_volume:
-                gs = system.get_field_by_ID('gstrain').get_values().flatten().tolist()
+                try:
+                    gs = system.get_field_by_ID('gstrain').get_values().flatten().tolist()
+                except:
+                    gs = [0.0, 0.0, 0.0]
                 vol_ref = system.lattice.ref_volume
                 vol = (1+gs[0] + gs[1] + gs[2]) * vol_ref
                 values.append(vol)
-            if self.report_potential_energy or self.report_kinetic_energy or self.report_temperature:
-                so3_fields = system.get_all_SO3_fields()
-                other_fields = system.get_all_non_SO3_fields()
-                all_fields = so3_fields + other_fields
+            all_fields = system.get_all_fields()
             if self.report_potential_energy:
-                for field in all_fields:
-                    values.append(field.get_potential_energy().tolist())
+                values.append(system.calc_total_potential_energy())
             if self.report_kinetic_energy:
-                for field in other_fields:
-                    values.append(field.get_kinetic_energy().tolist())
+                for field in all_fields:
+                    values.append(field.get_kinetic_energy())
             if self.report_temperature:
-                for field in other_fields:
-                    values.append(field.get_temperature().tolist())
+                for field in all_fields:
+                    values.append(field.get_temperature())
             with open(self.file, 'a') as f:
                 f.write(", ".join(map(str, values)))
                 f.write("\n")
