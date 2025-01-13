@@ -15,7 +15,7 @@ OpenFerro is designed to minimize the effort required to build on-lattice Hamilt
 * **highly flexible**, supports simultaneous simulation of R^n and SO(3) local order parameters. Fields with other symmetries can be implemented easily.
 
 # Credits
-There will be a paper in the near future for technical details of OpenFerro.
+There will be a paper in the near future laying out the technical details of OpenFerro.
 
 # OpenFerro in a nutshell
 
