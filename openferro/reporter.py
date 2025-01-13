@@ -6,11 +6,12 @@ import os
 import time
 import jax.numpy as jnp
 class Thermo_Reporter:
-    def __init__(self, file='thermo.log', log_interval=100, global_strain=False, volume=True, potential_energy=False, kinetic_energy=False, temperature=False):
+    def __init__(self, file='thermo.log', log_interval=100, global_strain=False, excess_stress=False, volume=True, potential_energy=False, kinetic_energy=False, temperature=False):
         self.file = file
         self.counter = -1
         self.log_interval = log_interval
         self.report_global_strain = global_strain
+        self.report_excess_stress = excess_stress
         self.report_volume = volume
         self.report_potential_energy = potential_energy
         self.report_kinetic_energy = kinetic_energy
@@ -28,6 +29,13 @@ class Thermo_Reporter:
             self.item_list.append('Strain-4')
             self.item_list.append('Strain-5')
             self.item_list.append('Strain-6')
+        if self.report_excess_stress:
+            self.item_list.append('ex_stress-1')
+            self.item_list.append('ex_stress-2')
+            self.item_list.append('ex_stress-3')
+            self.item_list.append('ex_stress-4')
+            self.item_list.append('ex_stress-5')
+            self.item_list.append('ex_stress-6')
         if self.report_volume:
             self.item_list.append('Volume')
         if self.report_potential_energy:
@@ -57,6 +65,9 @@ class Thermo_Reporter:
             if self.report_global_strain:
                 gs = system.get_field_by_ID('gstrain').get_values().flatten().tolist()
                 values.extend(gs)
+            if self.report_excess_stress:
+                ex_stress = system.calc_excess_stress()
+                values.extend(ex_stress)
             if self.report_volume:
                 try:
                     gs = system.get_field_by_ID('gstrain').get_values().flatten().tolist()

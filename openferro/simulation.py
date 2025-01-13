@@ -25,11 +25,11 @@ class Simulation:
     def clear_reporters(self):
         self.reporters = []
 
-    def add_thermo_reporter(self, file='thermo.log', log_interval=100, global_strain=True, volume=True, potential_energy=False, kinetic_energy=False, temperature=False):
+    def add_thermo_reporter(self, file='thermo.log', log_interval=100, global_strain=False, excess_stress=False, volume=False, potential_energy=False, kinetic_energy=False, temperature=False):
         """
         Add a reporter to the simulation to output global thermodynamic information.
         """
-        self.reporters.append(Thermo_Reporter(file, log_interval, global_strain, volume, potential_energy, kinetic_energy, temperature))
+        self.reporters.append(Thermo_Reporter(file, log_interval, global_strain, excess_stress, volume, potential_energy, kinetic_energy, temperature))
     
     def add_field_reporter(self, file_prefix, field_ID, log_interval=100, field_average=True, dump_field=False):
         """

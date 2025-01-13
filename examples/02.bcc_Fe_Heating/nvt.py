@@ -6,7 +6,9 @@ from openferro.engine import *
 from openferro.units import Constants
 from openferro.engine.magnetic import *
 import logging
+import os
 
+os.makedirs("./output", exist_ok=True)
 logging.basicConfig(level=logging.INFO, filename="simulation.log")
 ##########################################################################################
 ## Define the lattice 
@@ -36,16 +38,21 @@ Fe_bcc.add_isotropic_exchange_interaction_4th_shell(ID="exchange_4th_shell", fie
 # Fe_bcc.add_cubic_anisotropy_interaction(ID="cubic_anisotropy", field_ID="spin", K1=K1, K2=K2)
 
 ##########################################################################################
-## NPT simulation
+## NVT simulation
 ##########################################################################################
 dt = 0.0002
 temp_list = [10,  100, 200, 300, 400, 500, 600, 700, 800, 900, 950, 1000, 1050, 1100, 1150, 1200, 1250, 1300, 1350, 1400, 1450, 1500]
+temp_list = [ 1000, 1050, 1100, 1150, 1200, 1250, 1300, 1350, 1400, 1450, 1500]
+
 simulation = SimulationNVTLangevin(Fe_bcc)
 for temp in temp_list:
-    simulation.remove_all_reporters()
-    simulation.add_thermo_reporter(file='thermo_{}K.log'.format(temp), log_interval=100, global_strain=False, volume=True, potential_energy=True, kinetic_energy=True, temperature=True)
-    simulation.add_field_reporter(file_prefix="spin_{}K".format(temp), field_ID="spin", log_interval=100, field_average=True, dump_field=False)
-    logging.info("Temp={}K, NVT Simulation".format(temp))
     spin_field.set_integrator('isothermal', dt=dt, temp=temp, alpha=0.5)
-    simulation.run(10000)
- 
+    ## equlibration
+    logging.info("Temp={}K, NVT Equilibration".format(temp))
+    simulation.remove_all_reporters()
+    simulation.run(5000)
+    ## sampling
+    simulation.add_thermo_reporter(file='./output/thermo_{}K.log'.format(temp), log_interval=100, global_strain=False, volume=True, potential_energy=True, kinetic_energy=True, temperature=True)
+    simulation.add_field_reporter(file_prefix="./output/spin_{}K".format(temp), field_ID="spin", log_interval=100, field_average=True, dump_field=False)
+    logging.info("Temp={}K, NVT Sampling".format(temp))
+    simulation.run(20000)

@@ -5,15 +5,17 @@
 A universal framework for on-lattice atomistic dynamics simulation
 
 # About OpenFerro
-OpenFerro is a Python package for on-lattice atomistic dynamics simulation. OpenFerro is largely based on [JAX](https://github.com/google/jax), a high-performance linear algebra package supporting auto-differentiation and painless GPU acceleration.
+OpenFerro is a Python package for on-lattice atomistic dynamics simulation. OpenFerro is largely based on [JAX](https://github.com/google/jax), a high-performance linear algebra package supporting auto-differentiation and GPU acceleration.
 OpenFerro is designed to minimize the effort required to build on-lattice Hamiltonian models, and to perform molecular dynamics (MD) and Landau-Lifshitz-Gilbert simulations. 
  
-
 # Highlighted features
-* **GPU supports**, making it highly efficient for large-scale simulations.
-* **highly modularized**, easy to implement new interaction terms in a lattice Hamiltonian model, benefitted from auto-differentiation.
+* **GPU supports**, highly efficient for large-scale simulations.
+* **auto-differentiable**, will have native support for enhanced sampling and Hamiltonian optimization.
+* **highly modularized**, easy to implement new interaction terms. No need to look into the details of the codebase.
+* **highly flexible**, supports simultaneous simulation of R^n and SO(3) local order parameters. Fields with other symmetries can be implemented easily.
 
 # Credits
+There will be a paper in the near future for technical details of OpenFerro.
 
 # OpenFerro in a nutshell
 
@@ -31,8 +33,7 @@ Clone the package and pip install.
 ## Examples
 
 ## Units
-
-OpenFerro do not process unit conversion. The unit system is the same as the 'metal' unit system used in LAMMPS.
+OpenFerro's internal unit system is the same as the 'metal' unit system used in LAMMPS.
 
 mass = grams/mole
 

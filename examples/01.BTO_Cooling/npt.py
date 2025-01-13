@@ -5,16 +5,15 @@ from openferro.simulation import *
 from openferro.engine.elastic import *
 from openferro.engine.ferroelectric import *
 from openferro.units import Constants
-from matplotlib import pyplot as plt
 import json
-from time import time as timer
 import logging
-
+import os
+os.makedirs('output', exist_ok=True)
 logging.basicConfig(level=logging.INFO, filename='simulation.log')
 ##########################################################################################
 ## Define the lattice 
 ##########################################################################################
-L = 12
+L = 20
 hydropres =  -4.8e4
 config = json.load(open('BaTiO3.json'))
 latt_vecs = jnp.eye(3) * config['lattice']['a1']
@@ -24,12 +23,10 @@ bto = of.System(latt)
 ##########################################################################################
 ## Define the fields
 ##########################################################################################
-# dipole_field = bto.add_field(ID="dipole", ftype="Rn", dim=3, value=0.1, mass = 1.0)
-# lstrain_field = bto.add_field(ID="lstrain", ftype="LocalStrain3D", value=0.0, mass = 40)
-# gstrain  = bto.add_global_strain(value=jnp.array([0.01,0.01,0.01,0,0,0]), mass = 200.0 *  L**3)
 dipole_field = bto.add_field(ID="dipole", ftype="Rn", dim=3, value=0.0, mass = 200 * Constants.amu)
 lstrain_field = bto.add_field(ID="lstrain", ftype="LocalStrain3D", value=0.0, mass = 200 * Constants.amu)
 gstrain  = bto.add_global_strain(value=jnp.array([0.01,0.01,0.01,0,0,0]), mass = 200 * Constants.amu * L**3)
+
 ##########################################################################################
 ## Define the Hamiltonian
 ##########################################################################################
@@ -51,7 +48,9 @@ dipole_field.set_integrator('optimization', dt=0.0001)
 gstrain.set_integrator('optimization', dt=0.0001)
 lstrain_field.set_integrator('optimization', dt=0.0001)
 minimizer = MDMinimize(bto, max_iter=1000, tol=1e-5)
+minimizer.add_thermo_reporter(file='output/optimization.log', log_interval=10, global_strain=True, volume=True, potential_energy=True, kinetic_energy=False, temperature=False)
 minimizer.run(variable_cell=True, pressure=hydropres)
+
 ##########################################################################################
 ## NPT cooling simulation
 ##########################################################################################
@@ -59,36 +58,24 @@ log_freq = 100
 total_time = 100
 dt = 0.002
 relax_steps = int(10/dt)
-total_steps = int(total_time / dt)
-niters = total_steps // log_freq
+sampling_steps = int(total_time / dt)
 
 temp_list = np.array([400, 350, 320, 310, 300, 290, 280, 270, 260, 250, 240, 230, 220, 210, 200, 190, 180, 170, 160, 150, 140]).astype(int)
-simulation = SimulationNPTLangevin(bto, pressure=-4.8e4)
+simulation = SimulationNPTLangevin(bto, pressure=hydropres)
 simulation.init_velocity(mode='gaussian', temp=temp_list[0])
 
 for temperature in temp_list:
     dipole_field.set_integrator('isothermal', dt=dt, temp=temperature, tau=0.1)
     gstrain.set_integrator('isothermal', dt=dt, temp=temperature, tau=1)
     lstrain_field.set_integrator('isothermal', dt=dt, temp=temperature, tau=1)
+    ## equilibration
     logging.info('T={}K, NPT Equlibration'.format(temperature))
+    simulation.remove_all_reporters()
     simulation.run(relax_steps)
-    average_field = []
-    global_strain = []
+    ## sampling
     logging.info('T={}K, NPT Sampling'.format(temperature))
-    for ii in range(niters):
-        simulation.run(log_freq)
-        average_field.append(bto.get_field_by_ID('dipole').get_values().mean((0,1,2)))
-        global_strain.append(bto.get_field_by_ID("gstrain").get_values().flatten())
-        excess_pres = bto.calc_excess_stress()
-        if ii % 10 == 0:
-            logging.info('=================T={}K, iter={}======================='.format(temperature, ii))
-            logging.info('temperature: {}'.format(bto.calc_temp_by_ID('dipole')))
-            dipole2polar = config['born']['Z_star'] / latt.unit_volume * 16.0217646  # eA -> C/m^2
-            logging.info('Polarization : {}C/m^2'.format(average_field[-1] * dipole2polar ))
-            logging.info('global strain: {} '.format(global_strain[-1]))
-            logging.info('inhomogeneous strain std: {}'.format( lstrain_field.get_values().std((0,1,2))))
-            logging.info('excessive pressure:{}'.format(excess_pres))
-    average_field = jnp.array(average_field)
-    global_strain = jnp.array(global_strain)
-    jnp.save('output/field_history_T{}.npy'.format(temperature) , average_field)
-    jnp.save('output/strain_history_T{}.npy'.format(temperature) , global_strain)
+    simulation.add_thermo_reporter(file='output/thermo_{}K.log'.format(temperature), log_interval=log_freq, 
+        global_strain=True, excess_stress=True, volume=True, potential_energy=True, kinetic_energy=True, temperature=True)
+    simulation.add_field_reporter(file_prefix='output/field_{}K'.format(temperature), field_ID="dipole", log_interval=log_freq, 
+        field_average=True, dump_field=False)
+    simulation.run(sampling_steps)
