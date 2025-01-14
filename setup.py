@@ -5,7 +5,7 @@ setup(
     name='OpenFerro',
     version='0.1.0',
     author="Pinchen Xie",
-    author_email="<pinchenx@math.princeton.edu>",
+    author_email="<pinchenxie@lbl.gov>",
     # packages=find_packages(),
     packages=['openferro'],
     description=DESCRIPTION,

@@ -90,3 +90,9 @@ See examples in [examples](https://github.com/salinelake/OpenFerro/tree/main/exa
 There will be a paper in the near future explaining the technical details of OpenFerro. Before that, please cite this repository for any use of OpenFerro.
 
 The initial development of OpenFerro is done by Pinchen Xie with support from LBNL. 
+
+# Model configuration
+At this point, only a few publicly availabel model configurations are provided in the [model_configs](https://github.com/salinelake/OpenFerro/tree/main/model_configs) directory. We welcome contributions from the community to add more model configurations. 
+
+# Contributing
+We welcome contributions from the community. Raise an issue or submit a pull request. Also feel free to contact pinchenxie@lbl.gov for any questions.
