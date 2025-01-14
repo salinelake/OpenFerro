@@ -4,9 +4,9 @@ Credits
 Cite OpenFerro
 --------------
 
-If you use OpenFerro in your work, please cite the following paper:
+There will be a paper in the near future explaining the technical details of OpenFerro. Before that, please cite the GitHub repository for any use of OpenFerro.
 
-- For general purpose:
+
 
 Package contributors
 ---------------------

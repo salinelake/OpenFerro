@@ -6,8 +6,8 @@ Fields
 ^^^^^^
 Supported field types:
 
-* Rn - For continuous vector fields
-* SO3 - For spin/magnetic systems
+* Rn - For R^n vector fields
+* SO3 - For SO(3) vector fields
 * LocalStrain3D - For local strain fields
 * GlobalStrain - For global lattice deformation
 

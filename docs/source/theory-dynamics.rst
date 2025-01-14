@@ -6,17 +6,32 @@ With the lattice, local order parameters, global variables and Hamiltonian defin
 
 OpenFerro, up to this point, support only molecular dynamics simulation, since it is a more general approach to study the dynamics of a physical system. Enhanced sampling methods (e.g. metadynamics, umbrella sampling) will be supported in the future. In the long term, kinetic Monte Carlo may also be supported to overcome the limitation of time scale.
 
-**Equations of motion**
-OpenFerro deals with coarse-grained representation of atomic systems. The molecular dynamics simulated by OpenFerro will be different from the [generic molecular dynamics](https://en.wikipedia.org/wiki/Molecular_dynamics) (considering all atomic degrees of freedom) formulated under the Born-Oppenheimer approximation. The existence of $SO(3)$ fields further complicates the problem because the general molecular dynamics equations are not applicable to $SO(3)$ fields. So we need to have two sets of equations of motion for $R^d$ and $SO(3)$ fields.
+Equations of motion
+-------------------
 
-- Equation of motion for $R^d$ fields
-For $R^d$ local order parameters and unconstrained global variables, the equations of motion are:
-**NVE ensemble**: the microcanonical ensemble is sampled by the Newton's equation of motion, driven by the potential energy $E$:
-$$
-\frac{d^2 \mathbf{u}_{n}}{dt^2} = -\nabla_{\mathbf{u}_n} E(\mathbf{u}_1, \cdots, \mathbf{u}_N)
-$$
+OpenFerro deals with coarse-grained representation of atomic systems.
+The equations of motion simulated by OpenFerro will be different from that of `generic molecular dynamics <https://en.wikipedia.org/wiki/Molecular_dynamics>`_ (considering all atomic degrees of freedom).
 
-- Equation of motion for $SO(3)$ fields ([Landau-Lifshitz-Gilbert equation](https://en.wikipedia.org/wiki/Landau%E2%80%93Lifshitz%E2%80%93Gilbert_equation))
+We have two sets of equations of motion, respectively for :math:`R^d` fields and :math:`SO(3)` fields.
+
+Equation of motion for :math:`R^d` fields
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+For :math:`R^d` local order parameters and unconstrained global variables, the equations of motion are:
+
+**NVE ensemble**: the microcanonical ensemble is sampled by the Newton's equation of motion, driven by the potential energy :math:`E`: 
+
+.. math::
+
+   \frac{d^2 \mathbf{u}_{n}}{dt^2} = -\nabla_{\mathbf{u}_n} E(\mathbf{u}_1, \cdots, \mathbf{u}_N)
+
+
+
+
+
+Equation of motion for :math:`SO(3)` fields
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+`Landau-Lifshitz-Gilbert equation <https://en.wikipedia.org/wiki/Landau%E2%80%93Lifshitz%E2%80%93Gilbert_equation>`_
 
 
 .. ### Generic molecular dynamics
