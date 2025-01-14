@@ -17,3 +17,21 @@ $$
 $$
 
 - Equation of motion for $SO(3)$ fields ([Landau-Lifshitz-Gilbert equation](https://en.wikipedia.org/wiki/Landau%E2%80%93Lifshitz%E2%80%93Gilbert_equation))
+
+
+.. ### Generic molecular dynamics
+.. A generic molecular dynamics simulation tracks the position of all atoms (position vector $R_i$ associated to atom-$i$) from an atomic system. 
+.. - NVE ensemble: the microcanonical ensemble is sampled by the Newton's equation of motion, driven by the potential energy $E$:
+.. $$
+.. m_i\frac{d^2 \mathbf{R}_{i}}{dt^2} = -\nabla_{i} E(\mathbf{R_1}, \cdots, \mathbf{R_N})
+.. $$
+
+.. - NVT ensemble: the canonical ensemble can be sampled by the Langevin equation, driven by the potential energy $E$, the friction force and a random force:
+.. $$
+.. m_i\frac{d^2 \mathbf{R}_{i}}{dt^2} = -\nabla_{i} E(\mathbf{R_1}, \cdots, \mathbf{R_N}) - \gamma \frac{d \mathbf{R}_{i}}{dt} + \sqrt{2\gamma k_B T} \xi_i
+.. $$
+.. where $\gamma$ is the friction coefficient, $k_B$ is the Boltzmann constant, $T$ is the temperature, and $\xi_i$ is a random force with zero mean and variance $2\gamma k_B T$.
+
+.. ### On-lattice atomisticdynamics
+
+.. ### Landau-Lifshitz-Gilbert equation
