@@ -6,11 +6,11 @@ Follow this jupyter-notebook tutorial_ to learn the basic usage of OpenFerro.
 Running OpenFerro on CPU
 ------------------------
 
-No matter if you are working on a CPU-only machine or a GPU-enabled machine, if you want to run OpenFerro on CPU, specify the environment variable ``JAX_PLATFORMs`` before you run your code.
+No matter if you are working on a CPU-only machine or a GPU-enabled machine, if you want to run OpenFerro on CPU, specify the environment variable ``JAX_PLATFORMS`` before you run your code.
 
 .. code-block:: bash
 
-   export JAX_PLATFORMs=cpu
+   export JAX_PLATFORMS=cpu
 
 Running OpenFerro on GPU 
 ------------------------
