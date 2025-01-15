@@ -1,9 +1,18 @@
+Introduction
+------------
+
+(This page is under construction.)
+Before you get to know the core components of OpenFerro, we recommend you to follow the hands-on tutorial_ first. Then the purpose of most of the core components will be clear.
+
+.. _tutorial: https://github.com/salinelake/OpenFerro/blob/main/tutorials/quickstart.ipynb
+
 System
-^^^^^^
+------
+
 The central class managing the simulation, handling fields and their interactions.
 
 Fields
-^^^^^^
+------
 Supported field types:
 
 * Rn - For R^n vector fields
@@ -12,7 +21,7 @@ Supported field types:
 * GlobalStrain - For global lattice deformation
 
 Interactions
-^^^^^^^^^^^^
+------------
 Built-in interaction types:
 
 * Dipole-dipole interactions with Ewald summation
@@ -21,5 +30,5 @@ Built-in interaction types:
 * Magnetic exchange interactions
 
 Simulations
-^^^^^^^^^^^
+-----------
 

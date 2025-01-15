@@ -1,6 +1,10 @@
 Quickstart
 ==========
 
+
+Tutorial
+--------
+
 Follow this jupyter-notebook tutorial_ to learn the basic usage of OpenFerro.
 
 Running OpenFerro on CPU
@@ -11,6 +15,8 @@ No matter if you are working on a CPU-only machine or a GPU-enabled machine, if 
 .. code-block:: bash
 
    export JAX_PLATFORMS=cpu
+
+JAX automatically determine how many CPU cores it will utilize.
 
 Running OpenFerro on GPU 
 ------------------------
