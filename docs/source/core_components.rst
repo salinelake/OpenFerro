@@ -20,10 +20,6 @@ Built-in interaction types:
 * Elastic interactions
 * Magnetic exchange interactions
 
-Integrators
+Simulations
 ^^^^^^^^^^^
-Available integrators for time evolution:
 
-* Gradient Descent
-* Molecular Dynamics
-* Landau-Lifshitz-Gilbert
