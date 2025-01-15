@@ -1,7 +1,10 @@
 """
 Classes to define the Bravais lattices
+
+Notes
+-----
+This file is part of OpenFerro.
 """
-# This file is part of OpenFerro.
 
 import numpy as np
 import jax.numpy as jnp
@@ -9,6 +12,23 @@ import jax.numpy as jnp
 class BravaisLattice3D:
     """
     A class to represent a 3D Bravais lattice
+
+    Parameters
+    ----------
+    l1 : int
+        Size in first dimension
+    l2 : int
+        Size in second dimension 
+    l3 : int
+        Size in third dimension
+    a1 : array_like, optional
+        First primitive vector, defaults to [1,0,0]
+    a2 : array_like, optional
+        Second primitive vector, defaults to [0,1,0]
+    a3 : array_like, optional
+        Third primitive vector, defaults to [0,0,1]
+    pbc : bool, optional
+        Whether to use periodic boundary conditions, defaults to True
     """
     def __init__(self, l1, l2, l3, a1=None, a2=None, a3=None, pbc=True):
         self.name = 'BravaisLattice3D'
@@ -34,6 +54,11 @@ class BravaisLattice3D:
     def unit_volume(self):
         """
         Returns the volume of the unit cell
+
+        Returns
+        -------
+        float
+            Volume of unit cell
         """
         return jnp.abs(jnp.dot(jnp.cross(self.a1, self.a2), self.a3))
     
@@ -45,6 +70,11 @@ class BravaisLattice3D:
     def latt_vec(self):
         """
         Returns lattice vectors.
+
+        Returns
+        -------
+        ndarray
+            3x3 array of lattice vectors
         """
         return jnp.stack([self.a1, self.a2, self.a3], axis=0)
     
@@ -52,6 +82,11 @@ class BravaisLattice3D:
     def reciprocal_latt_vec(self):
         """
         Calculates reciprocal lattice vectors.
+
+        Returns
+        -------
+        ndarray
+            3x3 array of reciprocal lattice vectors
         """
         coef = 2 * jnp.pi / self.ref_volume
         b1 = coef * np.cross(self.a2,self.a3)  
@@ -61,7 +96,28 @@ class BravaisLattice3D:
 
 class SimpleCubic3D(BravaisLattice3D):
     """
-    A class to represent a simple cubic lattice. Coordination number is 6. First shell has 6 neighbours. Second shell has 12 neighbours. Third shell has 8 neighbours.
+    A class to represent a simple cubic lattice
+
+    Parameters
+    ----------
+    l1 : int
+        Size in first dimension
+    l2 : int
+        Size in second dimension
+    l3 : int
+        Size in third dimension
+    a1 : array_like, optional
+        First primitive vector
+    a2 : array_like, optional
+        Second primitive vector
+    a3 : array_like, optional
+        Third primitive vector
+    pbc : bool, optional
+        Whether to use periodic boundary conditions, defaults to True
+
+    Notes
+    -----
+    Coordination number is 6. First shell has 6 neighbours. Second shell has 12 neighbours. Third shell has 8 neighbours.
     """
     def __init__(self, l1, l2, l3, a1=None, a2=None, a3=None, pbc=True):
         super().__init__(l1, l2, l3, a1, a2, a3, pbc)
@@ -72,9 +128,13 @@ class SimpleCubic3D(BravaisLattice3D):
 
     def _1st_shell_roller(self):
         """
-        Return a list of rolling functions for moving a site to all sites in the first shell of the lattice. 
-        The number of rolling functions is half the shell coordination number.
-        This will come useful when we want to calculate the interaction between a site and its neighbours.
+        Return a list of rolling functions for moving a site to all sites in the first shell of the lattice.
+
+        Returns
+        -------
+        list
+            List of rolling functions. The number of rolling functions is half the shell coordination number.
+            Used to calculate interactions between a site and its neighbours.
         """
         roller = [
             lambda x: jnp.roll(x, 1, axis=0),
@@ -85,9 +145,13 @@ class SimpleCubic3D(BravaisLattice3D):
     
     def _2nd_shell_roller(self):
         """
-        Return a list of rolling functions for moving a site to all sites in the second shell of the lattice. 
-        The number of rolling functions is half the shell coordination number.
-        This will come useful when we want to calculate the interaction between a site and its neighbours.
+        Return a list of rolling functions for moving a site to all sites in the second shell of the lattice.
+
+        Returns
+        -------
+        list
+            List of rolling functions. The number of rolling functions is half the shell coordination number.
+            Used to calculate interactions between a site and its neighbours.
         """
         roller = [
             lambda x: jnp.roll(x, (1, 1), axis=(0,1)),
@@ -103,9 +167,13 @@ class SimpleCubic3D(BravaisLattice3D):
     
     def _3rd_shell_roller(self):
         """
-        Return a list of rolling functions for moving a site to all sites in the third shell of the lattice. 
-        The number of rolling functions is half the shell coordination number.
-        This will come useful when we want to calculate the interaction between a site and its neighbours.
+        Return a list of rolling functions for moving a site to all sites in the third shell of the lattice.
+
+        Returns
+        -------
+        list
+            List of rolling functions. The number of rolling functions is half the shell coordination number.
+            Used to calculate interactions between a site and its neighbours.
         """
         roller = [
             lambda x: jnp.roll(x, (1, 1, 1), axis=(0,1,2)),
@@ -117,8 +185,29 @@ class SimpleCubic3D(BravaisLattice3D):
 
 class BodyCenteredCubic3D(SimpleCubic3D):
     """
-    A class to represent a body-centered cubic lattice. Coordination number is 8. 
-    First shell has 8 neighbours. Second shell has 6 neighbours. Third shell has 12 neighbours. Fourth shell has 24 neighbours.
+    A class to represent a body-centered cubic lattice
+
+    Parameters
+    ----------
+    l1 : int
+        Size in first dimension
+    l2 : int
+        Size in second dimension
+    l3 : int
+        Size in third dimension
+    a1 : array_like, optional
+        First primitive vector
+    a2 : array_like, optional
+        Second primitive vector
+    a3 : array_like, optional
+        Third primitive vector
+    pbc : bool, optional
+        Whether to use periodic boundary conditions, defaults to True
+
+    Notes
+    -----
+    Coordination number is 8. First shell has 8 neighbours. Second shell has 6 neighbours. 
+    Third shell has 12 neighbours. Fourth shell has 24 neighbours.
     """
     def __init__(self, l1, l2, l3, a1=None, a2=None, a3=None, pbc=True):
         super().__init__(l1, l2, l3, a1, a2, a3, pbc)
@@ -134,8 +223,12 @@ class BodyCenteredCubic3D(SimpleCubic3D):
     def _1st_shell_roller(self):
         """
         Return a list of rolling functions for moving a site to all sites in the first shell of the lattice.
-        The number of rolling functions is half the shell coordination number.
-        This will come useful when we want to calculate the interaction between a site and its neighbours.
+
+        Returns
+        -------
+        list
+            List of rolling functions. The number of rolling functions is half the shell coordination number.
+            Used to calculate interactions between a site and its neighbours.
         """
         roller = [
             lambda x: jnp.roll(x, 1, axis=0),  # (-0.5, 0.5, 0.5)
@@ -148,8 +241,12 @@ class BodyCenteredCubic3D(SimpleCubic3D):
     def _2nd_shell_roller(self):
         """
         Return a list of rolling functions for moving a site to all sites in the second shell of the lattice.
-        The number of rolling functions is half the shell coordination number.
-        This will come useful when we want to calculate the interaction between a site and its neighbours.
+
+        Returns
+        -------
+        list
+            List of rolling functions. The number of rolling functions is half the shell coordination number.
+            Used to calculate interactions between a site and its neighbours.
         """
         roller = [
             lambda x: jnp.roll(x, (1,1), axis=(1,2)),   # (1,0,0)
@@ -161,8 +258,12 @@ class BodyCenteredCubic3D(SimpleCubic3D):
     def _3rd_shell_roller(self):
         """
         Return a list of rolling functions for moving a site to all sites in the third shell of the lattice.
-        The number of rolling functions is half the shell coordination number.
-        This will come useful when we want to calculate the interaction between a site and its neighbours.
+
+        Returns
+        -------
+        list
+            List of rolling functions. The number of rolling functions is half the shell coordination number.
+            Used to calculate interactions between a site and its neighbours.
         """
         roller = [
             lambda x: jnp.roll(x, (1,2,1), axis=(0,1,2)),   # (1,0,1)
@@ -177,8 +278,12 @@ class BodyCenteredCubic3D(SimpleCubic3D):
     def _4th_shell_roller(self):
         """
         Return a list of rolling functions for moving a site to all sites in the fourth shell of the lattice.
-        The number of rolling functions is half the shell coordination number.
-        This will come useful when we want to calculate the interaction between a site and its neighbours.
+
+        Returns
+        -------
+        list
+            List of rolling functions. The number of rolling functions is half the shell coordination number.
+            Used to calculate interactions between a site and its neighbours.
         """
         roller = [
             lambda x: jnp.roll(x, (1,2,2), axis=(0,1,2)),  # (1.5,0.5,0.5)
@@ -200,7 +305,28 @@ class BodyCenteredCubic3D(SimpleCubic3D):
 
 class FaceCenteredCubic3D(BodyCenteredCubic3D):
     """
-    A class to represent a face-centered cubic lattice. Coordination number is 12. First shell has 12 neighbours. Second shell has 6 neighbours. Third shell has 24 neighbours.
+    A class to represent a face-centered cubic lattice
+
+    Parameters
+    ----------
+    l1 : int
+        Size in first dimension
+    l2 : int
+        Size in second dimension
+    l3 : int
+        Size in third dimension
+    a1 : array_like, optional
+        First primitive vector
+    a2 : array_like, optional
+        Second primitive vector
+    a3 : array_like, optional
+        Third primitive vector
+    pbc : bool, optional
+        Whether to use periodic boundary conditions, defaults to True
+
+    Notes
+    -----
+    Coordination number is 12. First shell has 12 neighbours. Second shell has 6 neighbours. Third shell has 24 neighbours.
     """
     def __init__(self, l1, l2, l3, a1=None, a2=None, a3=None, pbc=True):
         super().__init__(l1, l2, l3, a1, a2, a3, pbc)
@@ -212,7 +338,24 @@ class FaceCenteredCubic3D(BodyCenteredCubic3D):
 
 class Hexagonal3D(BravaisLattice3D):
     """
-    A class to represent a hexagonal lattice.  
+    A class to represent a hexagonal lattice
+
+    Parameters
+    ----------
+    l1 : int
+        Size in first dimension
+    l2 : int
+        Size in second dimension
+    l3 : int
+        Size in third dimension
+    a1 : array_like, optional
+        First primitive vector
+    a2 : array_like, optional
+        Second primitive vector
+    a3 : array_like, optional
+        Third primitive vector
+    pbc : bool, optional
+        Whether to use periodic boundary conditions, defaults to True
     """
     def __init__(self, l1, l2, l3, a1=None, a2=None, a3=None, pbc=True):
         super().__init__(l1, l2, l3, a1, a2, a3, pbc)
@@ -224,6 +367,19 @@ class Hexagonal3D(BravaisLattice3D):
 class BravaisLattice2D:
     """
     A class to represent a 2D Bravais lattice
+
+    Parameters
+    ----------
+    l1 : int
+        Size in first dimension
+    l2 : int
+        Size in second dimension
+    a1 : array_like, optional
+        First primitive vector
+    a2 : array_like, optional
+        Second primitive vector
+    pbc : bool, optional
+        Whether to use periodic boundary conditions, defaults to True
     """
     def __init__(self, l1, l2, a1=None, a2=None, pbc=True):
         self.name = 'BravaisLattice2D'
@@ -242,6 +398,11 @@ class BravaisLattice2D:
     def unit_area(self):
         """
         Returns the area of the unit cell
+
+        Returns
+        -------
+        float
+            Area of unit cell
         """
         return jnp.abs(jnp.cross(self.a1, self.a2))
     
@@ -253,6 +414,11 @@ class BravaisLattice2D:
     def latt_vec(self):
         """
         Returns lattice vectors.
+
+        Returns
+        -------
+        ndarray
+            2x2 array of lattice vectors
         """
         return jnp.stack([self.a1, self.a2], axis=0)
     
@@ -260,6 +426,11 @@ class BravaisLattice2D:
     def reciprocal_latt_vec(self):
         """
         Calculates reciprocal lattice vectors.
+
+        Returns
+        -------
+        ndarray
+            2x2 array of reciprocal lattice vectors
         """
         coef = 2 * jnp.pi / (self.a1[0] * self.a2[1] - self.a1[1] * self.a2[0])
         b1 = coef * jnp.array([self.a2[1], -self.a2[0]])
@@ -268,7 +439,24 @@ class BravaisLattice2D:
     
 class SimpleSquare2D(BravaisLattice2D):
     """
-    A class to represent a simple square lattice. Coordination number is 4. First shell has 4 neighbours. Second shell has 4 neighbours. Third shell has 4 neighbours.
+    A class to represent a simple square lattice
+
+    Parameters
+    ----------
+    l1 : int
+        Size in first dimension
+    l2 : int
+        Size in second dimension
+    a1 : array_like, optional
+        First primitive vector
+    a2 : array_like, optional
+        Second primitive vector
+    pbc : bool, optional
+        Whether to use periodic boundary conditions, defaults to True
+
+    Notes
+    -----
+    Coordination number is 4. First shell has 4 neighbours. Second shell has 4 neighbours. Third shell has 4 neighbours.
     """
     def __init__(self, l1, l2, a1=None, a2=None, pbc=True):
         super().__init__(l1, l2, a1, a2, pbc)
@@ -280,8 +468,12 @@ class SimpleSquare2D(BravaisLattice2D):
     def _1st_shell_roller(self):
         """
         Return a list of rolling functions for moving a site to all sites in the first shell of the lattice.
-        The number of rolling functions is half the shell coordination number.
-        This will come useful when we want to calculate the interaction between a site and its neighbours.
+
+        Returns
+        -------
+        list
+            List of rolling functions. The number of rolling functions is half the shell coordination number.
+            Used to calculate interactions between a site and its neighbours.
         """
         roller = [lambda x: jnp.roll(x, 1, axis=i) for i in range(2)]
         return roller
@@ -289,8 +481,12 @@ class SimpleSquare2D(BravaisLattice2D):
     def _2nd_shell_roller(self):
         """
         Return a list of rolling functions for moving a site to all sites in the second shell of the lattice.
-        The number of rolling functions is half the shell coordination number.
-        This will come useful when we want to calculate the interaction between a site and its neighbours.
+
+        Returns
+        -------
+        list
+            List of rolling functions. The number of rolling functions is half the shell coordination number.
+            Used to calculate interactions between a site and its neighbours.
         """
         roller = [
             lambda x: jnp.roll(x, (1,1), axis=(0,1)),
@@ -301,15 +497,34 @@ class SimpleSquare2D(BravaisLattice2D):
     def _3rd_shell_roller(self):
         """
         Return a list of rolling functions for moving a site to all sites in the third shell of the lattice.
-        The number of rolling functions is half the shell coordination number.
-        This will come useful when we want to calculate the interaction between a site and its neighbours.
+
+        Returns
+        -------
+        list
+            List of rolling functions. The number of rolling functions is half the shell coordination number.
+            Used to calculate interactions between a site and its neighbours.
         """
         roller = [lambda x: jnp.roll(x, 2, axis=i) for i in range(2)]
         return roller
     
 class Hexagonal2D(SimpleSquare2D):
     """
-    A class to represent a hexagonal lattice. Coordination number is 6. 
+    A class to represent a hexagonal lattice
+
+    Parameters
+    ----------
+    l1 : int
+        Size in first dimension
+    l2 : int
+        Size in second dimension
+    a1 : array_like, optional
+        First primitive vector
+    a2 : array_like, optional
+        Second primitive vector
+
+    Notes
+    -----
+    Coordination number is 6.
     """
     def __init__(self, l1, l2, a1=None, a2=None):
         super().__init__(l1, l2, a1, a2)

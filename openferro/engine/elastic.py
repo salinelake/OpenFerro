@@ -1,7 +1,12 @@
 """
-Functions that define a term in the elastic energy. They will be added into <class interaction> for automatic differentiation.
+Functions that define a term in the elastic energy.
+
+These functions will be added into <class interaction> for automatic differentiation.
+
+Notes
+-----
+This file is part of OpenFerro.
 """
-# This file is part of OpenFerro.
 
 import numpy as np
 import jax.numpy as jnp
@@ -10,12 +15,17 @@ def homo_elastic_energy(global_strain, parameters):
     """
     Returns the homogeneous elastic energy of a strain field.
     
-    Args:
-        global_strain: jnp.array, shape=(6), the global strain of a supercell
-        parameters: jax.numpy array, the parameters of the energy function
+    Parameters
+    ----------
+    global_strain : jnp.ndarray
+        The global strain of a supercell, shape=(6)
+    parameters : jnp.ndarray
+        The parameters of the energy function
     
-    Returns:
-        jnp.array, the homogeneous elastic energy
+    Returns
+    -------
+    jnp.ndarray
+        The homogeneous elastic energy
     """
     B11, B12, B44, N = parameters
 
@@ -31,12 +41,17 @@ def pV_energy(global_strain, parameters):
     """
     Returns pressure * (volume - reference volume)
 
-    Args:
-        global_strain: jnp.array, shape=(6), the global strain of a supercell
-        parameters: jax.numpy array, the parameters of the energy function
+    Parameters
+    ----------
+    global_strain : jnp.ndarray
+        The global strain of a supercell, shape=(6)
+    parameters : jnp.ndarray
+        The parameters of the energy function
     
-    Returns:
-        jnp.array, the pV energy
+    Returns
+    -------
+    jnp.ndarray
+        The pV energy
     """
     # pres = parameters['p']
     # vol_ref = parameters['V0']
@@ -50,16 +65,20 @@ def inhomo_elastic_energy(local_displacement, parameters):
     """
     Returns the inhomogeneous elastic energy of a strain field.
 
-    Args: 
-        local_displacement: jnp.array, shape=(nx, ny, nz, 3), the local displacement field
-        global_strain: jnp.array, shape=(6), the global strain of a supercell
-        parameters: dict, the parameters of the energy function containing:
-            'B11': float, elastic constant B11
-            'B12': float, elastic constant B12
-            'B44': float, elastic constant B44
+    Parameters
+    ----------
+    local_displacement : jnp.ndarray
+        The local displacement field, shape=(nx, ny, nz, 3)
+    parameters : tuple
+        The parameters of the energy function containing:
+        - B11 (float): elastic constant B11
+        - B12 (float): elastic constant B12
+        - B44 (float): elastic constant B44
 
-    Returns:
-        jnp.array, the total elastic energy (homogeneous + inhomogeneous)
+    Returns
+    -------
+    jnp.ndarray
+        The total elastic energy (homogeneous + inhomogeneous)
     """
     B11, B12, B44 = parameters
     g11 = B11 / 4
@@ -110,5 +129,3 @@ def inhomo_elastic_energy(local_displacement, parameters):
     inhomo_elastic_energy +=  g44 * jnp.sum((vyz_m+vzy_p)**2)
     inhomo_elastic_energy +=  g44 * jnp.sum((vyz_p+vzy_p)**2)
     return inhomo_elastic_energy
-
- 

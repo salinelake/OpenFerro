@@ -1,7 +1,10 @@
 """
-Classes which define the time evolution of physical systems. 
+Classes which define the time evolution of physical systems.
+
+Notes
+-----
+This file is part of OpenFerro.
 """
-# This file is part of OpenFerro.
 
 from time import time as timer
 import logging
@@ -15,8 +18,16 @@ from openferro.reporter import Thermo_Reporter, Field_Reporter
 
 class Simulation:
     """
-    The base class to define a simulation. A simulation controls the time evolution of a system.
-    This class does not implement any time integration algorithm. Each field object has its own integrator. The class only calls the step method of each integrator and controls output.
+    The base class to define a simulation.
+    
+    A simulation controls the time evolution of a system. This class does not implement any time 
+    integration algorithm. Each field object has its own integrator. The class only calls the step 
+    method of each integrator and controls output.
+
+    Parameters
+    ----------
+    system : System
+        The physical system to simulate
     """
     def __init__(self, system):
         self.system = system
@@ -27,20 +38,50 @@ class Simulation:
 
     def add_thermo_reporter(self, file='thermo.log', log_interval=100, global_strain=False, excess_stress=False, volume=False, potential_energy=False, kinetic_energy=False, temperature=False):
         """
-        Add a reporter to the simulation to output global thermodynamic information.
+        Add a reporter to output global thermodynamic information.
+
+        Parameters
+        ----------
+        file : str, optional
+            Output file name, by default 'thermo.log'
+        log_interval : int, optional
+            Number of steps between outputs, by default 100
+        global_strain : bool, optional
+            Whether to output global strain, by default False
+        excess_stress : bool, optional
+            Whether to output excess stress, by default False
+        volume : bool, optional
+            Whether to output volume, by default False
+        potential_energy : bool, optional
+            Whether to output potential energy, by default False
+        kinetic_energy : bool, optional
+            Whether to output kinetic energy, by default False
+        temperature : bool, optional
+            Whether to output temperature, by default False
         """
         self.reporters.append(Thermo_Reporter(file, log_interval, global_strain, excess_stress, volume, potential_energy, kinetic_energy, temperature))
     
     def add_field_reporter(self, file_prefix, field_ID, log_interval=100, field_average=True, dump_field=False):
         """
-        Add a reporter to the simulation to dump the values of a given field.
+        Add a reporter to dump the values of a given field.
+
+        Parameters
+        ----------
+        file_prefix : str
+            Prefix for output files
+        field_ID : str
+            ID of field to report
+        log_interval : int, optional
+            Number of steps between outputs, by default 100
+        field_average : bool, optional
+            Whether to output field averages, by default True
+        dump_field : bool, optional
+            Whether to dump full field values, by default False
         """
         self.reporters.append(Field_Reporter(file_prefix, field_ID, log_interval, field_average, dump_field))
 
     def initialize_reporters(self):
-        """
-        Initialize all reporters.
-        """
+        """Initialize all reporters."""
         for reporter in self.reporters:
             reporter.initialize(self.system)
 
@@ -48,16 +89,12 @@ class Simulation:
         self.reporters = []
 
     def reset_reporters(self):
-        """
-        Reset the counters of all reporters.
-        """
+        """Reset the counters of all reporters."""
         for reporter in self.reporters:
             reporter.counter = -1
     
     def step_reporters(self):
-        """
-        Step all reporters.
-        """
+        """Step all reporters."""
         for reporter in self.reporters:
             reporter.step(self.system)
     
@@ -74,11 +111,23 @@ class Simulation:
     
     def run(self):
         """
-        Run the simulation for a given number of steps or until a convergence criterion is met. To be implemented by subclasses.
+        Run the simulation for a given number of steps or until convergence. To be implemented by subclasses.
         """
         pass
         
 class MDMinimize(Simulation):
+    """
+    Class for energy minimization using molecular dynamics.
+
+    Parameters
+    ----------
+    system : System
+        The physical system to minimize
+    max_iter : int, optional
+        Maximum number of iterations, by default 100
+    tol : float, optional
+        Force tolerance for convergence, by default 1e-5
+    """
     def __init__(self, system, max_iter=100, tol=1e-5 ):
         super().__init__(system)
         self.max_iter = max_iter
@@ -88,6 +137,11 @@ class MDMinimize(Simulation):
     def _step(self, variable_cell):
         """
         Update the field by one time step.
+
+        Parameters
+        ----------
+        variable_cell : bool
+            Whether to allow cell parameters to vary
         """
         SO3_fields = self.system.get_all_SO3_fields()
         non_SO3_fields = self.system.get_all_non_SO3_fields()
@@ -106,6 +160,23 @@ class MDMinimize(Simulation):
                 field.integrator.step(field, force_updater=self.system.update_force)
             
     def run(self, variable_cell=True, pressure=None):
+        """
+        Run the minimization.
+
+        Parameters
+        ----------
+        variable_cell : bool, optional
+            Whether to allow cell parameters to vary, by default True
+        pressure : float, optional
+            External pressure in bar, required if variable_cell=True
+
+        Raises
+        ------
+        ValueError
+            If pressure not specified for variable cell minimization
+            If pressure specified for fixed cell minimization
+            If integrator not set for any field
+        """
         ## sanity check
         if variable_cell:
             if pressure is None:
@@ -141,7 +212,12 @@ class MDMinimize(Simulation):
 
 class SimulationNVE(Simulation):
     """
-    The base class to define a simulation. A simulation describes the time evolution of a system.
+    Class for NVE (microcanonical) molecular dynamics simulation.
+
+    Parameters
+    ----------
+    system : System
+        The physical system to simulate
     """
     def __init__(self, system):
         super().__init__(system)
@@ -154,6 +230,11 @@ class SimulationNVE(Simulation):
     def _step(self, profile=False):
         """
         Update the field by one step.
+
+        Parameters
+        ----------
+        profile : bool, optional
+            Whether to profile timing, by default False
         """
         if len(self.non_SO3_fields) > 0:
             ## update the force for all fields. 
@@ -177,6 +258,21 @@ class SimulationNVE(Simulation):
                     jax.block_until_ready(field.get_values())
                     logging.info('Time for updating field {}: {:.8f}s'.format(type(field), timer()-t0))
     def run(self, nsteps=1, profile=False):
+        """
+        Run the simulation.
+
+        Parameters
+        ----------
+        nsteps : int, optional
+            Number of steps to run, by default 1
+        profile : bool, optional
+            Whether to profile timing, by default False
+
+        Raises
+        ------
+        ValueError
+            If integrator not set for any field
+        """
         ## sanity check
         for field in self.all_fields:
             if field.integrator is None:
@@ -189,12 +285,27 @@ class SimulationNVE(Simulation):
 
 class SimulationNVTLangevin(SimulationNVE):
     """
-    A class to define a simulation using the Langevin equation. A Langevin simulation evolves the system in time using the Langevin equation.
+    Class for NVT molecular dynamics simulation using Langevin dynamics.
+
+    Parameters
+    ----------
+    system : System
+        The physical system to simulate
     """
     def __init__(self, system):
         super().__init__(system)
 
     def _step(self, keys, profile=False):
+        """
+        Update the field by one step.
+
+        Parameters
+        ----------
+        keys : array_like
+            Random keys for Langevin dynamics
+        profile : bool, optional
+            Whether to profile timing, by default False
+        """
         keys_SO3 = keys[:len(self.SO3_fields)]
         keys_non_SO3 = keys[len(self.SO3_fields):]
         if len(self.non_SO3_fields) > 0:
@@ -218,7 +329,19 @@ class SimulationNVTLangevin(SimulationNVE):
 
     def run(self, nsteps=1, profile=False):
         """
-        Update the field by n steps.
+        Run the simulation.
+
+        Parameters
+        ----------
+        nsteps : int, optional
+            Number of steps to run, by default 1
+        profile : bool, optional
+            Whether to profile timing, by default False
+
+        Raises
+        ------
+        ValueError
+            If integrator not set for any field
         """
         ## sanity check
         for field in self.all_fields:
@@ -241,7 +364,14 @@ class SimulationNVTLangevin(SimulationNVE):
 
 class SimulationNPTLangevin(SimulationNVTLangevin):
     """
-    A class to define a simulation using the Langevin equation. A Langevin simulation evolves the system in time using the Langevin equation.
+    Class for NPT molecular dynamics simulation using Langevin dynamics.
+
+    Parameters
+    ----------
+    system : System
+        The physical system to simulate
+    pressure : float, optional
+        External pressure in bar, by default 0.0
     """
     def __init__(self, system, pressure=0.0):
         super().__init__(system)

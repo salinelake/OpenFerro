@@ -12,14 +12,18 @@ from openferro.integrator import *
 
 class Field:
     """
-    Template class to define a field on a lattice. 
+    Template class to define a field on a lattice.
     """
     def __init__(self, lattice, ID: str):
         """
         Initialize a field.
-        Args:
-            lattice: BravaisLattice3D object.
-            ID: str, ID of the field.
+
+        Parameters
+        ----------
+        lattice : BravaisLattice3D
+            Lattice object
+        ID : str
+            ID of the field
         """
         self.lattice = lattice
         self.ID = ID
@@ -43,6 +47,16 @@ class Field:
     def get_values(self):
         """
         Get the values of the field.
+
+        Returns
+        -------
+        array_like
+            Values of the field
+
+        Raises
+        ------
+        ValueError
+            If field has no values set
         """
         if self._values is None:
             raise ValueError("Field has no values. Set values before getting them.")
@@ -187,8 +201,17 @@ class Field:
     """
     def set_integrator(self, integrator_class, dt, **kwargs):
         """
-        Set the integrator according to the given integrator class.  Set the time step.
+        Set the integrator according to the given integrator class. Set the time step.
         To be implemented by the subclasses.
+
+        Parameters
+        ----------
+        integrator_class : str
+            Class of integrator to use
+        dt : float
+            Time step
+        **kwargs
+            Additional arguments passed to integrator
         """
         pass
 
@@ -197,7 +220,7 @@ class Field:
 
 class FieldRn(Field):
     """
-    R^n field on a lattice. Values are stored as n-dimensional vectors. 
+    R^n field on a lattice. Values are stored as n-dimensional vectors.
     """
     def __init__(self, lattice, ID, dim, unit=None):
         super().__init__(lattice, ID)
@@ -214,6 +237,11 @@ class FieldRn(Field):
     def mean(self):
         """
         Calculate the average of the field over the lattice.
+
+        Returns
+        -------
+        array_like
+            Mean value of field
         """
         return jnp.mean(self.get_values(), axis=[i for i in range(self.ldim)])
 
@@ -221,12 +249,24 @@ class FieldRn(Field):
     def var(self):
         """
         Calculate the variance of the field over the lattice.
+
+        Returns
+        -------
+        array_like
+            Variance of field
         """
         return jnp.var(self.get_values(), axis=[i for i in range(self.ldim)])
 
     def set_local_value(self, loc, value):
         """
-        Set the value of the field at a given location. 
+        Set the value of the field at a given location.
+
+        Parameters
+        ----------
+        loc : tuple
+            Location tuple with length equal to lattice dimension
+        value : array_like
+            Value to set at location
         """
         assert type(loc) is tuple and len(loc) == self.ldim, "Location must be a tuple of length equal to the dimension of the lattice"
         self._values[loc] = value
@@ -234,12 +274,23 @@ class FieldRn(Field):
 
     def set_integrator(self, integrator_class, dt, temp=None, tau=None):
         """
-        Set the integrator according to the given integrator class.  Set the time step.
-        Args:
-            integrator_class: str, integrator class.
-            dt: float, time step.
-            temp: float, temperature for the isothermal integrator.
-            tau: float, relaxation time for the Langevin integrator.
+        Set the integrator according to the given integrator class. Set the time step.
+
+        Parameters
+        ----------
+        integrator_class : str
+            Integrator class
+        dt : float
+            Time step
+        temp : float, optional
+            Temperature for isothermal integrator
+        tau : float, optional
+            Relaxation time for Langevin integrator
+
+        Raises
+        ------
+        ValueError
+            If integrator class not supported or required parameters missing
         """
         if integrator_class not in self.integrator_class:
             raise ValueError(f"Integrator class {integrator_class} is not supported for this field.")
@@ -256,7 +307,7 @@ class FieldRn(Field):
 
 class FieldScalar(FieldRn):
     """
-    Scalar field. Values are stored as scalars. 
+    Scalar field. Values are stored as scalars.
     Example: mass, density, any onsite constant, etc.
     """
     def __init__(self, lattice, ID, unit=None):
@@ -264,7 +315,7 @@ class FieldScalar(FieldRn):
 
 class FieldR3(FieldRn):
     """
-    3D vector field. Values are stored as 3-dimensional vectors. 
+    3D vector field. Values are stored as 3-dimensional vectors.
     Example: flexible dipole moment.
     """
     def __init__(self, lattice, ID, unit=None):
@@ -272,7 +323,7 @@ class FieldR3(FieldRn):
 
 class FieldSO3(FieldRn):
     """
-    3D vector field with fixed magnitude and flexible orientation. Values are stored as 3-dimensional vectors. 
+    3D vector field with fixed magnitude and flexible orientation. Values are stored as 3-dimensional vectors.
     Example: rigid atomistic spin, molecular orientation, etc.
     """
     def __init__(self, lattice, ID, unit=None):
@@ -338,12 +389,23 @@ class FieldSO3(FieldRn):
 
     def set_integrator(self, integrator_class, dt, temp=None, alpha=None):
         """
-        Set the integrator according to the given integrator class.  Set the time step.
-        Args:
-            integrator_class: str, integrator class.
-            dt: float, time step.
-            temp: float, temperature for the isothermal integrator. Only required for the isothermal integrator.
-            alpha: float, Gilbert damping constant. Required for Landau-Lifshitz equation of motion. Not required for adiabatic spin precession.
+        Set the integrator according to the given integrator class. Set the time step.
+
+        Parameters
+        ----------
+        integrator_class : str
+            Integrator class
+        dt : float
+            Time step
+        temp : float, optional
+            Temperature for isothermal integrator
+        alpha : float, optional
+            Gilbert damping constant for Landau-Lifshitz equation of motion
+
+        Raises
+        ------
+        ValueError
+            If integrator class not supported or required parameters missing
         """
         if integrator_class not in self.integrator_class:
             raise ValueError(f"Integrator class {integrator_class} is not supported for this field.")
@@ -373,9 +435,19 @@ class LocalStrain3D(FieldRn):
 
     @staticmethod
     def get_local_strain_symmetric(values):
-        '''
+        """
         Calculate the local strain field from the local displacement field.
-        '''
+
+        Parameters
+        ----------
+        values : array_like
+            Local displacement field values
+
+        Returns
+        -------
+        array_like
+            Local strain field with shape (l1, l2, l3, 6)
+        """
         padded_values = jnp.pad(values, ((1, 1), (1, 1), (1, 1), (0, 0)), mode='wrap') ## pad x,y,z axis with periodic boundary condition
         grad_0, grad_1, grad_2 = jnp.gradient(padded_values, axis=(0, 1, 2))
         grad_0 = grad_0[1:-1, 1:-1, 1:-1]
@@ -393,10 +465,20 @@ class LocalStrain3D(FieldRn):
 
     @staticmethod
     def get_local_strain(values):
-        '''
+        """
         Calculate the local strain field from the local displacement field.
-        Implemented accroding to Physical Review B 52.9 (1995): 6301.
-        '''
+        Implemented according to Physical Review B 52.9 (1995): 6301.
+
+        Parameters
+        ----------
+        values : array_like
+            Local displacement field values
+
+        Returns
+        -------
+        array_like
+            Local strain field with shape (l1, l2, l3, 6)
+        """
         eta_1 = jnp.roll(values[..., 0], 1, axis=0) - values[..., 0]  # vx(R-dx) - vx(R)
         eta_1 = eta_1 + jnp.roll(eta_1, 1, axis=1) + jnp.roll(eta_1, 1, axis=2) + jnp.roll(jnp.roll(eta_1, 1, axis=1), 1, axis=2)
         eta_1 = eta_1 / 4.0
@@ -465,15 +547,29 @@ class GlobalStrain(Field):
 
     def set_integrator(self, integrator_class, dt, temp=None, tau=None, freeze_x=False, freeze_y=False, freeze_z=False):
         """
-        Set the integrator according to the given integrator class.  Set the time step.
-        Args:
-            integrator_class: str, integrator class.
-            dt: float, time step.
-            temp: float, temperature for the isothermal integrator.
-            tau: float, relaxation time for the Langevin integrator.
-            freeze_x: bool, whether to freeze the x-component of the strain.
-            freeze_y: bool, whether to freeze the y-component of the strain.
-            freeze_z: bool, whether to freeze the z-component of the strain.
+        Set the integrator according to the given integrator class. Set the time step.
+
+        Parameters
+        ----------
+        integrator_class : str
+            Integrator class
+        dt : float
+            Time step
+        temp : float, optional
+            Temperature for isothermal integrator
+        tau : float, optional
+            Relaxation time for Langevin integrator
+        freeze_x : bool, optional
+            Whether to freeze x-component of strain, by default False
+        freeze_y : bool, optional
+            Whether to freeze y-component of strain, by default False
+        freeze_z : bool, optional
+            Whether to freeze z-component of strain, by default False
+
+        Raises
+        ------
+        ValueError
+            If integrator class not supported or required parameters missing
         """
         if integrator_class not in self.integrator_class:
             raise ValueError(f"Integrator class {integrator_class} is not supported for this field.")

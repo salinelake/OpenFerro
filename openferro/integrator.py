@@ -15,17 +15,33 @@ import logging
 class Integrator:
     """
     Base class for integrators.
+
+    Parameters
+    ----------
+    dt : float
+        Time step size
     """
     def __init__(self, dt):
         self.dt = dt
 
     def step(self, field, force_updater=None):
         """
-        Update the field by one time step. In most cases, the force will be updated for all fields in one setting, before any integrator is called.
-        So the force_updater is not necessary in most cases. However, for some implicit integrators, the force_updater is needed. 
-        Args:
-            field: the field to be updated
-            force_updater: a function that updates the force of all field. 
+        Update the field by one time step.
+
+        In most cases, the force will be updated for all fields in one setting, before any integrator is called.
+        So the force_updater is not necessary in most cases. However, for some implicit integrators, the force_updater is needed.
+
+        Parameters
+        ----------
+        field : Field
+            The field to be updated
+        force_updater : callable, optional
+            A function that updates the force of all fields
+
+        Returns
+        -------
+        Field
+            The updated field
         """
         pass
 
@@ -37,6 +53,11 @@ Integrators for unconstrained molecular dynamics
 class GradientDescentIntegrator(Integrator):
     """
     Gradient descent integrator.
+
+    Parameters
+    ----------
+    dt : float
+        Time step size
     """
     def _step_x(self, x, f, m, dt):
         return x + f / m * dt
@@ -47,7 +68,17 @@ class GradientDescentIntegrator(Integrator):
     
     def step(self, field):
         """
-        Update the field by one time step. 
+        Update the field by one time step.
+
+        Parameters
+        ----------
+        field : Field
+            The field to be updated
+
+        Returns
+        -------
+        Field
+            The updated field
         """
         x0 = field.get_values()
         f0 = field.get_force()
@@ -58,6 +89,17 @@ class GradientDescentIntegrator(Integrator):
 class GradientDescentIntegrator_Strain(GradientDescentIntegrator):
     """
     Gradient descent integrator for global strain.
+
+    Parameters
+    ----------
+    dt : float
+        Time step size
+    freeze_x : bool, optional
+        Whether to freeze motion in x direction
+    freeze_y : bool, optional  
+        Whether to freeze motion in y direction
+    freeze_z : bool, optional
+        Whether to freeze motion in z direction
     """
     def __init__(self, dt, freeze_x=False, freeze_y=False, freeze_z=False):
         super().__init__(dt)
@@ -72,6 +114,11 @@ class GradientDescentIntegrator_Strain(GradientDescentIntegrator):
 class LeapFrogIntegrator(Integrator):
     """
     Leapfrog integrator.
+
+    Parameters
+    ----------
+    dt : float
+        Time step size
     """
     def _step_xp(self, x, v, f, m, dt):
         v += f / m * dt
@@ -84,7 +131,17 @@ class LeapFrogIntegrator(Integrator):
 
     def step(self, field):
         """
-        Update the field by one time step. 
+        Update the field by one time step.
+
+        Parameters
+        ----------
+        field : Field
+            The field to be updated
+
+        Returns
+        -------
+        Field
+            The updated field
         """
         x0 = field.get_values()
         v0 = field.get_velocity()
@@ -96,6 +153,17 @@ class LeapFrogIntegrator(Integrator):
 class LeapFrogIntegrator_Strain(LeapFrogIntegrator):
     """
     Leapfrog integrator for global strain.
+
+    Parameters
+    ----------
+    dt : float
+        Time step size
+    freeze_x : bool, optional
+        Whether to freeze motion in x direction
+    freeze_y : bool, optional
+        Whether to freeze motion in y direction
+    freeze_z : bool, optional
+        Whether to freeze motion in z direction
     """
     def __init__(self, dt, freeze_x=False, freeze_y=False, freeze_z=False):
         super().__init__(dt)
@@ -112,11 +180,21 @@ class LeapFrogIntegrator_Strain(LeapFrogIntegrator):
 
 class LangevinIntegrator(Integrator):
     """
-    Langevin integrator as in J. Phys. Chem. A 2019, 123, 28, 6056-6079. 
+    Langevin integrator as in J. Phys. Chem. A 2019, 123, 28, 6056-6079.
     ABOBA scheme: exp(i L dt) = exp(i Lx dt/2)exp(i Lt dt)exp(i Lx dt/2)exp(i Lp dt)
+    
     Lx/2: half-step position update (_step_x)
     Lt: velocity update from damping and noise (_step_t)
     Lp: full-step velocity update (_step_p)
+
+    Parameters
+    ----------
+    dt : float
+        Time step size
+    temp : float
+        Temperature
+    tau : float
+        Relaxation time
     """
     def _step_p(self, v, f, m, dt):
         v += f / m * dt
@@ -143,6 +221,21 @@ class LangevinIntegrator(Integrator):
         self.step_t = jit(self._step_t)
     
     def get_noise(self, key, field):
+        """
+        Generate random noise for the Langevin dynamics.
+
+        Parameters
+        ----------
+        key : jax.random.PRNGKey
+            Random number generator key
+        field : Field
+            The field to generate noise for
+
+        Returns
+        -------
+        jax.Array
+            Random noise array
+        """
         gaussian = jax.random.normal(key, field.get_velocity().shape) 
         if field._sharding != gaussian.sharding:
             gaussian = jax.device_put(gaussian, field._sharding)
@@ -150,7 +243,19 @@ class LangevinIntegrator(Integrator):
         
     def step(self, key, field):
         """
-        Update the field by one time step. 
+        Update the field by one time step.
+
+        Parameters
+        ----------
+        key : jax.random.PRNGKey
+            Random number generator key
+        field : Field
+            The field to be updated
+
+        Returns
+        -------
+        Field
+            The updated field
         """
         dt = self.dt
         mass = field.get_mass()
@@ -170,6 +275,21 @@ class LangevinIntegrator(Integrator):
 class LangevinIntegrator_Strain(LangevinIntegrator):
     """
     Langevin integrator for global strain.
+
+    Parameters
+    ----------
+    dt : float
+        Time step size
+    temp : float
+        Temperature
+    tau : float
+        Relaxation time
+    freeze_x : bool, optional
+        Whether to freeze motion in x direction
+    freeze_y : bool, optional
+        Whether to freeze motion in y direction
+    freeze_z : bool, optional
+        Whether to freeze motion in z direction
     """
     def __init__(self, dt, temp, tau, freeze_x=False, freeze_y=False, freeze_z=False):
         super().__init__(dt, temp, tau)
@@ -197,6 +317,15 @@ class LangevinIntegrator_Strain(LangevinIntegrator):
 class OverdampedLangevinIntegrator(Integrator):
     """
     Overdamped Langevin integrator.
+
+    Parameters
+    ----------
+    dt : float
+        Time step size
+    temp : float
+        Temperature
+    tau : float
+        Relaxation time
     """
     def __init__(self, dt, temp, tau):
         super().__init__(dt)
@@ -210,30 +339,42 @@ class ConservativeLLIntegrator(Integrator):
     """
     [For testing purposes: naive geometric integrator that may cause increasement in energy.]
     Adiabatic spin precession, i.e. Landau-Lifshitz equation of motion without dissipative damping term.
+    
     The equation of motion is:
     dM/dt = -gamma M x B
+
+    Parameters
+    ----------
+    dt : float
+        Time step size
+    gamma : float, optional
+        Gyromagnetic ratio. If None, uses electron gyromagnetic ratio
     """
     def _step_x(self, M, B, gamma, dt):
         """
         Update the orientation of the magnetization M by rotating it around the magnetic field B
-        Args:
-            M: the magnetization (shape=(*, 3))
-            B: the magnetic field (shape=(*, 3))
-            gamma: the gyromagnetic ratio
-            dt: the time step
-        Returns:
-            the updated magnetization (shape=(*, 3))
+
+        Parameters
+        ----------
+        M : jax.Array
+            The magnetization (shape=(*, 3))
+        B : jax.Array
+            The magnetic field (shape=(*, 3))
+        gamma : float
+            The gyromagnetic ratio
+        dt : float
+            The time step
+
+        Returns
+        -------
+        jax.Array
+            The updated magnetization (shape=(*, 3))
         """
         R = SO3_rotation(B, gamma * dt)
         return (R * M[..., None, :]).sum(-1)
 
     def __init__(self, dt, gamma=None):
         super().__init__(dt)
-        """
-        Args:
-            dt: the time step
-            gamma: the gyromagnetic ratio
-        """
         if gamma is None:
             self.gamma = Constants.electron_gyro_ratio
         else:
@@ -242,7 +383,19 @@ class ConservativeLLIntegrator(Integrator):
 
     def step(self, field, force_updater=None):
         """
-        Update the field by one time step. 
+        Update the field by one time step.
+
+        Parameters
+        ----------
+        field : Field
+            The field to be updated
+        force_updater : callable, optional
+            A function that updates the force of all fields
+
+        Returns
+        -------
+        Field
+            The updated field
         """
         M = field.get_values()
         B = field.get_force()
@@ -254,32 +407,47 @@ class LLIntegrator(ConservativeLLIntegrator):
     """
     [For testing purposes: naive geometric integrator.]
     Landau-Lifshitz equation of motion.
+    
     See Eriksson, Olle, et al. Atomistic spin dynamics: foundations and applications. Oxford university press, 2017, Sec.7.4.5 for details.
+    
     The equation of motion is:
     dM/dt = -gamma M x B - (gamma * alpha / |M|) * M x (M x B)
+    
     Here gamma=(gyromagnetic ratio)/ (1+alpha^2) is the renormalized gyromagnetic ratio for simulating LLG equation in Landau-Lifshitz form.
+
+    Parameters
+    ----------
+    dt : float
+        Time step size
+    alpha : float
+        Gilbert damping constant
+    gamma : float, optional
+        Gyromagnetic ratio. If None, uses electron gyromagnetic ratio
     """
     def _step_b(self, M, B, alpha, Ms):
         """
         Update the magnetic field B by adding the term ( alpha / |M|) * (M x B)
-        Args:
-            M: the magnetization (shape=(*, 3))
-            B: the magnetic field (shape=(*, 3))
-            alpha: the Gilbert damping constant
-            Ms: the magnitude of the magnetization (shape=(*,))
-        Returns:
-            the updated magnetic field (shape=(*, 3))
+
+        Parameters
+        ----------
+        M : jax.Array
+            The magnetization (shape=(*, 3))
+        B : jax.Array
+            The magnetic field (shape=(*, 3))
+        alpha : float
+            The Gilbert damping constant
+        Ms : jax.Array
+            The magnitude of the magnetization (shape=(*,))
+
+        Returns
+        -------
+        jax.Array
+            The updated magnetic field (shape=(*, 3))
         """
         return B + alpha / Ms[..., None] * jnp.cross(M, B)
  
     def __init__(self, dt, alpha, gamma=None):
         super().__init__(dt, gamma)
-        """
-        Args:
-            dt: the time step
-            alpha: the Gilbert damping constant
-            gamma: the gyromagnetic ratio
-        """
         ## get the renormalized gyromagnetic ratio for simulating LLG equation in Landau-Lifshitz form
         if gamma is None:
             self.gamma = Constants.electron_gyro_ratio / (1 + alpha**2)
@@ -290,7 +458,19 @@ class LLIntegrator(ConservativeLLIntegrator):
 
     def step(self, field, force_updater=None):
         """
-        Update the field by one time step. 
+        Update the field by one time step.
+
+        Parameters
+        ----------
+        field : Field
+            The field to be updated
+        force_updater : callable, optional
+            A function that updates the force of all fields
+
+        Returns
+        -------
+        Field
+            The updated field
         """
         Ms = field.get_magnitude()
         M = field.get_values()
@@ -305,26 +485,48 @@ class LLLangevinIntegrator(LLIntegrator):
     """
     [For testing purposes: naive geometric integrator.]
     Stochastic Landau-Lifshitz equation of motion.
+    
     See Eriksson, Olle, et al. Atomistic spin dynamics: foundations and applications. Oxford university press, 2017, Sec.7.4.5 for details.
+    
     The equation of motion is:
     dM/dt = -gamma M x (B + b) - (gamma * alpha / |M|) * M x (M x (B + b))
+    
     b is the stochastic force <b_i_alpha(t) b_j_beta(s)> = 2 * D * delta_ij * delta_alpha_beta * delta(t-s)
     A steady Boltzmann state requires D= alpha/(1+alpha^2) * kbT / gamma / |m|
+
+    Parameters
+    ----------
+    dt : float
+        Time step size
+    temp : float
+        Temperature
+    alpha : float
+        Gilbert damping constant
+    gamma : float, optional
+        Gyromagnetic ratio. If None, uses electron gyromagnetic ratio
     """
  
     def __init__(self, dt, temp, alpha, gamma=None):
         super().__init__(dt, alpha, gamma)
-        """
-        Args:
-            dt: the time step
-            temp: the temperature
-            alpha: the Gilbert damping constant
-            gamma: the gyromagnetic ratio
-        """
         self.kbT = Constants.kb * temp
         self.D_base = self.alpha/(1+self.alpha**2) * self.kbT / self.gamma  
 
     def get_noise(self, key, field):
+        """
+        Generate random noise for the Langevin dynamics.
+
+        Parameters
+        ----------
+        key : jax.random.PRNGKey
+            Random number generator key
+        field : Field
+            The field to generate noise for
+
+        Returns
+        -------
+        jax.Array
+            Random noise array
+        """
         gaussian = jax.random.normal(key, field.get_values().shape) 
         if field._sharding != gaussian.sharding:
             gaussian = jax.device_put(gaussian, field._sharding)
@@ -332,7 +534,21 @@ class LLLangevinIntegrator(LLIntegrator):
     
     def step(self, key, field, force_updater=None):
         """
-        Update the field by one time step. 
+        Update the field by one time step.
+
+        Parameters
+        ----------
+        key : jax.random.PRNGKey
+            Random number generator key
+        field : Field
+            The field to be updated
+        force_updater : callable, optional
+            A function that updates the force of all fields
+
+        Returns
+        -------
+        Field
+            The updated field
         """
         Ms = field.get_magnitude()
         M = field.get_values()
@@ -348,17 +564,48 @@ class ConservativeLLSIBIntegrator(Integrator):
     """
     [Semi-implicit B (SIB) scheme. (J. Phys.: Condens. Matter 22 (2010) 176001) ]
     Adiabatic spin precession, i.e. Landau-Lifshitz equation of motion without dissipative damping term.
+    
     The equation of motion is:
         dM/dt = -gamma M x B
+        
     Let M[i] be the spin configuration at time step i, Y[i] be the auxiliary spin configuration at time step i+1, B(M) be the magnetic field of configuration M.
     The SIB scheme is:  
         (step 1) Y[i] = M[i] - dt * gamma * (M[i]+Y[i])/2 x B(M[i])
         (step 2) M[i+1] = M[i] - dt * gamma * (M[i]+M[i+1])/2 x B((M[i] + Y[i])/2)
     Both equations are implicit, and can be solved iteratively through fixed-point iterations.
+
+    Parameters
+    ----------
+    dt : float
+        Time step size
+    gamma : float, optional
+        Gyromagnetic ratio. If None, uses electron gyromagnetic ratio
+    max_iter : int, optional
+        Maximum number of iterations for fixed-point iterations
+    tol : float, optional
+        Tolerance for convergence. Convergence is declared if Average[|M_new - M_old|/Ms] < tol
     """
     def _update_x(self, M, Ms, Y, B, step_size):
         """
         One iteration of (step 1) or (step 2) in the SIB scheme. Will be called iteratively through fixed-point iterations.
+
+        Parameters
+        ----------
+        M : jax.Array
+            Current magnetization
+        Ms : jax.Array
+            Magnitude of magnetization
+        Y : jax.Array
+            Previous iteration result
+        B : jax.Array
+            Magnetic field
+        step_size : float
+            Time step size
+
+        Returns
+        -------
+        tuple
+            (Updated Y, normalized difference average)
         """
         Y_new = M - step_size * jnp.cross((M + Y)/2, B)
         L1_diff = jnp.linalg.norm(Y_new - Y, axis=-1) 
@@ -367,13 +614,6 @@ class ConservativeLLSIBIntegrator(Integrator):
     
     def __init__(self, dt, gamma=None, max_iter=10, tol=1e-6):
         super().__init__(dt)
-        """
-        Args:
-            dt: the time step
-            gamma: the gyromagnetic ratio
-            max_iter: the maximum number of iterations for fixed-point iterations
-            tol: the tolerance for convergence. Convergence is declared if Average[|M_new - M_old|/Ms] < tol
-        """
         if gamma is None:
             self.gamma = Constants.electron_gyro_ratio
         else:
@@ -385,11 +625,18 @@ class ConservativeLLSIBIntegrator(Integrator):
     def step(self, field, force_updater):
         """
         Iteratively solve the implicit equations (step 1) and (step 2) in the SIB scheme.
-        Args:
-            field: the field to be updated
-            force_updater: a function that updates the force of all fields
-        Returns:
-            the updated spin configuration (shape=(*, 3))
+
+        Parameters
+        ----------
+        field : Field
+            The field to be updated
+        force_updater : callable
+            A function that updates the force of all fields
+
+        Returns
+        -------
+        Field
+            The updated field
         """
         force_updater()
         M = field.get_values()
@@ -422,9 +669,12 @@ class ConservativeLLSIBIntegrator(Integrator):
 class LLSIBIntegrator(Integrator):
     """
     Landau-Lifshitz equation of motion.
+    
     See Eriksson, Olle, et al. Atomistic spin dynamics: foundations and applications. Oxford university press, 2017, Sec.7.4.5 for details.
+    
     The equation of motion is:
         dM/dt = -gamma M x B - (gamma * alpha / |M|) * M x (M x B)
+        
     Here gamma=(gyromagnetic ratio)/ (1+alpha^2) is the renormalized gyromagnetic ratio for simulating LLG equation in Landau-Lifshitz form.
     Let M[i] be the spin configuration at time step i, Y[i] be the auxiliary spin configuration at time step i+1.
     Let B(M) be the effective magnetic field that includes also the dissipative damping term.
@@ -432,10 +682,41 @@ class LLSIBIntegrator(Integrator):
         (step 1) Y[i] = M[i] - dt * gamma * (M[i]+Y[i])/2 x B(M[i])
         (step 2) M[i+1] = M[i] - dt * gamma * (M[i]+M[i+1])/2 x B((M[i] + Y[i])/2)
     Both equations are implicit, and can be solved iteratively through fixed-point iterations.
+
+    Parameters
+    ----------
+    dt : float
+        Time step size
+    alpha : float
+        Gilbert damping constant
+    gamma : float, optional
+        Gyromagnetic ratio. If None, uses electron gyromagnetic ratio
+    max_iter : int, optional
+        Maximum number of iterations for fixed-point iterations
+    tol : float, optional
+        Tolerance for convergence. Convergence is declared if Average[|M_new - M_old|/Ms averaged over lattice] < tol
     """
     def _update_x(self, M, Ms, Y, B, step_size):
         """
         One iteration of (step 1) or (step 2) in the SIB scheme. Will be called iteratively through fixed-point iterations.
+
+        Parameters
+        ----------
+        M : jax.Array
+            Current magnetization
+        Ms : jax.Array
+            Magnitude of magnetization
+        Y : jax.Array
+            Previous iteration result
+        B : jax.Array
+            Magnetic field
+        step_size : float
+            Time step size
+
+        Returns
+        -------
+        tuple
+            (Updated Y, normalized difference average)
         """
         Y_new = M - step_size * jnp.cross((M + Y)/2.0, B)
         L1_diff = jnp.linalg.norm(Y_new - Y, axis=-1) 
@@ -445,26 +726,27 @@ class LLSIBIntegrator(Integrator):
     def _update_b(self, M, B, alpha, Ms):
         """
         Update the magnetic field B by adding the term ( alpha / |M|) * (M x B)
-        Args:
-            M: the magnetization (shape=(*, 3))
-            B: the magnetic field (shape=(*, 3))
-            alpha: the Gilbert damping constant
-            Ms: the magnitude of the magnetization (shape=(*,))
-        Returns:
-            the updated magnetic field (shape=(*, 3))
+
+        Parameters
+        ----------
+        M : jax.Array
+            The magnetization (shape=(*, 3))
+        B : jax.Array
+            The magnetic field (shape=(*, 3))
+        alpha : float
+            The Gilbert damping constant
+        Ms : jax.Array
+            The magnitude of the magnetization (shape=(*,))
+
+        Returns
+        -------
+        jax.Array
+            The updated magnetic field (shape=(*, 3))
         """
         return B + alpha * jnp.cross(M, B) / Ms[..., None]
  
     def __init__(self, dt, alpha, gamma=None, max_iter=10, tol=1e-6):
         super().__init__(dt)
-        """
-        Args:
-            dt: the time step
-            alpha: the Gilbert damping constant
-            gamma: the gyromagnetic ratio
-            max_iter: the maximum number of iterations for fixed-point iterations
-            tol: the tolerance for convergence. Convergence is declared if Average[|M_new - M_old|/Ms averaged over lattice] < tol
-        """
         ## get the renormalized gyromagnetic ratio for simulating LLG equation in Landau-Lifshitz form
         self.alpha = alpha
         if gamma is None:
@@ -479,11 +761,18 @@ class LLSIBIntegrator(Integrator):
     def step(self, field, force_updater):
         """
         Iteratively solve the implicit equations (step 1) and (step 2) in the SIB scheme.
-        Args:
-            field: the field to be updated
-            force_updater: a function that updates the force of all fields
-        Returns:
-            the updated spin configuration (shape=(*, 3))
+
+        Parameters
+        ----------
+        field : Field
+            The field to be updated
+        force_updater : callable
+            A function that updates the force of all fields
+
+        Returns
+        -------
+        Field
+            The updated field
         """
         force_updater()
         M = field.get_values()
@@ -518,9 +807,12 @@ class LLSIBIntegrator(Integrator):
 class LLSIBLangevinIntegrator(LLSIBIntegrator):
     """
     Stochastic Landau-Lifshitz equation of motion.
+    
     See Eriksson, Olle, et al. Atomistic spin dynamics: foundations and applications. Oxford university press, 2017, Sec.7.4.5 for details.
+    
     The equation of motion is:
         dM/dt = -gamma M x (B + b) - (gamma * alpha / |M|) * M x (M x (B + b))
+        
     Here gamma=(gyromagnetic ratio)/ (1+alpha^2) is the renormalized gyromagnetic ratio for simulating LLG equation in Landau-Lifshitz form.
     b is the stochastic force <b_i_alpha(t) b_j_beta(s)> = 2 * D * delta_ij * delta_alpha_beta * delta(t-s)
     A steady Boltzmann state requires D= alpha/(1+alpha^2) * kbT / gamma / |m|

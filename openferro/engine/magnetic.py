@@ -8,9 +8,17 @@ import numpy as np
 import jax.numpy as jnp
 
 def get_isotropic_exchange_energy_engine(rollers):
-    """
-    Returns the exchange energy engine for a R^3 field defined on a lattice with periodic boundary conditions.
-    The neighbors are specified by rollers, which is a list of jnp.roll functions.
+    """Returns the exchange energy engine for a R^3 field defined on a lattice with periodic boundary conditions.
+
+    Parameters
+    ----------
+    rollers : list
+        List of jnp.roll functions specifying the neighbors
+
+    Returns
+    -------
+    callable
+        Energy engine function
     """
     def energy_engine(field, parameters):
         coupling = - parameters[0] * 2  #  the double counting should be made under adopted convention
@@ -22,9 +30,19 @@ def get_isotropic_exchange_energy_engine(rollers):
     return energy_engine
  
 def cubic_anisotropy_energy(field, parameters):
-    """
-    Returns the anisotropy energy of the field.
-    E = - K1 * (mx^2 my^2 + my^2 mz^2 + mx^2 mz^2) - K2 * mx^2 my^2 mz^2
+    """Returns the anisotropy energy of the field.
+
+    Parameters
+    ----------
+    field : ndarray
+        The magnetic field
+    parameters : ndarray
+        Array containing K1 and K2 anisotropy constants
+
+    Returns
+    -------
+    float
+        The anisotropy energy: -K1*(mx^2*my^2 + my^2*mz^2 + mx^2*mz^2) - K2*mx^2*my^2*mz^2
     """
     K1 = parameters[0]
     K2 = parameters[1]
@@ -33,14 +51,36 @@ def cubic_anisotropy_energy(field, parameters):
     return energy
 
 def Dzyaloshinskii_Moriya_energy(field, parameters):
-    """
-    Returns the Dzyaloshinskii-Moriya energy of the field.
+    """Returns the Dzyaloshinskii-Moriya energy of the field.
+
+    Parameters
+    ----------
+    field : ndarray
+        The magnetic field
+    parameters : ndarray
+        Array of parameters
+
+    Returns
+    -------
+    float
+        The Dzyaloshinskii-Moriya energy
     """
     pass
 
 def external_field_energy(field, parameters):
-    """
-    Returns the external field energy of the field.
+    """Returns the external field energy of the field.
+
+    Parameters
+    ----------
+    field : ndarray
+        The magnetic field
+    parameters : ndarray
+        Array containing the external field B_ext
+
+    Returns
+    -------
+    float
+        The external field energy: -field·B_ext
     """
     B_ext = parameters[0]
     energy = - jnp.sum(field * B_ext)

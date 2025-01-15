@@ -1,9 +1,14 @@
 """
-Classes which define the "interaction" between fields. Each interaction is associated with a term in the Hamiltonian. 
-Each interaction stores a function "self.energy_engine" that calculates the energy of the interaction and a function "force engine" that calculates the force of the interaction.
+Classes which define the "interaction" between fields.
+
+Each interaction is associated with a term in the Hamiltonian. Each interaction stores a function "self.energy_engine" that calculates the energy of the interaction and a function "force engine" that calculates the force of the interaction.
+
 Only the energy engine is required. The force engine is optional. If the force engine is not set, the force will be calculated by automatic differentiation of the energy engine.
+
+Notes
+-----
+This file is part of OpenFerro.
 """
-# This file is part of OpenFerro.
 
 import numpy as np
 import jax.numpy as jnp
@@ -19,9 +24,17 @@ class interaction_base:
         self.force_engine = None
     def set_parameters(self, parameters):
         """
-        Set the parameters of the interaction. 
-        Args:
-            parameters (list-like or jax array): the parameters of the interaction
+        Set the parameters of the interaction.
+
+        Parameters
+        ----------
+        parameters : array_like
+            The parameters of the interaction
+
+        Raises
+        ------
+        ValueError
+            If parameters is not a numpy array, list, or jax array
         """
         ## turning list or numpy array to jax array
         if isinstance(parameters, jnp.ndarray):
@@ -34,16 +47,23 @@ class interaction_base:
     def get_parameters(self):
         """
         Get the parameters of the interaction.
-        Returns:
-            parameters (jax array): the parameters of the interaction
+
+        Returns
+        -------
+        jax.numpy.ndarray
+            The parameters of the interaction
         """
         return self.parameters
     def set_energy_engine(self, energy_engine, enable_jit=True):
         """
         Set the energy engine of the interaction.
-        Args:
-            energy_engine (function): the energy engine of the interaction. It should take the values of the fields as input and return the energy as output.
-            enable_jit (bool): whether to enable jit for the energy engine
+
+        Parameters
+        ----------
+        energy_engine : callable
+            The energy engine of the interaction. It should take the values of the fields as input and return the energy as output.
+        enable_jit : bool, optional
+            Whether to enable jit for the energy engine, by default True
         """
         if enable_jit:
             self.energy_engine = jit(energy_engine)
@@ -58,6 +78,13 @@ class interaction_base:
 class self_interaction(interaction_base):
     """
     A class to specify the self-interaction of a field.
+
+    Parameters
+    ----------
+    field_ID : str
+        Identifier for the field
+    parameters : array_like, optional
+        Parameters for the interaction, by default None
     """
     def __init__(self, field_ID, parameters=None):
         super().__init__( parameters)
@@ -65,8 +92,16 @@ class self_interaction(interaction_base):
     def create_force_engine(self, enable_jit=True):
         """
         Derive the force engine of the interaction from the energy engine through automatic differentiation.
-        Args:
-            enable_jit (bool): whether to enable jit for the force engine
+
+        Parameters
+        ----------
+        enable_jit : bool, optional
+            Whether to enable jit for the force engine, by default True
+
+        Raises
+        ------
+        ValueError
+            If energy engine is not set
         """
         if self.energy_engine is None:
             raise ValueError("Energy engine is not set. Set energy engine before creating force engine.")
@@ -79,20 +114,32 @@ class self_interaction(interaction_base):
     def calc_energy(self, field):
         """
         Calculate the energy of the interaction for a given field.
-        Args:
-            field (Field): the field to calculate the energy
-        Returns:
-            energy (float): the energy of the interaction
+
+        Parameters
+        ----------
+        field : Field
+            The field to calculate the energy
+
+        Returns
+        -------
+        float
+            The energy of the interaction
         """
         field_values = field.get_values()
         return self.energy_engine(field_values, self.parameters)
     def calc_force(self, field):
         """
         Calculate the force of the interaction for a given field.
-        Args:
-            field (Field): the field to calculate the force
-        Returns:
-            force (jax array): the gradient of the energy with respect to the field. It has the same shape as the field.
+
+        Parameters
+        ----------
+        field : Field
+            The field to calculate the force
+
+        Returns
+        -------
+        jax.numpy.ndarray
+            The gradient of the energy with respect to the field. It has the same shape as the field.
         """
         field_values = field.get_values()
         gradient = self.force_engine(field_values, self.parameters)
@@ -100,7 +147,16 @@ class self_interaction(interaction_base):
 
 class mutual_interaction(interaction_base):
     """
-    A class to specify the  mutual interaction between two fields.
+    A class to specify the mutual interaction between two fields.
+
+    Parameters
+    ----------
+    field_1_ID : str
+        Identifier for the first field
+    field_2_ID : str
+        Identifier for the second field
+    parameters : array_like, optional
+        Parameters for the interaction, by default None
     """
     def __init__(self, field_1_ID, field_2_ID, parameters=None):
         super().__init__( parameters)
@@ -109,8 +165,16 @@ class mutual_interaction(interaction_base):
     def create_force_engine(self, enable_jit=True):
         """
         Derive the force engine of the interaction from the energy engine through automatic differentiation.
-        Args:
-            enable_jit (bool): whether to enable jit for the force engine
+
+        Parameters
+        ----------
+        enable_jit : bool, optional
+            Whether to enable jit for the force engine, by default True
+
+        Raises
+        ------
+        ValueError
+            If energy engine is not set
         """
         if self.energy_engine is None:
             raise ValueError("Energy engine is not set. Set energy engine before creating force engine.")
@@ -121,11 +185,18 @@ class mutual_interaction(interaction_base):
     def calc_energy(self, field1, field2):
         """
         Calculate the energy of the interaction for a given pair of fields.
-        Args:
-            field1 (Field): the first field
-            field2 (Field): the second field
-        Returns:
-            energy (float): the energy of the interaction
+
+        Parameters
+        ----------
+        field1 : Field
+            The first field
+        field2 : Field
+            The second field
+
+        Returns
+        -------
+        float
+            The energy of the interaction
         """
         f1 = field1.get_values()
         f2 = field2.get_values()
@@ -133,11 +204,18 @@ class mutual_interaction(interaction_base):
     def calc_force(self, field1, field2):
         """
         Calculate the force of the interaction for a given pair of fields.
-        Args:
-            field1 (Field): the first field
-            field2 (Field): the second field
-        Returns:
-            force (tuple of jax arrays): the gradient of the energy with respect to the fields. It has the same shape as the fields.
+
+        Parameters
+        ----------
+        field1 : Field
+            The first field
+        field2 : Field
+            The second field
+
+        Returns
+        -------
+        tuple of jax.numpy.ndarray
+            The gradient of the energy with respect to the fields. It has the same shape as the fields.
         """
         f1 = field1.get_values()
         f2 = field2.get_values()
@@ -146,7 +224,18 @@ class mutual_interaction(interaction_base):
 
 class triple_interaction:
     """
-    A class to specify the  mutual interaction between three fields.
+    A class to specify the mutual interaction between three fields.
+
+    Parameters
+    ----------
+    field_1_ID : str
+        Identifier for the first field
+    field_2_ID : str
+        Identifier for the second field
+    field_3_ID : str
+        Identifier for the third field
+    parameters : array_like, optional
+        Parameters for the interaction, by default None
     """
     def __init__(self, field_1_ID, field_2_ID, field_3_ID, parameters=None):
         super().__init__( parameters)
@@ -156,8 +245,16 @@ class triple_interaction:
     def create_force_engine(self, enable_jit=True):
         """
         Derive the force engine of the interaction from the energy engine through automatic differentiation.
-        Args:
-            enable_jit (bool): whether to enable jit for the force engine
+
+        Parameters
+        ----------
+        enable_jit : bool, optional
+            Whether to enable jit for the force engine, by default True
+
+        Raises
+        ------
+        ValueError
+            If energy engine is not set
         """
         if self.energy_engine is None:
             raise ValueError("Energy engine is not set. Set energy engine before creating force engine.")
@@ -168,12 +265,20 @@ class triple_interaction:
     def calc_energy(self, field1, field2, field3):
         """
         Calculate the energy of the interaction for a given triple of fields.
-        Args:
-            field1 (Field): the first field
-            field2 (Field): the second field
-            field3 (Field): the third field
-        Returns:
-            energy (float): the energy of the interaction
+
+        Parameters
+        ----------
+        field1 : Field
+            The first field
+        field2 : Field
+            The second field
+        field3 : Field
+            The third field
+
+        Returns
+        -------
+        float
+            The energy of the interaction
         """
         f1 = field1.get_values()
         f2 = field2.get_values()
@@ -182,16 +287,23 @@ class triple_interaction:
     def calc_force(self, field1, field2, field3):
         """
         Calculate the force of the interaction for a given triple of fields.
-        Args:
-            field1 (Field): the first field
-            field2 (Field): the second field
-            field3 (Field): the third field
-        Returns:
-            force (tuple of jax arrays): the gradient of the energy with respect to the fields. It has the same shape as the fields.
+
+        Parameters
+        ----------
+        field1 : Field
+            The first field
+        field2 : Field
+            The second field
+        field3 : Field
+            The third field
+
+        Returns
+        -------
+        tuple of jax.numpy.ndarray
+            The gradient of the energy with respect to the fields. It has the same shape as the fields.
         """
         f1 = field1.get_values()
         f2 = field2.get_values()
         f3 = field3.get_values()
         gradient = self.force_engine(f1, f2, f3, self.parameters)
         return (- gradient[0], - gradient[1], - gradient[2])
- 

@@ -1,11 +1,35 @@
 """
-Reporter of the simulation.
+Classes for reporting simulation data.
+
+This module contains classes for reporting thermodynamic quantities and field values during simulations.
 """
 # This file is part of OpenFerro.
 import os
 import time
 import jax.numpy as jnp
 class Thermo_Reporter:
+    """
+    Reporter for thermodynamic quantities.
+
+    Parameters
+    ----------
+    file : str, optional
+        Output file name, by default 'thermo.log'
+    log_interval : int, optional
+        Number of steps between outputs, by default 100
+    global_strain : bool, optional
+        Whether to output global strain, by default False
+    excess_stress : bool, optional
+        Whether to output excess stress, by default False
+    volume : bool, optional
+        Whether to output volume, by default True
+    potential_energy : bool, optional
+        Whether to output potential energy, by default False
+    kinetic_energy : bool, optional
+        Whether to output kinetic energy, by default False
+    temperature : bool, optional
+        Whether to output temperature, by default False
+    """
     def __init__(self, file='thermo.log', log_interval=100, global_strain=False, excess_stress=False, volume=True, potential_energy=False, kinetic_energy=False, temperature=False):
         self.file = file
         self.counter = -1
@@ -19,6 +43,14 @@ class Thermo_Reporter:
         self.item_list = []
 
     def initialize(self, system):
+        """
+        Initialize the reporter.
+
+        Parameters
+        ----------
+        system : System
+            The physical system to report on
+        """
         ## make the directory if not exists
         all_fields = system.get_all_fields()
         self.item_list = ['Step']
@@ -59,6 +91,14 @@ class Thermo_Reporter:
             f.write("\n")
 
     def step(self, system):
+        """
+        Record data for current step.
+
+        Parameters
+        ----------
+        system : System
+            The physical system to report on
+        """
         self.counter += 1
         if self.counter % self.log_interval == 0:
             values = [self.counter]
@@ -90,6 +130,22 @@ class Thermo_Reporter:
                 f.write("\n")
 
 class Field_Reporter:
+    """
+    Reporter for field values.
+
+    Parameters
+    ----------
+    file_prefix : str
+        Prefix for output files
+    field_ID : str
+        ID of field to report
+    log_interval : int, optional
+        Number of steps between outputs, by default 100
+    field_average : bool, optional
+        Whether to output field averages, by default True
+    dump_field : bool, optional
+        Whether to dump full field values, by default False
+    """
     def __init__(self, file_prefix, field_ID, log_interval=100, field_average=True, dump_field=False):
         self.file_prefix = file_prefix
         self.file_avg_name = '{}_avg.log'.format(self.file_prefix)
@@ -101,6 +157,14 @@ class Field_Reporter:
         self.counter = -1
     
     def initialize(self, system):
+        """
+        Initialize the reporter.
+
+        Parameters
+        ----------
+        system : System
+            The physical system to report on
+        """
         field = system.get_field_by_ID(self.field_ID)  ## check if the field exists
         dim = field
         if self.report_field_average:
@@ -117,6 +181,14 @@ class Field_Reporter:
                 f.write("\n")
     
     def step(self, system):
+        """
+        Record data for current step.
+
+        Parameters
+        ----------
+        system : System
+            The physical system to report on
+        """
         self.counter += 1
         if self.counter % self.log_interval == 0:
             field = system.get_field_by_ID(self.field_ID)
@@ -131,4 +203,3 @@ class Field_Reporter:
             if self.dump_field:
                 file_name = '{}_dump_{}.npy'.format(self.file_prefix, self.counter)
                 jnp.save(file_name, values)
-            

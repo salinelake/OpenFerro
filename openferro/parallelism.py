@@ -1,7 +1,10 @@
 """
 Classes for multi-GPU parallelism.
+
+Notes
+-----
+This file is part of OpenFerro.
 """
-# This file is part of OpenFerro.
 
 from jax.sharding import Mesh, PartitionSpec, NamedSharding
 import numpy as np
@@ -12,6 +15,21 @@ class DeviceMesh:
     def __init__(self, devices=None, num_rows=None, num_cols=None):
         """
         Initialize the single-host multi-device parallelism. Get the mesh of the devices.
+
+        Parameters
+        ----------
+        devices : array-like, optional
+            List of devices to use. If None, uses all available devices
+        num_rows : int, optional
+            Number of rows in device mesh. If None, automatically determined
+        num_cols : int, optional
+            Number of columns in device mesh. If None, automatically determined
+
+        Raises
+        ------
+        ValueError
+            If only one device is available
+            If num_rows * num_cols does not match number of devices
         """
         if devices is None:
             devices = np.array(jax.devices())
@@ -42,14 +60,25 @@ class DeviceMesh:
     def partition_sharding(self):
         """
         Produce a NamedSharding object to distribute a value across devices, partitioning along the x and y axes.
+
+        Returns
+        -------
+        NamedSharding
+            Sharding object for partitioning values across devices
         """
         sharding = NamedSharding(self.mesh, PartitionSpec('x', 'y'))
         return sharding
     
     def replicate_sharding(self):
         """
-        Produce a NamedSharding object to replicate a value across devices. 
+        Produce a NamedSharding object to replicate a value across devices.
+
         Used for broadcasting values that do not need to be partitioned.
+
+        Returns
+        -------
+        NamedSharding
+            Sharding object for replicating values across devices
         """
         sharding = NamedSharding(self.mesh, PartitionSpec())
         return sharding

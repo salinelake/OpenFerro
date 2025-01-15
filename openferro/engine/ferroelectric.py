@@ -11,15 +11,20 @@ from openferro.field import LocalStrain3D
 
 def self_energy_onsite_isotropic(field, parameters):
     """
-    Returns the isotropic self-energy of a 3D field. 
+    Returns the isotropic self-energy of a 3D field.
     See Eq.(2-3) in [Zhong, W., David Vanderbilt, and K. M. Rabe. Physical Review B 52.9 (1995): 6301.] for meaning of the parameters.
-    
-    Args:
-        field: jnp.array, the field to calculate the energy
-        parameters: jax.numpy array, the parameters of the energy function
-    
-    Returns:
-        jnp.array, the energy of the field
+
+    Parameters
+    ----------
+    field : jnp.array
+        The field to calculate the energy
+    parameters : jax.numpy array
+        The parameters of the energy function
+
+    Returns
+    -------
+    jnp.array
+        The energy of the field
     """
     k2 = parameters[0]
     alpha = parameters[1]
@@ -35,16 +40,21 @@ def self_energy_onsite_isotropic(field, parameters):
 
 def self_energy_onsite_scalar(field, parameters):
     """
-    Returns the self-energy of a scalar field. 
+    Returns the self-energy of a scalar field.
     E=  sum_i E_i.  (sum over the lattice sites i)
-    E_i = k_2 * u_i^2 + alpha * u_i^4 
+    E_i = k_2 * u_i^2 + alpha * u_i^4
 
-    Args:
-        field: jnp.array, the field to calculate the energy
-        parameters: jax.numpy array, the parameters of the energy function
-    
-    Returns:
-        jnp.array, the energy of the field
+    Parameters
+    ----------
+    field : jnp.array
+        The field to calculate the energy
+    parameters : jax.numpy array
+        The parameters of the energy function
+
+    Returns
+    -------
+    jnp.array
+        The energy of the field
     """
     # k2 = parameters['k2']
     # alpha = parameters['alpha']
@@ -58,13 +68,18 @@ def self_energy_onsite_scalar(field, parameters):
 def short_range_1stnn_isotropic_scalar(field, parameters):
     """
     Returns the short-range interaction of nearest neighbors for a R^3 field defined on a lattice with periodic boundary conditions.
-    
-    Args:
-        field: jnp.array, the field to calculate the energy
-        parameters: jax.numpy array, the parameters of the energy function
-    
-    Returns:
-        jnp.array, the energy of the field
+
+    Parameters
+    ----------
+    field : jnp.array
+        The field to calculate the energy
+    parameters : jax.numpy array
+        The parameters of the energy function
+
+    Returns
+    -------
+    jnp.array
+        The energy of the field
     """
     # j = parameters['j']
     # offset = parameters['offset']
@@ -80,13 +95,18 @@ def short_range_1stnn_isotropic_scalar(field, parameters):
 def short_range_1stnn_isotropic(field, parameters):
     """
     Returns the short-range interaction of nearest neighbors for a R^3 field defined on a isotropic lattice with periodic boundary conditions.
-    
-    Args:
-        field: jnp.array, the field to calculate the energy
-        parameters: jax.numpy array, the parameters of the energy function
-    
-    Returns:
-        jnp.array, the energy of the field
+
+    Parameters
+    ----------
+    field : jnp.array
+        The field to calculate the energy
+    parameters : jax.numpy array
+        The parameters of the energy function
+
+    Returns
+    -------
+    jnp.array
+        The energy of the field
     """
     j1 = parameters[0]  ## uni-axis interaction orthogonal to displacement direction
     j2 = parameters[1]  ## uni-axis interaction along displacement direction
@@ -102,13 +122,18 @@ def short_range_1stnn_isotropic(field, parameters):
 def short_range_1stnn_anisotropic(field, parameters):
     """
     Returns the short-range interaction of nearest neighbors for a R^3 field defined on a anisotropic lattice with periodic boundary conditions.
-    
-    Args:
-        field: jnp.array, the field to calculate the energy
-        parameters: jax.numpy array, the parameters of the energy function
-    
-    Returns:
-        jnp.array, the energy of the field
+
+    Parameters
+    ----------
+    field : jnp.array
+        The field to calculate the energy
+    parameters : jax.numpy array
+        The parameters of the energy function
+
+    Returns
+    -------
+    jnp.array
+        The energy of the field
     """
     # J_1 = parameters['J_1']
     # J_2 = parameters['J_2']
@@ -128,13 +153,18 @@ def short_range_1stnn_anisotropic(field, parameters):
 def short_range_2ednn_isotropic(field, parameters):
     """
     Returns the short-range interaction of nearest neighbors for a R^3 field defined on a lattice with periodic boundary conditions.
-    
-    Args:
-        field: jnp.array, the field to calculate the energy
-        parameters: jax.numpy array, the parameters of the energy function
-    
-    Returns:
-        jnp.array, the energy of the field
+
+    Parameters
+    ----------
+    field : jnp.array
+        The field to calculate the energy
+    parameters : jax.numpy array
+        The parameters of the energy function
+
+    Returns
+    -------
+    jnp.array
+        The energy of the field
     """
     j3, j4, j5 = parameters
     
@@ -157,6 +187,11 @@ def short_range_2ednn_isotropic(field, parameters):
 def get_short_range_3rdnn_isotropic():
     """
     Returns the engine of short-range interaction of third nearest neighbors for a R^3 field defined on a lattice with periodic boundary conditions.
+
+    Returns
+    -------
+    function
+        The interaction function
     """
     c_0 = jnp.eye(3)
     c_1 = jnp.array([
@@ -182,13 +217,18 @@ def get_short_range_3rdnn_isotropic():
     def short_range_3rdnn_isotropic(field, parameters):
         """
         Returns the short-range interaction of nearest neighbors for a R^3 field defined on a lattice with periodic boundary conditions.
-        
-        Args:
-            field: jnp.array, the field to calculate the energy
-            parameters: jax.numpy array, the parameters of the energy function
-        
-        Returns:
-            jnp.array, the energy of the field
+
+        Parameters
+        ----------
+        field : jnp.array
+            The field to calculate the energy
+        parameters : jax.numpy array
+            The parameters of the energy function
+
+        Returns
+        -------
+        jnp.array
+            The energy of the field
         """
         j6 = parameters[0]  ## uni-axis interaction 
         j7 = parameters[1]  ## orthogonal-axis interaction
@@ -212,18 +252,26 @@ def get_short_range_3rdnn_isotropic():
 def homo_strain_dipole_interaction(global_strain, dipole_field, parameters):
     """
     Returns the homogeneous strain dipole interaction energy.
-    
-    Args:
-        global_strain: jnp.array, shape=(6), the global strain of a supercell
-        dipole_field: jnp.array, shape=(nx, ny, nz, 3), the dipole field
-        parameters: jax.numpy array, the parameters of the energy function
-            'B1xx': float, elastic constant B1xx
-            'B1yy': float, elastic constant B1yy
-            'B4yz': float, elastic constant B4yz
-            'offset': float, offset of the dipole field
 
-    Returns:
-        jnp.array, the homogeneous strain dipole interaction energy
+    Parameters
+    ----------
+    global_strain : jnp.array
+        Shape=(6), the global strain of a supercell
+    dipole_field : jnp.array
+        Shape=(nx, ny, nz, 3), the dipole field
+    parameters : jax.numpy array
+        The parameters of the energy function containing:
+        B1xx : float
+            Elastic constant B1xx
+        B1yy : float
+            Elastic constant B1yy
+        B4yz : float
+            Elastic constant B4yz
+
+    Returns
+    -------
+    jnp.array
+        The homogeneous strain dipole interaction energy
     """
     B1xx, B1yy, B4yz = parameters
     
@@ -247,21 +295,43 @@ def homo_strain_dipole_interaction(global_strain, dipole_field, parameters):
     return energy
 
 def get_inhomo_strain_dipole_interaction(enable_jit=True):
+    """
+    Returns the inhomogeneous strain dipole interaction function.
+
+    Parameters
+    ----------
+    enable_jit : bool, optional
+        Whether to enable JIT compilation, by default True
+
+    Returns
+    -------
+    function
+        The interaction function
+    """
     get_local_strain = jit(LocalStrain3D.get_local_strain) if enable_jit else LocalStrain3D.get_local_strain
     def inhomo_strain_dipole_interaction(local_displacement, dipole_field, parameters):
         """
         Returns the inhomogeneous strain dipole interaction energy.
-        
-        Args:
-            local_displacement: jnp.array, shape=(nx, ny, nz, 3), the local displacement field
-            dipole_field: jnp.array, shape=(nx, ny, nz, 3), the dipole field
-            parameters: jax.numpy array, the parameters of the energy function
-                'B1xx': float, elastic constant B1xx
-                'B1yy': float, elastic constant B1yy
-                'B4yz': float, elastic constant B4yz
 
-        Returns:
-            jnp.array, the inhomogeneous strain dipole interaction energy
+        Parameters
+        ----------
+        local_displacement : jnp.array
+            Shape=(nx, ny, nz, 3), the local displacement field
+        dipole_field : jnp.array
+            Shape=(nx, ny, nz, 3), the dipole field
+        parameters : jax.numpy array
+            The parameters of the energy function containing:
+            B1xx : float
+                Elastic constant B1xx
+            B1yy : float
+                Elastic constant B1yy
+            B4yz : float
+                Elastic constant B4yz
+
+        Returns
+        -------
+        jnp.array
+            The inhomogeneous strain dipole interaction energy
         """
         B1xx, B1yy, B4yz = parameters
         ls = get_local_strain(local_displacement)  # (l1, l2, l3, 6)
@@ -279,6 +349,18 @@ def get_inhomo_strain_dipole_interaction(enable_jit=True):
 def dipole_efield_interaction(field, parameters):
     """
     Returns the dipole-electric field interaction energy.
+
+    Parameters
+    ----------
+    field : jnp.array
+        The field to calculate the energy
+    parameters : jax.numpy array
+        The parameters of the energy function
+
+    Returns
+    -------
+    jnp.array
+        The interaction energy
     """
     efield = parameters[:3]
     energy = - jnp.sum(efield * field)

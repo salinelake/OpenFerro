@@ -8,6 +8,23 @@ from openferro.engine.ferroelectric import *
 def get_self_energy_onsite_on_AmBnLattice(lattice, m, n):
     """
     Returns the engine of the self-energy of a field on an a AmBn superlattice. The stacking direction is along the z-axis.
+
+    Parameters
+    ----------
+    lattice : object
+        The lattice object containing size information
+    m : int
+        Size of A layer
+    n : int 
+        Size of B layer
+
+    Returns
+    -------
+    function
+        Energy engine function
+
+    Notes
+    -----
     m+n has to be the size of the simulation cell along the z-axis.
     """
     l1, l2, l3 = lattice.size
@@ -18,15 +35,20 @@ def get_self_energy_onsite_on_AmBnLattice(lattice, m, n):
     
     def energy_engine(field, parameters):
         """
-        Returns the isotropic self-energy of a 3D field. 
+        Returns the isotropic self-energy of a 3D field.
         See Eq.(2-3) in [Zhong, W., David Vanderbilt, and K. M. Rabe. Physical Review B 52.9 (1995): 6301.] for meaning of the parameters.
-        
-        Args:
-            field: jnp.array, the field to calculate the energy
-            parameters: jax.numpy array, the parameters of the energy function
-        
-        Returns:
-            jnp.array, the energy of the field
+
+        Parameters
+        ----------
+        field : jnp.array
+            The field to calculate the energy
+        parameters : jax.numpy array
+            The parameters of the energy function
+
+        Returns
+        -------
+        jnp.array
+            The energy of the field
         """
         para_A = parameters[:3]
         para_B = parameters[3:]
@@ -49,7 +71,25 @@ def get_self_energy_onsite_on_AmBnLattice(lattice, m, n):
 
 def get_short_range_1stnn_on_AmBnLattice(lattice, m, n):
     """
-    Returns the engine of the short-range interaction of nearest neighbors for a field on an a AmBn superlattice. The stacking direction is along the z-axis.
+    Returns the engine of the short-range interaction of nearest neighbors for a field on an a AmBn superlattice.
+
+    Parameters
+    ----------
+    lattice : object
+        The lattice object containing size information
+    m : int
+        Size of A layer
+    n : int
+        Size of B layer
+
+    Returns
+    -------
+    function
+        Energy engine function
+
+    Notes
+    -----
+    The stacking direction is along the z-axis.
     m+n has to be the size of the simulation cell along the z-axis.
     """
     l1, l2, l3 = lattice.size
@@ -61,13 +101,18 @@ def get_short_range_1stnn_on_AmBnLattice(lattice, m, n):
     def energy_engine(field, parameters):
         """
         Returns the short-range interaction of nearest neighbors for a R^3 field defined on a isotropic lattice with periodic boundary conditions.
-        
-        Args:
-            field: jnp.array, the field to calculate the energy
-            parameters: jax.numpy array, the parameters of the energy function
-        
-        Returns:
-            jnp.array, the energy of the field
+
+        Parameters
+        ----------
+        field : jnp.array
+            The field to calculate the energy
+        parameters : jax.numpy array
+            The parameters of the energy function
+
+        Returns
+        -------
+        jnp.array
+            The energy of the field
         """
         para_A = parameters[:2]
         para_B = parameters[2:4]
@@ -99,7 +144,25 @@ def get_short_range_1stnn_on_AmBnLattice(lattice, m, n):
 
 def get_short_range_2ednn_on_AmBnLattice(lattice, m, n):
     """
-    Returns the engine of the short-range interaction of second nearest neighbors for a field on an a AmBn superlattice. The stacking direction is along the z-axis.
+    Returns the engine of the short-range interaction of second nearest neighbors for a field on an a AmBn superlattice.
+
+    Parameters
+    ----------
+    lattice : object
+        The lattice object containing size information
+    m : int
+        Size of A layer
+    n : int
+        Size of B layer
+
+    Returns
+    -------
+    function
+        Energy engine function
+
+    Notes
+    -----
+    The stacking direction is along the z-axis.
     m+n has to be the size of the simulation cell along the z-axis.
     """
     l1, l2, l3 = lattice.size
@@ -111,13 +174,18 @@ def get_short_range_2ednn_on_AmBnLattice(lattice, m, n):
     def energy_engine(field, parameters):
         """
         Returns the short-range interaction of nearest neighbors for a R^3 field defined on a lattice with periodic boundary conditions.
-        
-        Args:
-            field: jnp.array, the field to calculate the energy
-            parameters: jax.numpy array, the parameters of the energy function
-        
-        Returns:
-            jnp.array, the energy of the field
+
+        Parameters
+        ----------
+        field : jnp.array
+            The field to calculate the energy
+        parameters : jax.numpy array
+            The parameters of the energy function
+
+        Returns
+        -------
+        jnp.array
+            The energy of the field
         """
         para_A = parameters[:3]  # j3, j4, j5
         para_B = parameters[3:6] 
@@ -170,7 +238,25 @@ def get_short_range_2ednn_on_AmBnLattice(lattice, m, n):
 
 def get_short_range_3rdnn_on_AmBnLattice(lattice, m, n):
     """
-    Returns the engine of the short-range interaction of second nearest neighbors for a field on an a AmBn superlattice. The stacking direction is along the z-axis.
+    Returns the engine of the short-range interaction of second nearest neighbors for a field on an a AmBn superlattice.
+
+    Parameters
+    ----------
+    lattice : object
+        The lattice object containing size information
+    m : int
+        Size of A layer
+    n : int
+        Size of B layer
+
+    Returns
+    -------
+    function
+        Energy engine function
+
+    Notes
+    -----
+    The stacking direction is along the z-axis.
     m+n has to be the size of the simulation cell along the z-axis.
     """
     l1, l2, l3 = lattice.size
@@ -203,13 +289,18 @@ def get_short_range_3rdnn_on_AmBnLattice(lattice, m, n):
     def energy_engine(field, parameters):
         """
         Returns the engine of short-range interaction of third nearest neighbors for a R^3 field defined on a superlattice
-        
-        Args:
-            field: jnp.array, the field to calculate the energy
-            parameters: jax.numpy array, the parameters of the energy function
-        
-        Returns:
-            jnp.array, the energy of the field
+
+        Parameters
+        ----------
+        field : jnp.array
+            The field to calculate the energy
+        parameters : jax.numpy array
+            The parameters of the energy function
+
+        Returns
+        -------
+        jnp.array
+            The energy of the field
         """
         field_A = field[:,:,:m-1,:]
         field_B = field[:,:,m:-1,:]
@@ -252,7 +343,25 @@ def get_short_range_3rdnn_on_AmBnLattice(lattice, m, n):
 
 def get_homo_strain_dipole_interaction_on_AmBnLattice(lattice, m, n):
     """
-    Returns the engine of the homogeneous strain dipole interaction for an AmBn superlattice. The stacking direction is along the z-axis.
+    Returns the engine of the homogeneous strain dipole interaction for an AmBn superlattice.
+
+    Parameters
+    ----------
+    lattice : object
+        The lattice object containing size information
+    m : int
+        Size of A layer
+    n : int
+        Size of B layer
+
+    Returns
+    -------
+    function
+        Energy engine function
+
+    Notes
+    -----
+    The stacking direction is along the z-axis.
     m+n has to be the size of the simulation cell along the z-axis.
     """
     l1, l2, l3 = lattice.size
@@ -264,18 +373,24 @@ def get_homo_strain_dipole_interaction_on_AmBnLattice(lattice, m, n):
     def energy_engine(global_strain, dipole_field, parameters):
         """
         Returns the homogeneous strain dipole interaction energy.
-        
-        Args:
-            global_strain: jnp.array, shape=(6), the global strain of a supercell
-            dipole_field: jnp.array, shape=(nx, ny, nz, 3), the dipole field
-            parameters: jax.numpy array, the parameters of the energy function
-                'B1xx': float, elastic constant B1xx
-                'B1yy': float, elastic constant B1yy
-                'B4yz': float, elastic constant B4yz
-                'offset': float, offset of the dipole field
 
-        Returns:
-            jnp.array, the homogeneous strain dipole interaction energy
+        Parameters
+        ----------
+        global_strain : jnp.array
+            Shape=(6), the global strain of a supercell
+        dipole_field : jnp.array
+            Shape=(nx, ny, nz, 3), the dipole field
+        parameters : jax.numpy array
+            The parameters of the energy function containing:
+            'B1xx': float, elastic constant B1xx
+            'B1yy': float, elastic constant B1yy
+            'B4yz': float, elastic constant B4yz
+            'offset': float, offset of the dipole field
+
+        Returns
+        -------
+        jnp.array
+            The homogeneous strain dipole interaction energy
         """
         para_A = parameters[:3] # B1xx, B1yy, B4yz
         para_B = parameters[3:]
@@ -300,6 +415,28 @@ def get_homo_strain_dipole_interaction_on_AmBnLattice(lattice, m, n):
  
 
 def get_inhomo_strain_dipole_interaction_on_AmBnLattice(lattice, m, n):
+    """
+    Returns the engine of the inhomogeneous strain dipole interaction for an AmBn superlattice.
+
+    Parameters
+    ----------
+    lattice : object
+        The lattice object containing size information
+    m : int
+        Size of A layer
+    n : int
+        Size of B layer
+
+    Returns
+    -------
+    function
+        Energy engine function
+
+    Notes
+    -----
+    The stacking direction is along the z-axis.
+    m+n has to be the size of the simulation cell along the z-axis.
+    """
     l1, l2, l3 = lattice.size
     if l3 != m+n:
         raise ValueError("The size of the lattice along the z-axis must be equal to m+n.")
@@ -309,17 +446,23 @@ def get_inhomo_strain_dipole_interaction_on_AmBnLattice(lattice, m, n):
     def energy_engine(local_displacement, dipole_field, parameters):
         """
         Returns the inhomogeneous strain dipole interaction energy.
-        
-        Args:
-            local_displacement: jnp.array, shape=(nx, ny, nz, 3), the local displacement field
-            dipole_field: jnp.array, shape=(nx, ny, nz, 3), the dipole field
-            parameters: jax.numpy array, the parameters of the energy function
-                'B1xx': float, elastic constant B1xx
-                'B1yy': float, elastic constant B1yy
-                'B4yz': float, elastic constant B4yz
 
-        Returns:
-            jnp.array, the inhomogeneous strain dipole interaction energy
+        Parameters
+        ----------
+        local_displacement : jnp.array
+            Shape=(nx, ny, nz, 3), the local displacement field
+        dipole_field : jnp.array
+            Shape=(nx, ny, nz, 3), the dipole field
+        parameters : jax.numpy array
+            The parameters of the energy function containing:
+            'B1xx': float, elastic constant B1xx
+            'B1yy': float, elastic constant B1yy
+            'B4yz': float, elastic constant B4yz
+
+        Returns
+        -------
+        jnp.array
+            The inhomogeneous strain dipole interaction energy
         """
         para_A = parameters[:3]
         para_B = parameters[3:]

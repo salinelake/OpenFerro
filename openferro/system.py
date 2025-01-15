@@ -1,7 +1,10 @@
 """
-Classes which define the physical system. 
+Classes which specify the physical system. 
+
+Notes
+-----
+This file is part of OpenFerro.
 """
-# This file is part of OpenFerro.
 
 from time import time as timer
 import warnings
@@ -24,16 +27,17 @@ from openferro.parallelism import DeviceMesh
 
 class System:
     """
-    A class to define a physical system. A system is a lattice with fields and a Hamiltonian.
+    A class to define a physical system.
+    
+    A system is a lattice with fields and a Hamiltonian. Fields are added to the system by the user. 
+    Interactions are added to the system by the user. Pointers to fields and interactions are stored in dictionaries.
+
+    Attributes
+    ----------
+    lattice : BravaisLattice3D
+        The lattice of the system
     """
     def __init__(self, lattice ):
-        """
-        Initialize a system. A system is a lattice with fields and a Hamiltonian. 
-        Fields are added to the system by the user. Interactions are added to the system by the user.
-        Fields and interactions are stored in dictionaries.
-        Args:
-            lattice (BravaisLattice3D): the lattice of the system
-        """
         self.lattice = lattice
         self.pbc = lattice.pbc
         self._fields_dict = {}
@@ -51,10 +55,21 @@ class System:
     def get_field_by_ID(self, ID):
         """
         Get a field by ID.
-        Args:
-            ID (string): ID of the field
-        Returns:
-            Field (openferro.field): the field with the given ID
+
+        Parameters
+        ----------
+        ID : str
+            ID of the field
+
+        Returns
+        -------
+        Field
+            The field with the given ID
+
+        Raises
+        ------
+        ValueError
+            If field with given ID does not exist
         """
         if ID in self._fields_dict:
             return self._fields_dict[ID]
@@ -64,8 +79,11 @@ class System:
     def get_all_fields(self):
         """
         Get all fields in the system.
-        Returns:
-            list of fields (openferro.field): all fields in the system
+
+        Returns
+        -------
+        list
+            All fields in the system
         """
         return [self._fields_dict[ID] for ID in self._fields_dict.keys()]
 
@@ -78,8 +96,11 @@ class System:
     def move_fields_to_multi_devs(self, mesh: DeviceMesh):
         """
         Move all fields to given devices for parallelization.
-        Args:
-            mesh (DeviceMesh): the device mesh to move the fields to. 
+
+        Parameters
+        ----------
+        mesh : DeviceMesh
+            The device mesh to move the fields to
         """
         for ID in self._fields_dict.keys():
             self._fields_dict[ID].to_multi_devs(mesh)
@@ -87,14 +108,31 @@ class System:
     def add_field(self, ID, ftype='scalar', dim=None, value=None, mass=1.0):
         """
         Add a predefined field to the system.
-        Args:
-            ID (string): ID of the field
-            ftype (string): type of the field. Can be 'scalar', 'SO3', 'LocalStrain3D', etc
-            dim (int): dimension of the field. Only used for Rn fields.
-            value (array): initial value of the field. Will be broadcasted to the shape of the field.
-            mass (float or array): mass of the field. When mass is a float, it will be broadcasted to the shape of the field.
-        Returns:
-            Field (openferro.field): the field with the given ID
+
+        Parameters
+        ----------
+        ID : str
+            ID of the field
+        ftype : str, optional
+            Type of the field. Can be 'scalar', 'SO3', 'LocalStrain3D', etc
+        dim : int, optional
+            Dimension of the field. Only used for Rn fields
+        value : array-like, optional
+            Initial value of the field. Will be broadcasted to the shape of the field
+        mass : float or array-like, optional
+            Mass of the field. When mass is a float, it will be broadcasted to the shape of the field
+
+        Returns
+        -------
+        Field
+            The field with the given ID
+
+        Raises
+        ------
+        ValueError
+            If field with this ID already exists or if ID is reserved
+        ValueError
+            If field type is unknown
         """
         ## sanity check
         if ID in self._fields_dict:
@@ -123,11 +161,23 @@ class System:
     def add_global_strain(self, value=None, mass=1):
         """
         Add a global strain to the system. Allow variable cell simulation.
-        Args:
-            value (array): initial value of the global strain.  
-            mass (float): effective mass of the global strain for the barostat.
-        Returns:
-            Field (openferro.field): the global strain
+
+        Parameters
+        ----------
+        value : array-like, optional
+            Initial value of the global strain
+        mass : float, optional
+            Effective mass of the global strain for the barostat
+
+        Returns
+        -------
+        Field
+            The global strain field
+
+        Raises
+        ------
+        AssertionError
+            If value is provided but not a 6D vector
         """
         ID = 'gstrain'
         if value is not None:
@@ -149,18 +199,32 @@ class System:
     def interaction_dict(self):
         """
         Get all interactions in the system.
-        Returns:
-            dict: all interactions in the system
+
+        Returns
+        -------
+        dict
+            All interactions in the system
         """
         return {**self._self_interaction_dict, **self._mutual_interaction_dict, **self._triple_interaction_dict}
 
     def get_interaction_by_ID(self, interaction_ID):
         """
         Get an interaction by ID.
-        Args:
-            interaction_ID (string): ID of the interaction
-        Returns:
-            Interaction (openferro.interaction): the interaction with the given ID
+
+        Parameters
+        ----------
+        interaction_ID : str
+            ID of the interaction
+
+        Returns
+        -------
+        Interaction
+            The interaction with the given ID
+
+        Raises
+        ------
+        ValueError
+            If interaction with given ID does not exist
         """
         if interaction_ID in self._self_interaction_dict:
             return self._self_interaction_dict[interaction_ID]
@@ -173,6 +237,16 @@ class System:
     def _add_interaction_sanity_check(self, ID):
         """
         Sanity check for adding an interaction.
+
+        Parameters
+        ----------
+        ID : str
+            ID of the interaction to check
+
+        Raises
+        ------
+        ValueError
+            If ID is reserved or already exists
         """
         if ID == 'pV':
             raise ValueError("The interaction ID 'pV' is internal. The term pV in the Hamiltonian will be added automatically when you add a global strain.")
@@ -187,11 +261,22 @@ class System:
     def add_dipole_dipole_interaction(self, ID, field_ID, prefactor=1.0, enable_jit=True):
         """
         Add the long-range dipole-dipole interaction term to the Hamiltonian.
-        Args:
-            ID (string): ID of the interaction
-            field_ID (string): ID of the field
-            prefactor (float): prefactor of the interaction
-            enable_jit (bool): whether to use JIT compilation
+
+        Parameters
+        ----------
+        ID : str
+            ID of the interaction
+        field_ID : str
+            ID of the field
+        prefactor : float, optional
+            Prefactor of the interaction
+        enable_jit : bool, optional
+            Whether to use JIT compilation
+
+        Returns
+        -------
+        Interaction
+            The created interaction
         """
         self._add_interaction_sanity_check(ID)
         field = self.get_field_by_ID(field_ID)
@@ -270,14 +355,27 @@ class System:
         return interaction
 
     def add_pressure(self, pressure):
-        '''
-        Add a pressure term (pV) to the Hamiltonian. The ID of the interaction is reserved as 'pV'. 
-        V is the volume of the system, which is calculated from the reference lattice vectors and the global strain.
-        Args:
-            pressure (float): pressure in bars
-        Returns:
-            Interaction (openferro.interaction): the pV interaction
-        '''
+        """
+        Add a pressure term (pV) to the Hamiltonian.
+
+        The ID of the interaction is reserved as 'pV'. V is the volume of the system, 
+        which is calculated from the reference lattice vectors and the global strain.
+
+        Parameters
+        ----------
+        pressure : float
+            Pressure in bars
+
+        Returns
+        -------
+        Interaction
+            The pV interaction
+
+        Raises
+        ------
+        ValueError
+            If pV term already exists or if gstrain field is invalid
+        """
         _pres = pressure * Constants.bar  # bar -> eV/Angstrom^3
         ## interaction ID sanity check
         ID = 'pV'
@@ -322,6 +420,24 @@ class System:
     def add_cubic_anisotropy_interaction(self, ID, field_ID, K1, K2, enable_jit=True):
         """
         Add the cubic anisotropy interaction term.
+
+        Parameters
+        ----------
+        ID : str
+            ID of the interaction
+        field_ID : str
+            ID of the field
+        K1 : float
+            First anisotropy constant
+        K2 : float
+            Second anisotropy constant
+        enable_jit : bool, optional
+            Whether to use JIT compilation
+
+        Returns
+        -------
+        Interaction
+            The created interaction
         """
         self._add_interaction_sanity_check(ID)
         interaction = self_interaction(field_ID)
@@ -333,16 +449,25 @@ class System:
 
     def _add_isotropic_exchange_interaction_by_rollers(self, ID, field_ID, coupling, rollers, enable_jit=True):
         """
-        Add the isotropic exchange interaction term H=sum_{i~j} Jij*Si*Sj to the Hamiltonian. 
-        The neighbouring relationship is defined by the rollers (jnp.roll).
-        Args:
-            ID (string): ID of the interaction
-            field_ID (string): ID of the field
-            coupling (float): coupling constant
-            rollers (list): list of rolling functions for specifying the neighbouring relationship
-            enable_jit (bool): whether to use JIT compilation
-        Returns:
-            Interaction (openferro.interaction): the interaction with the given ID
+        Add the isotropic exchange interaction term H=sum_{i~j} Jij*Si*Sj to the Hamiltonian.
+
+        Parameters
+        ----------
+        ID : str
+            ID of the interaction
+        field_ID : str
+            ID of the field
+        coupling : float
+            Coupling constant
+        rollers : list
+            List of rolling functions for specifying the neighbouring relationship
+        enable_jit : bool, optional
+            Whether to use JIT compilation
+
+        Returns
+        -------
+        Interaction
+            The created interaction
         """
         self._add_interaction_sanity_check(ID)
         energy_engine = get_isotropic_exchange_energy_engine(rollers)
@@ -355,7 +480,25 @@ class System:
 
     def add_isotropic_exchange_interaction_1st_shell(self, ID, field_ID, coupling, enable_jit=True):
         """
-        Add the first shell isotropic exchange interaction term. The first shell is defined in lattice class.
+        Add the first shell isotropic exchange interaction term.
+
+        The first shell is defined in lattice class.
+
+        Parameters
+        ----------
+        ID : str
+            ID of the interaction
+        field_ID : str
+            ID of the field
+        coupling : float
+            Coupling constant
+        enable_jit : bool, optional
+            Whether to use JIT compilation
+
+        Returns
+        -------
+        Interaction
+            The created interaction
         """
         interaction = self._add_isotropic_exchange_interaction_by_rollers(
             ID, field_ID, coupling, self.lattice.first_shell_roller, enable_jit=enable_jit)
@@ -363,7 +506,25 @@ class System:
 
     def add_isotropic_exchange_interaction_2nd_shell(self, ID, field_ID, coupling, enable_jit=True):
         """
-        Add the second shell isotropic exchange interaction term. The second shell is defined in lattice class.
+        Add the second shell isotropic exchange interaction term.
+
+        The second shell is defined in lattice class.
+
+        Parameters
+        ----------
+        ID : str
+            ID of the interaction
+        field_ID : str
+            ID of the field
+        coupling : float
+            Coupling constant
+        enable_jit : bool, optional
+            Whether to use JIT compilation
+
+        Returns
+        -------
+        Interaction
+            The created interaction
         """
         interaction = self._add_isotropic_exchange_interaction_by_rollers(
             ID, field_ID, coupling, self.lattice.second_shell_roller, enable_jit=enable_jit)
@@ -371,7 +532,25 @@ class System:
     
     def add_isotropic_exchange_interaction_3rd_shell(self, ID, field_ID, coupling, enable_jit=True):
         """
-        Add the third shell isotropic exchange interaction term. The third shell is defined in lattice class.
+        Add the third shell isotropic exchange interaction term.
+
+        The third shell is defined in lattice class.
+
+        Parameters
+        ----------
+        ID : str
+            ID of the interaction
+        field_ID : str
+            ID of the field
+        coupling : float
+            Coupling constant
+        enable_jit : bool, optional
+            Whether to use JIT compilation
+
+        Returns
+        -------
+        Interaction
+            The created interaction
         """
         interaction = self._add_isotropic_exchange_interaction_by_rollers(
             ID, field_ID, coupling, self.lattice.third_shell_roller, enable_jit=enable_jit)
@@ -379,7 +558,25 @@ class System:
     
     def add_isotropic_exchange_interaction_4th_shell(self, ID, field_ID, coupling, enable_jit=True):
         """
-        Add the fourth shell isotropic exchange interaction term. The fourth shell is defined in lattice class.
+        Add the fourth shell isotropic exchange interaction term.
+
+        The fourth shell is defined in lattice class.
+
+        Parameters
+        ----------
+        ID : str
+            ID of the interaction
+        field_ID : str
+            ID of the field
+        coupling : float
+            Coupling constant
+        enable_jit : bool, optional
+            Whether to use JIT compilation
+
+        Returns
+        -------
+        Interaction
+            The created interaction
         """
         interaction = self._add_isotropic_exchange_interaction_by_rollers(
             ID, field_ID, coupling, self.lattice.fourth_shell_roller, enable_jit=enable_jit)
@@ -388,17 +585,27 @@ class System:
     Methods for adding custom interactions to the Hamiltonian. Energy engines should be provided by the user.
     """
     def add_self_interaction(self, ID, field_ID, energy_engine, parameters=None, enable_jit=True):
-        '''
+        """
         Add a custom self-interaction term to the Hamiltonian.
-        Args:
-            ID (string): ID of the interaction
-            field_ID (string): ID of the field
-            energy_engine (function): a function that takes the field as input and returns the interaction energy
-            parameters (list): parameters for the interaction
-            enable_jit (bool): whether to use JIT compilation
-        Returns:
-            Interaction (openferro.interaction): the interaction with the given ID
-        '''
+
+        Parameters
+        ----------
+        ID : str
+            ID of the interaction
+        field_ID : str
+            ID of the field
+        energy_engine : callable
+            A function that takes the field as input and returns the interaction energy
+        parameters : array-like, optional
+            Parameters for the interaction
+        enable_jit : bool, optional
+            Whether to use JIT compilation
+
+        Returns
+        -------
+        Interaction
+            The created interaction
+        """
         self._add_interaction_sanity_check(ID)
         interaction = self_interaction( field_ID)
         interaction.set_energy_engine(energy_engine, enable_jit=enable_jit)
@@ -409,18 +616,29 @@ class System:
         return interaction
     
     def add_mutual_interaction(self, ID, field_1_ID, field_2_ID, energy_engine,  parameters=None, enable_jit=True):
-        '''
+        """
         Add a custom mutual interaction term to the Hamiltonian.
-        Args:
-            ID (string): ID of the interaction
-            field_1_ID (string): ID of the first field
-            field_2_ID (string): ID of the second field
-            energy_engine (function): a function that takes the fields as input and returns the interaction energy
-            parameters (list): parameters for the interaction
-            enable_jit (bool): whether to use JIT compilation
-        Returns:
-            Interaction (openferro.interaction): the interaction with the given ID
-        '''
+
+        Parameters
+        ----------
+        ID : str
+            ID of the interaction
+        field_1_ID : str
+            ID of the first field
+        field_2_ID : str
+            ID of the second field
+        energy_engine : callable
+            A function that takes the fields as input and returns the interaction energy
+        parameters : array-like, optional
+            Parameters for the interaction
+        enable_jit : bool, optional
+            Whether to use JIT compilation
+
+        Returns
+        -------
+        Interaction
+            The created interaction
+        """
         self._add_interaction_sanity_check(ID)
         interaction = mutual_interaction( field_1_ID, field_2_ID)
         interaction.set_energy_engine(energy_engine, enable_jit=enable_jit)
@@ -431,19 +649,31 @@ class System:
         return interaction
     
     def add_triple_interaction(self, ID, field_1_ID, field_2_ID, field_3_ID, energy_engine, parameters=None, enable_jit=True):
-        '''
-        Add a custom triple interaction term to the Hamiltonian. 
-        Args:
-            ID (string): ID of the interaction
-            field_1_ID (string): ID of the first field
-            field_2_ID (string): ID of the second field
-            field_3_ID (string): ID of the third field
-            energy_engine (function): a function that takes the fields as input and returns the interaction energy
-            parameters (list): parameters for the interaction
-            enable_jit (bool): whether to use JIT compilation
-        Returns:
-            Interaction (openferro.interaction): the interaction with the given ID
-        '''
+        """
+        Add a custom triple interaction term to the Hamiltonian.
+
+        Parameters
+        ----------
+        ID : str
+            ID of the interaction
+        field_1_ID : str
+            ID of the first field
+        field_2_ID : str
+            ID of the second field
+        field_3_ID : str
+            ID of the third field
+        energy_engine : callable
+            A function that takes the fields as input and returns the interaction energy
+        parameters : array-like, optional
+            Parameters for the interaction
+        enable_jit : bool, optional
+            Whether to use JIT compilation
+
+        Returns
+        -------
+        Interaction
+            The created interaction
+        """
         self._add_interaction_sanity_check(ID)
         interaction = triple_interaction(field_1_ID, field_2_ID, field_3_ID)
         interaction.set_energy_engine(energy_engine, enable_jit=enable_jit)
@@ -460,10 +690,21 @@ class System:
     def calc_energy_by_ID(self, interaction_ID):
         """
         Calculate the energy of an interaction by ID.
-        Args:
-            interaction_ID (string): ID of the interaction
-        Returns:
-            float: the energy of the interaction
+
+        Parameters
+        ----------
+        interaction_ID : str
+            ID of the interaction
+
+        Returns
+        -------
+        float
+            The energy of the interaction
+
+        Raises
+        ------
+        ValueError
+            If interaction with given ID does not exist
         """
         if interaction_ID in self._self_interaction_dict:
             interaction = self.get_interaction_by_ID(interaction_ID)
@@ -488,10 +729,21 @@ class System:
     def calc_force_by_ID(self, interaction_ID):
         """
         Calculate the gradient force from an interaction by ID.
-        Args:
-            interaction_ID (string): ID of the interaction
-        Returns:
-            array: the gradient force of the interaction
+
+        Parameters
+        ----------
+        interaction_ID : str
+            ID of the interaction
+
+        Returns
+        -------
+        array
+            The gradient force of the interaction
+
+        Raises
+        ------
+        ValueError
+            If interaction with given ID does not exist
         """
         if interaction_ID in self._self_interaction_dict:
             interaction = self.get_interaction_by_ID(interaction_ID)
@@ -516,6 +768,11 @@ class System:
     def calc_total_self_energy(self):
         """
         Calculate the total self-interaction energy.
+
+        Returns
+        -------
+        float
+            Total self-interaction energy
         """
         energy = 0.0
         for interaction_ID in self._self_interaction_dict:
@@ -527,6 +784,11 @@ class System:
     def calc_total_mutual_interaction(self):
         """
         Calculate the total mutual interaction energy.
+
+        Returns
+        -------
+        float
+            Total mutual interaction energy
         """
         energy = 0.0
         for interaction_ID in self._mutual_interaction_dict:
@@ -538,6 +800,11 @@ class System:
     def calc_total_triple_interaction(self):
         """
         Calculate the total triple interaction energy.
+
+        Returns
+        -------
+        float
+            Total triple interaction energy
         """
         energy = 0.0
         for interaction_ID in self._triple_interaction_dict:
@@ -546,6 +813,8 @@ class System:
 
     def calc_total_potential_energy(self):
         """
+        Calculate the total potential energy of the system.
+
         Calculate the total potential energy of the system. 
         Total potential energy is the sum of self-interaction energy, mutual interaction energy, and triple interaction energy.
         """
