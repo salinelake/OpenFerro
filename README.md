@@ -9,15 +9,14 @@ OpenFerro is a Python package for on-lattice atomistic dynamics simulation. Open
 OpenFerro is designed to minimize the effort required to build on-lattice Hamiltonian models, and to perform molecular dynamics (MD) and Landau-Lifshitz-Gilbert simulations. 
  
 # Highlighted features
-* **GPU supports**, highly efficient for large-scale simulations.
-* **auto-differentiable**, will have native support for enhanced sampling and Hamiltonian optimization.
-* **highly modularized**, easy to implement new interaction terms without looking into the codebase.
-* **highly flexible**, supports simultaneous simulation of $R^d$ and SO(3) local order parameters. Fields with other symmetries can also be implemented.
+* **Multi-GPU Acceleration**, highly efficient for large-scale simulations.
+* **Auto-differentiable**, will have native support for enhanced sampling and Hamiltonian optimization.
+* **Modularized**, easy to implement new interaction term as a plug-in python function. No need to modify source code. OpenFerro handles the rest, including graident calculation and GPU acceleration.
+* **Flexible**, supports simultaneous simulation of $R^d$ and SO(3) local order parameters. Fields with other symmetries can also be implemented.
 
 
 # Installation
 See [documentation](https://openferro.readthedocs.io/en/latest/installation.html) for installation instructions.
-
 
 # OpenFerro in a nutshell
 
@@ -76,6 +75,16 @@ See examples in [examples](https://github.com/salinelake/OpenFerro/tree/main/exa
 </p>
 
 The code for this superlattices simulation will be added to the [examples](https://github.com/salinelake/OpenFerro/tree/main/examples) soon.
+
+
+# Benchmark
+Running OpenFerro on a GPU node can bring over 100X speedup compared to a CPU node.
+<p align="center" >
+  <img width="50%" src="/examples/Profiling_GPU/GPU_benchmark.png" />
+</p>
+
+See [example](https://github.com/salinelake/OpenFerro/tree/main/examples/Profiling_GPU) for details.
+
 
 # Troubleshooting
 See [FAQ](https://openferro.readthedocs.io/en/latest/faq.html) for frequently asked questions.

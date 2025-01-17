@@ -1,15 +1,18 @@
 Examples for using OpenFerro.
 
-## 1. 
+- 01.BTO_Cooling
 
 Cooling simulation of BaTiO3. 
 
-## 2. 
+- 02.bcc_Fe_Heating
 
 Heating simulation of BCC iron. 
 
-## 3. 
+- 03.sc_Ising_Heating
 
 Heating simulation of a simple Ising model.
 
-...
+- Profiling_GPU
+
+Profiling the performance of OpenFerro on GPUs. 
+
