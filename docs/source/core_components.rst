@@ -9,8 +9,13 @@ Before you get to know the core components of OpenFerro, we recommend you to fol
 Lattice
 -------
 
-The 
-Here is how we can define a 
+A Bravias lattice in OpenFerro is defined by the size of the lattice and the primitive vectors.
+There are currently four types of 3D Bravias lattices supported in OpenFerro:
+
+* _Simple cubic: 
+* Face-centered cubic
+* Body-centered cubic
+* Hexagonal close-packed
 
 System
 ------

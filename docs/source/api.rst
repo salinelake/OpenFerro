@@ -1,5 +1,5 @@
 API Reference
-============
+=============
 
 System
 ------
@@ -26,9 +26,28 @@ Lattice
    :show-inheritance:
 
 Integrators
-----------
+-----------
 
-.. automodule:: openferro.integrator
+Base
+^^^^
+
+.. automodule:: openferro.integrator.base
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Molecular Dynamics
+^^^^^^^^^^^^^^^^^^
+
+.. automodule:: openferro.integrator.md
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Landau-Lifshitz-Gilbert
+^^^^^^^^^^^^^^^^^^^^^^^
+
+.. automodule:: openferro.integrator.llg
    :members:
    :undoc-members:
    :show-inheritance:
@@ -53,7 +72,7 @@ Elastic
    :show-inheritance:
 
 Ferroelectric
-^^^^^^^^^^^^
+^^^^^^^^^^^^^
 
 .. automodule:: openferro.engine.ferroelectric
    :members:
@@ -77,7 +96,7 @@ Ewald
    :show-inheritance:
 
 Utilities
---------
+---------
 
 .. automodule:: openferro.utilities
    :members:
@@ -85,7 +104,7 @@ Utilities
    :show-inheritance:
 
 Parallelism
-----------
+-----------
 
 .. automodule:: openferro.parallelism
    :members:

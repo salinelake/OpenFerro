@@ -78,12 +78,12 @@ The code for this superlattices simulation will be added to the [examples](https
 
 
 # Benchmark
-Running OpenFerro on a GPU node can bring over 100X speedup compared to a CPU node.
-<p align="center" >
-  <img width="50%" src="/examples/Profiling_GPU/GPU_benchmark.png" />
-</p>
+Running OpenFerro on a GPU node can bring over 100X speedup compared to a CPU node. See [example](https://github.com/salinelake/OpenFerro/tree/main/examples/Profiling_GPU) for details.
 
-See [example](https://github.com/salinelake/OpenFerro/tree/main/examples/Profiling_GPU) for details.
+<p align="center" >
+  <img width="30%" src="/examples/Profiling_GPU/GPU_benchmark.png" />
+</p>  
+
 
 
 # Troubleshooting

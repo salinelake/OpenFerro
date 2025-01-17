@@ -11,7 +11,7 @@ import jax.numpy as jnp
 
 class BravaisLattice3D:
     """
-    A class to represent a 3D Bravais lattice
+    Base class to represent a 3D Bravais lattice
 
     Parameters
     ----------
@@ -366,7 +366,7 @@ class Hexagonal3D(BravaisLattice3D):
 
 class BravaisLattice2D:
     """
-    A class to represent a 2D Bravais lattice
+    Base class to represent a 2D Bravais lattice
 
     Parameters
     ----------
