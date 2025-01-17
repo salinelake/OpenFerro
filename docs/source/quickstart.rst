@@ -38,4 +38,4 @@ You only need to add three lines to your code to enable multi-GPU parallelizatio
    system.move_fields_to_multi_devs(gpu_mesh)      
 
 .. _tutorial: https://github.com/salinelake/OpenFerro/blob/main/tutorials/quickstart.ipynb
-.. _here: https://github.com/salinelake/OpenFerro/blob/main/examples/Profiling_GPU/npt_parallel.py
+.. _here: https://github.com/salinelake/OpenFerro/blob/main/examples/Profiling_GPU/npt_GPU.ipynb

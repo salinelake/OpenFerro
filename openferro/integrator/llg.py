@@ -10,7 +10,7 @@ import jax.numpy as jnp
 from openferro.units import Constants
 from openferro.utilities import SO3_rotation
 import logging
-from .base import Integrator
+from openferro.integrator.base import Integrator
 
 
 class ConservativeLLIntegrator(Integrator):

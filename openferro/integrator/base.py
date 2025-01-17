@@ -3,11 +3,6 @@ Base class for integrators.
 
 This file is part of OpenFerro.
 """
-import jax
-from jax import jit
-import jax.numpy as jnp
-import logging
-
 
 class Integrator:
     """
@@ -33,7 +28,7 @@ class Integrator:
         field : Field
             The field to be updated
         force_updater : callable, optional
-            A function that updates the force of all fields
+            A function that updates the force of fields
 
         Returns
         -------

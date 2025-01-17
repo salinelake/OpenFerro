@@ -9,7 +9,7 @@ import jax
 from jax import jit
 import jax.numpy as jnp
 from openferro.units import Constants
-from .base import Integrator
+from openferro.integrator.base import Integrator
 
 
 class GradientDescentIntegrator(Integrator):
