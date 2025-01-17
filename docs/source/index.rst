@@ -43,7 +43,7 @@ Key Features
 
    units
    credits
-
+   faq
 
 Examples
 --------

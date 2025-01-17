@@ -28,6 +28,8 @@ A crystalline system is a periodic arrangement of atoms or molecules in space. I
 A Bravias lattice is specified by a set of basis vectors. For example, a 3D Bravais lattice is an infinite array of discrete points described by $\mathbf{R} = n_1 \mathbf{a}_1 + n_2 \mathbf{a}_2 + n_3 \mathbf{a}_3$, where $n_1, n_2, n_3$ are integers, and $\mathbf{a}_1, \mathbf{a}_2, \mathbf{a}_3$ are the basis vectors.
 
 #### Local order parameters
+<!-- there should be a figure here,   a few atomic unit cell -> local order parameter -> energy -->
+
 Local order parameters describe the state of each lattice site. They can be vectors in $R^d$ (e.g. atomic displacements, electric dipoles) or elements of SO(3) (e.g. fixed-magnitude magnetic moments, molecular orientations).  
 
 #### Global variables
@@ -72,6 +74,11 @@ See examples in [examples](https://github.com/salinelake/OpenFerro/tree/main/exa
 <p align="center" >
   <img width="80%" src="/docs/domain.png" />
 </p>
+
+The code for this superlattices simulation will be added to the [examples](https://github.com/salinelake/OpenFerro/tree/main/examples) soon.
+
+# Troubleshooting
+See [FAQ](https://openferro.readthedocs.io/en/latest/faq.html) for frequently asked questions.
 
 # Credits
 There will be a paper in the near future explaining the technical details of OpenFerro. Before that, please cite this repository for any use of OpenFerro.

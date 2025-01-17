@@ -1,10 +1,16 @@
 Introduction
 ------------
 
-(This page is under construction.)
+(This page is currently under construction. Others are more or less complete.)
 Before you get to know the core components of OpenFerro, we recommend you to follow the hands-on tutorial_ first. Then the purpose of most of the core components will be clear.
 
 .. _tutorial: https://github.com/salinelake/OpenFerro/blob/main/tutorials/quickstart.ipynb
+
+Lattice
+-------
+
+The 
+Here is how we can define a 
 
 System
 ------

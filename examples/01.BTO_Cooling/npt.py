@@ -1,3 +1,6 @@
+import json
+import logging
+import os
 import jax
 import openferro as of
 from openferro.interaction import *
@@ -5,9 +8,7 @@ from openferro.simulation import *
 from openferro.engine.elastic import *
 from openferro.engine.ferroelectric import *
 from openferro.units import Constants
-import json
-import logging
-import os
+
 os.makedirs('output', exist_ok=True)
 logging.basicConfig(level=logging.INFO, filename='simulation.log')
 ##########################################################################################
