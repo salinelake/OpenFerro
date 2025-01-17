@@ -25,43 +25,8 @@ Lattice
    :undoc-members:
    :show-inheritance:
 
-Integrators
------------
-
-Base
-^^^^
-
-.. automodule:: openferro.integrator.base
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-Molecular Dynamics
-^^^^^^^^^^^^^^^^^^
-
-.. automodule:: openferro.integrator.md
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-Landau-Lifshitz-Gilbert
-^^^^^^^^^^^^^^^^^^^^^^^
-
-.. automodule:: openferro.integrator.llg
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-Units
------
-
-.. automodule:: openferro.units
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-Engines
--------
+Hamiltonian
+--------------------------
 
 Elastic
 ^^^^^^^
@@ -95,8 +60,71 @@ Ewald
    :undoc-members:
    :show-inheritance:
 
+
+Integrators
+-----------
+
+Base
+^^^^
+
+.. automodule:: openferro.integrator.base
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Molecular Dynamics
+^^^^^^^^^^^^^^^^^^
+
+.. automodule:: openferro.integrator.md
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Landau-Lifshitz-Gilbert
+^^^^^^^^^^^^^^^^^^^^^^^
+
+.. automodule:: openferro.integrator.llg
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Simulation
+----------
+
+.. automodule:: openferro.simulation
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Interaction (Abstract)
+^^^^^^^^^^^^^^^^^^^^^^
+
+.. automodule:: openferro.interaction
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 Utilities
 ---------
+
+Reporters
+^^^^^^^^^
+
+.. automodule:: openferro.reporter
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Units
+^^^^^
+
+.. automodule:: openferro.units
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Helper Functions
+^^^^^^^^^^^^^^^^
 
 .. automodule:: openferro.utilities
    :members:
@@ -104,7 +132,7 @@ Utilities
    :show-inheritance:
 
 Parallelism
------------
+^^^^^^^^^^^
 
 .. automodule:: openferro.parallelism
    :members:

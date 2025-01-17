@@ -14,19 +14,19 @@ def SO3_rotation(B: jnp.ndarray, dt: float):
     Parameters
     ----------
     B : jnp.ndarray
-        The magnetic field with shape (*, 3)
+        The magnetic field with shape (\*, 3)
     dt : float
         The time step
 
     Returns
     -------
     jnp.ndarray
-        The rotation matrix with shape (*, 3, 3)
+        The rotation matrix with shape (\*, 3, 3)
 
     Notes
     -----
-    Returns the batched rotation matrix (shape=(*, 3, 3)) of a proper rotation of a vector 
-    by an angle theta (shape=(*,)) around the axes u (shape=(*, 3)).
+    Returns the batched rotation matrix (shape=(\*, 3, 3)) of a proper rotation of a vector 
+    by an angle theta (shape=(\*,)) around the axes u (shape=(\*, 3)).
     See https://en.wikipedia.org/wiki/Rotation_matrix for details.
 
     The angle and axes are specified by the magnetic field B and time step dt as:

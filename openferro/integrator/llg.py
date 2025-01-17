@@ -35,9 +35,9 @@ class ConservativeLLIntegrator(Integrator):
         Parameters
         ----------
         M : jax.Array
-            The magnetization (shape=(*, 3))
+            The magnetization (shape=(\*, 3))
         B : jax.Array
-            The magnetic field (shape=(*, 3))
+            The magnetic field (shape=(\*, 3))
         gamma : float
             The gyromagnetic ratio
         dt : float
@@ -46,7 +46,7 @@ class ConservativeLLIntegrator(Integrator):
         Returns
         -------
         jax.Array
-            The updated magnetization (shape=(*, 3))
+            The updated magnetization (shape=(\*, 3))
         """
         R = SO3_rotation(B, gamma * dt)
         return (R * M[..., None, :]).sum(-1)
@@ -68,7 +68,7 @@ class ConservativeLLIntegrator(Integrator):
         field : Field
             The field to be updated
         force_updater : callable, optional
-            A function that updates the force of all fields
+            A function that updates the force of fields
 
         Returns
         -------
@@ -88,8 +88,9 @@ class LLIntegrator(ConservativeLLIntegrator):
     
     See Eriksson, Olle, et al. Atomistic spin dynamics: foundations and applications. Oxford university press, 2017, Sec.7.4.5 for details.
     
-    The equation of motion is:
-    dM/dt = -gamma M x B - (gamma * alpha / |M|) * M x (M x B)
+    The equation of motion is
+
+    dM/dt = -gamma M x B - (gamma * alpha / \|M\|) * M x (M x B)
     
     Here gamma=(gyromagnetic ratio)/ (1+alpha^2) is the renormalized gyromagnetic ratio for simulating LLG equation in Landau-Lifshitz form.
 
@@ -104,23 +105,23 @@ class LLIntegrator(ConservativeLLIntegrator):
     """
     def _step_b(self, M, B, alpha, Ms):
         """
-        Update the magnetic field B by adding the term ( alpha / |M|) * (M x B)
+        Update the magnetic field B by adding the term ( alpha / \|M\|) * (M x B)
 
         Parameters
         ----------
         M : jax.Array
-            The magnetization (shape=(*, 3))
+            The magnetization (shape=(\*, 3))
         B : jax.Array
-            The magnetic field (shape=(*, 3))
+            The magnetic field (shape=(\*, 3))
         alpha : float
             The Gilbert damping constant
         Ms : jax.Array
-            The magnitude of the magnetization (shape=(*,))
+            The magnitude of the magnetization (shape=(\*,))
 
         Returns
         -------
         jax.Array
-            The updated magnetic field (shape=(*, 3))
+            The updated magnetic field (shape=(\*, 3))
         """
         return B + alpha / Ms[..., None] * jnp.cross(M, B)
  
@@ -143,7 +144,7 @@ class LLIntegrator(ConservativeLLIntegrator):
         field : Field
             The field to be updated
         force_updater : callable, optional
-            A function that updates the force of all fields
+            A function that updates the force of fields
 
         Returns
         -------
@@ -167,10 +168,10 @@ class LLLangevinIntegrator(LLIntegrator):
     See Eriksson, Olle, et al. Atomistic spin dynamics: foundations and applications. Oxford university press, 2017, Sec.7.4.5 for details.
     
     The equation of motion is:
-    dM/dt = -gamma M x (B + b) - (gamma * alpha / |M|) * M x (M x (B + b))
+    dM/dt = -gamma M x (B + b) - (gamma * alpha / \|M\|) * M x (M x (B + b))
     
     b is the stochastic force <b_i_alpha(t) b_j_beta(s)> = 2 * D * delta_ij * delta_alpha_beta * delta(t-s)
-    A steady Boltzmann state requires D= alpha/(1+alpha^2) * kbT / gamma / |m|
+    A steady Boltzmann state requires D= alpha/(1+alpha^2) * kbT / gamma / \|m\|
 
     Parameters
     ----------
@@ -221,7 +222,7 @@ class LLLangevinIntegrator(LLIntegrator):
         field : Field
             The field to be updated
         force_updater : callable, optional
-            A function that updates the force of all fields
+            A function that updates the force of fields
 
         Returns
         -------
@@ -243,13 +244,17 @@ class ConservativeLLSIBIntegrator(Integrator):
     [Semi-implicit B (SIB) scheme. (J. Phys.: Condens. Matter 22 (2010) 176001) ]
     Adiabatic spin precession, i.e. Landau-Lifshitz equation of motion without dissipative damping term.
     
-    The equation of motion is:
-        dM/dt = -gamma M x B
+    The equation of motion is
+
+    dM/dt = -gamma M x B
         
     Let M[i] be the spin configuration at time step i, Y[i] be the auxiliary spin configuration at time step i+1, B(M) be the magnetic field of configuration M.
-    The SIB scheme is:  
-        (step 1) Y[i] = M[i] - dt * gamma * (M[i]+Y[i])/2 x B(M[i])
-        (step 2) M[i+1] = M[i] - dt * gamma * (M[i]+M[i+1])/2 x B((M[i] + Y[i])/2)
+    The SIB scheme is
+
+    (step 1) Y[i] = M[i] - dt * gamma * (M[i]+Y[i])/2 x B(M[i])
+    
+    (step 2) M[i+1] = M[i] - dt * gamma * (M[i]+M[i+1])/2 x B((M[i] + Y[i])/2)
+
     Both equations are implicit, and can be solved iteratively through fixed-point iterations.
 
     Parameters
@@ -261,7 +266,7 @@ class ConservativeLLSIBIntegrator(Integrator):
     max_iter : int, optional
         Maximum number of iterations for fixed-point iterations
     tol : float, optional
-        Tolerance for convergence. Convergence is declared if Average[|M_new - M_old|/Ms] < tol
+        Tolerance for convergence. Convergence is declared if Average[\|M_new - M_old\|/Ms] < tol
     """
     def _update_x(self, M, Ms, Y, B, step_size):
         """
@@ -309,7 +314,7 @@ class ConservativeLLSIBIntegrator(Integrator):
         field : Field
             The field to be updated
         force_updater : callable
-            A function that updates the force of all fields
+            A function that updates the force of fields
 
         Returns
         -------
@@ -351,14 +356,14 @@ class LLSIBIntegrator(Integrator):
     See Eriksson, Olle, et al. Atomistic spin dynamics: foundations and applications. Oxford university press, 2017, Sec.7.4.5 for details.
     
     The equation of motion is:
-        dM/dt = -gamma M x B - (gamma * alpha / |M|) * M x (M x B)
+    dM/dt = -gamma M x B - (gamma * alpha / \|M\|) * M x (M x B)
         
     Here gamma=(gyromagnetic ratio)/ (1+alpha^2) is the renormalized gyromagnetic ratio for simulating LLG equation in Landau-Lifshitz form.
     Let M[i] be the spin configuration at time step i, Y[i] be the auxiliary spin configuration at time step i+1.
     Let B(M) be the effective magnetic field that includes also the dissipative damping term.
     The SIB scheme is:  
-        (step 1) Y[i] = M[i] - dt * gamma * (M[i]+Y[i])/2 x B(M[i])
-        (step 2) M[i+1] = M[i] - dt * gamma * (M[i]+M[i+1])/2 x B((M[i] + Y[i])/2)
+    (step 1) Y[i] = M[i] - dt * gamma * (M[i]+Y[i])/2 x B(M[i])
+    (step 2) M[i+1] = M[i] - dt * gamma * (M[i]+M[i+1])/2 x B((M[i] + Y[i])/2)
     Both equations are implicit, and can be solved iteratively through fixed-point iterations.
 
     Parameters
@@ -372,7 +377,7 @@ class LLSIBIntegrator(Integrator):
     max_iter : int, optional
         Maximum number of iterations for fixed-point iterations
     tol : float, optional
-        Tolerance for convergence. Convergence is declared if Average[|M_new - M_old|/Ms averaged over lattice] < tol
+        Tolerance for convergence. Convergence is declared if Average[\|M_new - M_old\|/Ms averaged over lattice] < tol
     """
     def _update_x(self, M, Ms, Y, B, step_size):
         """
@@ -403,23 +408,23 @@ class LLSIBIntegrator(Integrator):
     
     def _update_b(self, M, B, alpha, Ms):
         """
-        Update the magnetic field B by adding the term ( alpha / |M|) * (M x B)
+        Update the magnetic field B by adding the term ( alpha / \|M\|) * (M x B)
 
         Parameters
         ----------
         M : jax.Array
-            The magnetization (shape=(*, 3))
+            The magnetization (shape=(\*, 3))
         B : jax.Array
-            The magnetic field (shape=(*, 3))
+            The magnetic field (shape=(\*, 3))
         alpha : float
             The Gilbert damping constant
         Ms : jax.Array
-            The magnitude of the magnetization (shape=(*,))
+            The magnitude of the magnetization (shape=(\*,))
 
         Returns
         -------
         jax.Array
-            The updated magnetic field (shape=(*, 3))
+            The updated magnetic field (shape=(\*, 3))
         """
         return B + alpha * jnp.cross(M, B) / Ms[..., None]
  
@@ -445,7 +450,7 @@ class LLSIBIntegrator(Integrator):
         field : Field
             The field to be updated
         force_updater : callable
-            A function that updates the force of all fields
+            A function that updates the force of fields
 
         Returns
         -------
@@ -488,17 +493,22 @@ class LLSIBLangevinIntegrator(LLSIBIntegrator):
     
     See Eriksson, Olle, et al. Atomistic spin dynamics: foundations and applications. Oxford university press, 2017, Sec.7.4.5 for details.
     
-    The equation of motion is:
-        dM/dt = -gamma M x (B + b) - (gamma * alpha / |M|) * M x (M x (B + b))
+    The equation of motion is
+
+    dM/dt = -gamma M x (B + b) - (gamma * alpha / \|M\|) * M x (M x (B + b))
         
     Here gamma=(gyromagnetic ratio)/ (1+alpha^2) is the renormalized gyromagnetic ratio for simulating LLG equation in Landau-Lifshitz form.
     b is the stochastic force <b_i_alpha(t) b_j_beta(s)> = 2 * D * delta_ij * delta_alpha_beta * delta(t-s)
-    A steady Boltzmann state requires D= alpha/(1+alpha^2) * kbT / gamma / |m|
+    A steady Boltzmann state requires D= alpha/(1+alpha^2) * kbT / gamma / \|m\|
+
     Let M[i] be the spin configuration at time step i, Y[i] be the auxiliary spin configuration at time step i+1.
     Let B(M[i]) be the effective magnetic field including also the dissipative damping term and the stochastic force.
-    The SIB scheme is:  
-        (step 1) Y[i] = M[i] - dt * gamma * (M[i]+Y[i])/2 x B(M[i])
-        (step 2) M[i+1] = M[i] - dt * gamma * (M[i]+M[i+1])/2 x B((M[i] + Y[i])/2)
+    The SIB scheme is
+    
+    (step 1) Y[i] = M[i] - dt * gamma * (M[i]+Y[i])/2 x B(M[i])
+    
+    (step 2) M[i+1] = M[i] - dt * gamma * (M[i]+M[i+1])/2 x B((M[i] + Y[i])/2)
+    
     Both equations are implicit, and can be solved iteratively through fixed-point iterations.
     """
  
@@ -523,11 +533,20 @@ class LLSIBLangevinIntegrator(LLSIBIntegrator):
     def step(self, key, field, force_updater=None):
         """
         Iteratively solve the implicit equations (step 1) and (step 2) in the SIB scheme.
-        Args:
-            field: the field to be updated
-            force_updater: a function that updates the force of all fields
-        Returns:
-            the updated spin configuration (shape=(*, 3))
+
+        Parameters
+        ----------
+        key : jax.random.PRNGKey
+            Random number generator key
+        field : Field
+            The field to be updated
+        force_updater : callable, optional
+            A function that updates the force of fields
+
+        Returns
+        -------
+        Field
+            The updated field with new spin configuration (shape=(\*, 3))
         """
         M = field.get_values()
         Ms = field.get_magnitude()

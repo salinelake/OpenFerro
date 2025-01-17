@@ -260,13 +260,10 @@ def homo_strain_dipole_interaction(global_strain, dipole_field, parameters):
     dipole_field : jnp.array
         Shape=(nx, ny, nz, 3), the dipole field
     parameters : jax.numpy array
-        The parameters of the energy function containing:
-        B1xx : float
-            Elastic constant B1xx
-        B1yy : float
-            Elastic constant B1yy
-        B4yz : float
-            Elastic constant B4yz
+        The parameters of the energy function containing
+        B1xx : Elastic constant B1xx
+        B1yy : Elastic constant B1yy
+        B4yz : Elastic constant B4yz
 
     Returns
     -------
@@ -321,12 +318,9 @@ def get_inhomo_strain_dipole_interaction(enable_jit=True):
             Shape=(nx, ny, nz, 3), the dipole field
         parameters : jax.numpy array
             The parameters of the energy function containing:
-            B1xx : float
-                Elastic constant B1xx
-            B1yy : float
-                Elastic constant B1yy
-            B4yz : float
-                Elastic constant B4yz
+            B1xx : Elastic constant B1xx
+            B1yy : Elastic constant B1yy
+            B4yz : Elastic constant B4yz
 
         Returns
         -------
