@@ -7,12 +7,9 @@ This file is part of OpenFerro.
 """
 
 from time import time as timer
-import warnings
 import logging
-
 import numpy as np
 import jax.numpy as jnp
-from jax import jit
 from openferro.field import *
 from openferro.interaction import *
 from openferro.units import Constants

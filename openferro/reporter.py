@@ -4,7 +4,6 @@ Classes for reporting simulation data.
 This module contains classes for reporting thermodynamic quantities and field values during simulations.
 """
 # This file is part of OpenFerro.
-import os
 import time
 import jax.numpy as jnp
 class Thermo_Reporter:

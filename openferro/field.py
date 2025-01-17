@@ -8,7 +8,8 @@ import jax
 import jax.numpy as jnp
 from openferro.units import Constants
 from openferro.parallelism import DeviceMesh
-from openferro.integrator import *
+from openferro.integrator.llg import *
+from openferro.integrator.md import *
 
 class Field:
     """

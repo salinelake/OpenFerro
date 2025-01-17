@@ -6,10 +6,10 @@ Notes
 This file is part of OpenFerro.
 """
 
-from jax.sharding import Mesh, PartitionSpec, NamedSharding
+import logging
 import numpy as np
 import jax
-import logging
+from jax.sharding import Mesh, PartitionSpec, NamedSharding
 
 class DeviceMesh:
     def __init__(self, devices=None, num_rows=None, num_cols=None):

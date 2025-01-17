@@ -97,7 +97,7 @@ Simulation
    :show-inheritance:
 
 Interaction (Abstract)
-^^^^^^^^^^^^^^^^^^^^^^
+----------------------
 
 .. automodule:: openferro.interaction
    :members:

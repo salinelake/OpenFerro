@@ -355,15 +355,19 @@ class LLSIBIntegrator(Integrator):
     
     See Eriksson, Olle, et al. Atomistic spin dynamics: foundations and applications. Oxford university press, 2017, Sec.7.4.5 for details.
     
-    The equation of motion is:
+    The equation of motion is
+    
     dM/dt = -gamma M x B - (gamma * alpha / \|M\|) * M x (M x B)
         
     Here gamma=(gyromagnetic ratio)/ (1+alpha^2) is the renormalized gyromagnetic ratio for simulating LLG equation in Landau-Lifshitz form.
     Let M[i] be the spin configuration at time step i, Y[i] be the auxiliary spin configuration at time step i+1.
     Let B(M) be the effective magnetic field that includes also the dissipative damping term.
-    The SIB scheme is:  
+    The SIB scheme is
+
     (step 1) Y[i] = M[i] - dt * gamma * (M[i]+Y[i])/2 x B(M[i])
+    
     (step 2) M[i+1] = M[i] - dt * gamma * (M[i]+M[i+1])/2 x B((M[i] + Y[i])/2)
+    
     Both equations are implicit, and can be solved iteratively through fixed-point iterations.
 
     Parameters
