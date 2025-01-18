@@ -32,10 +32,11 @@ Key Features
 
 .. toctree::
    :maxdepth: 2
-   :caption: Core Components
-
+   :caption: Use OpenFerro
+   
+   logic
    core_components
-
+   guide_custum_engine
 
 .. toctree::
    :maxdepth: 2

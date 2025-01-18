@@ -21,13 +21,17 @@ See [documentation](https://openferro.readthedocs.io/en/latest/installation.html
 # OpenFerro in a nutshell
 
 ## Crystalline system and Lattice Hamiltonian
-A crystalline system is a periodic arrangement of atoms or molecules in space. In OpenFerro, a crystalline system is defined by a Bravias lattice, local order parameter, global variables of the lattice (such as global strain) and a Hamiltonian describing the energy of the system. See [documentation](https://openferro.readthedocs.io/en/latest/theory-lattice-model.html) for more details than the outline below.
+
+<p align="center" >
+  <img width="90%" src="/docs/multiscale_overview.png" />
+</p>
+
+A crystalline system is a periodic arrangement of atoms or molecules in space. OpenFerro focuses on a coarse-grained representation of a crystalline system, defined through a Bravias lattice, local order parameter, global variables of the lattice (such as global strain) and a Hamiltonian describing the energy of the system. See [documentation](https://openferro.readthedocs.io/en/latest/theory-lattice-model.html) for more details than the outline below.
 
 #### Bravias lattice
 A Bravias lattice is specified by a set of basis vectors. For example, a 3D Bravais lattice is an infinite array of discrete points described by $\mathbf{R} = n_1 \mathbf{a}_1 + n_2 \mathbf{a}_2 + n_3 \mathbf{a}_3$, where $n_1, n_2, n_3$ are integers, and $\mathbf{a}_1, \mathbf{a}_2, \mathbf{a}_3$ are the basis vectors.
 
 #### Local order parameters
-<!-- there should be a figure here,   a few atomic unit cell -> local order parameter -> energy -->
 
 Local order parameters describe the state of each lattice site. They can be vectors in $R^d$ (e.g. atomic displacements, electric dipoles) or elements of SO(3) (e.g. fixed-magnitude magnetic moments, molecular orientations).  
 
@@ -51,14 +55,15 @@ OpenFerro simulates dynamical evolution of local order parameters with molecular
 See the [documentation](https://openferro.readthedocs.io/en/latest/theory-dynamics.html) for equations of motion used in NVE, NVT, NPT, and structure-optimization simulations. The isothermal condition is maintained by the second fluctuation-dissipation theorem.
 
 ### Integrator
-Supported integrators (see [documentation](https://openferro.readthedocs.io/en/latest/core_components.html#integrators.html) for details):
+Supported integrators (see [documentation](https://openferro.readthedocs.io/en/latest/api.html#integrators) for details):
 - MD: Leapfrog (NVE), Mid-point Langevin (NVT, NPT, see J. Phys. Chem. A 2019, 123, 28, 6056-6079)
 - LLG: Semi-implicit B (SIB) scheme (see J. Phys.: Condens. Matter 22 (2010) 176001)
 
 # Use OpenFerro
 
 ## Overview
-A schematic of OpenFerro is shown below. See [documentation](https://openferro.readthedocs.io/en/latest/core_components.html) for introduction to core components of OpenFerro.
+Unlike DFT or all-atom MD, coarse-grained lattice dynamics has not yet been fully standardized. So OpenFerro is designed to be flexible to accommodate different models.
+A schematic of OpenFerro is shown below. See [documentation](https://openferro.readthedocs.io/en/latest/logic.html) for a pedagogical introduction to OpenFerro.
 <p align="center" >
   <img width="60%" src="/docs/overview.png" />
 </p>
@@ -67,7 +72,7 @@ A schematic of OpenFerro is shown below. See [documentation](https://openferro.r
 See [documentation](https://openferro.readthedocs.io/en/latest/quickstart.html) for a quick start, where we cover both the basic usage and more advanced features. 
 
 ## Examples
-See examples in [examples](https://github.com/salinelake/OpenFerro/tree/main/examples). 
+See [examples](https://github.com/salinelake/OpenFerro/tree/main/examples). 
 
 ## Snapshot
 <p align="center" >
@@ -98,4 +103,6 @@ The initial development of OpenFerro is done by Pinchen Xie with support from LB
 At this point, only a few publicly available model configurations are provided in the [model_configs](https://github.com/salinelake/OpenFerro/tree/main/model_configs) directory. We welcome contributions from the community to add more model configurations. 
 
 # Contributing
+OpenFerro is pythonic and modularized. It is designed to be easy to modify and extend. 
 We welcome contributions from the community. Raise an issue or submit a pull request. Also feel free to contact pinchenxie@lbl.gov for any questions.
+
