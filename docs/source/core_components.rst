@@ -10,6 +10,7 @@ Elastic
    :members:
    :undoc-members:
    :show-inheritance:
+   :no-index:
 
 Ferroelectric
 ^^^^^^^^^^^^^
@@ -18,6 +19,7 @@ Ferroelectric
    :members:
    :undoc-members:
    :show-inheritance:
+   :no-index:
 
 Magnetic
 ^^^^^^^^
@@ -26,6 +28,7 @@ Magnetic
    :members:
    :undoc-members:
    :show-inheritance:
+   :no-index:
 
 Ewald
 ^^^^^
@@ -34,4 +37,4 @@ Ewald
    :members:
    :undoc-members:
    :show-inheritance:
-
+   :no-index:
