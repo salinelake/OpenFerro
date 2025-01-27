@@ -38,3 +38,12 @@ Ewald
    :undoc-members:
    :show-inheritance:
    :no-index:
+
+Multiferroic
+^^^^^^^^^^^^
+
+.. automodule:: openferro.engine.multiferroic
+   :members:
+   :undoc-members:
+   :show-inheritance:
+   :no-index:

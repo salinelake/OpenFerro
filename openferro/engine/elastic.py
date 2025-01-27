@@ -8,7 +8,6 @@ Notes
 This file is part of OpenFerro.
 """
 
-import numpy as np
 import jax.numpy as jnp
 
 def homo_elastic_energy(global_strain, parameters):
@@ -53,12 +52,10 @@ def pV_energy(global_strain, parameters):
     jnp.ndarray
         The pV energy
     """
-    # pres = parameters['p']
-    # vol_ref = parameters['V0']
     pres, vol_ref = parameters
     
     gs = global_strain
-    pV = ( gs[:3].sum()) * pres * vol_ref
+    pV = ( gs[:3].sum()) * pres * vol_ref # TODO: change this to (1+gs[0]) * (1+gs[1]) * (1+gs[2]) * vol_ref * pres
     return pV
 
 def inhomo_elastic_energy(local_displacement, parameters):

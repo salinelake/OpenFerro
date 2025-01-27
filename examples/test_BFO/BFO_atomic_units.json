@@ -1,0 +1,111 @@
+
+{   "reference": "Physical Review B 103, L100102 (2021)",
+    "lattice": {
+        "a1": 3.98,
+        "a2": 3.98,
+        "a3": 3.98,
+        "alpha": 0,
+        "beta": 0,
+        "gamma": 0
+    },
+    "dipole_onsite": {
+        "k2": -0.00244873,
+        "alpha":0.02651,
+        "gamma":0.007373
+    },
+    "dipole_short_range": {
+        "j1": -0.008794,
+        "j2": 0.012442,
+        "j3": 0.000684,
+        "j4": -0.0021228,
+        "j5": 0.006948,
+        "j6": 0.0010992,
+        "j7": 0.0005496
+    },
+    "elastic": {
+        "B11": 3.585,
+        "B12": 2.899,
+        "B44": 1.151
+    },
+    "elastic_dipole": {
+        "B1xx": -0.49379,
+        "B1yy": -0.23606,
+        "B4yz": -0.05358
+    },
+    "born": {
+        "Z_star": 5.868,
+        "epsilon_inf": 7.164
+    },
+    "AFD_onsite": {
+        "k2": -0.25103,
+        "alpha":4.48968,
+        "gamma":-2.29697
+    },
+    "AFD_short_range": {
+        "k1": 0.06276,
+        "k2": 0.00210,
+        "k_prime": -0.159
+    },
+    "elastic_AFD": {
+        "B1xx": -1.13197,
+        "B1yy": -0.12311,
+        "B4yz": 1.90
+    },
+    "dipole_AFD_trilinear": {
+        "D": -0.008
+    },
+    "dipole_AFD_biquadratic": {
+        "Exxxx": 0.10544,
+        "Exxyy": 0.12165,
+        "Exyxy": -0.2882
+    },
+    "spin_short_range":{
+        "j1": 0.000014128,
+        "j2": 0.000014183,
+        "j3": -0.00000224,
+        "j4": -0.00000224,
+        "j5": 0.000005784,
+        "j6": -0.000000413,
+        "j7": -0.0000002068
+    },
+    "spin_dipole": {
+        "E1xxxx": 0.000051574,
+        "E1yyxx": 0.000051711,
+        "E1xyxy": 0.000000126,
+        "E2xxxx": 0.000007574,
+        "E2yyxx": 0.000007230,
+        "E2xyxy": 0.000000023,
+        "E3xxxx": 0.000007880,
+        "E3yyxx": 0.000007365,
+        "E3xyxy": -0.000000146
+    },
+    "spin_AFD": {
+        "F1xxxx": 0.00022400,
+        "F1yyxx": 0.00022242,
+        "F1xyxy": 0.000000319,
+        "F2xxxx": 0.000027196,
+        "F2yyxx": 0.000027196,
+        "F2xyxy": 0.000000658,
+        "F3xxxx": -0.000043136,
+        "F3yyxx": -0.000042289,
+        "F3xyxy": 0.000000239
+    },
+    "_notes": "G1yyxx is the coupling constant between eta_yy, m_{i,x}, m_{j,x}, where j is the 1st shell of i. Others follow the same pattern.",
+    "spin_elastic": {
+        "G1xxxx": 0.00004473,
+        "G1yyxx": 0.000088871,
+        "G1xyxy": -0.000001771,
+        "G2xxxx": 0.000041577,
+        "G2yyxx": 0.00001565,
+        "G2xyxy": -0.000001449,
+        "G3xxxx": 0.000054303,
+        "G3yyxx": -0.00001698,
+        "G3xyxy": -0.000000776
+    },
+    "spin_DM": {
+        "L1": 0.000002
+    },
+    "spin_magnitude":{
+        "M":4.0
+    }
+}

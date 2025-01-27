@@ -3,8 +3,6 @@ Functions that define a term in the magnetic Hamiltonian. They will be added int
 """
 # This file is part of OpenFerro.
 
-
-import numpy as np
 import jax.numpy as jnp
 
 def get_isotropic_exchange_energy_engine(rollers):

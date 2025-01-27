@@ -3,7 +3,6 @@ Functions that define a ferroelectric term in the Hamiltonian. They will be adde
 """
 # This file is part of OpenFerro.
 
-import numpy as np
 import jax.numpy as jnp
 from jax import jit
 from openferro.field import LocalStrain3D
