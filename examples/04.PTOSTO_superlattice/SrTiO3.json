@@ -1,0 +1,39 @@
+
+{   "name": "SrTiO3-WCGGA/Journal of the Physical Society of Japan 85, 114714 (2016)",
+    "lattice": {
+        "a1": 3.901,
+        "a2": 3.901,
+        "a3": 3.901,
+        "alpha": 0,
+        "beta": 0,
+        "gamma": 0
+    },
+    "onsite": {
+        "k2": 10.316,  
+        "alpha":22.39,
+        "gamma":-28.88
+    },
+    "short_range": { 
+        "j1": -2.012,
+        "j2": -1.815,
+        "j3": 0.590,
+        "j4": -0.567,
+        "j5": 0,
+        "j6": 0.238,
+        "j7": 0
+    },
+    "elastic": {
+        "B11": 131.33,
+        "B12": 36.26,
+        "B44": 41.30
+    },
+    "elastic_dipole": {
+        "B1xx": -102.09,
+        "B1yy": 0.5299,
+        "B4yz": -15.494
+    },
+    "born": {
+        "Z_star": 9.28,
+        "epsilon_inf":6.46
+    }
+}
