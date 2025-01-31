@@ -1,7 +1,7 @@
 import json
 import logging
 import os
-import jax
+import jax.numpy as jnp
 import openferro as of
 from openferro.interaction import *
 from openferro.simulation import *
@@ -25,6 +25,8 @@ bto = of.System(latt)
 ## Define the fields
 ##########################################################################################
 dipole_field = bto.add_field(ID="dipole", ftype="Rn", dim=3, value=0.0, mass = 200 * Constants.amu)
+## Although with ID='dipole'. This is actually the soft mode in unit of length (Angstrom).
+## To get the local electric dipole moment, one needs to multiply it by the Born effective charge.
 lstrain_field = bto.add_field(ID="lstrain", ftype="LocalStrain3D", value=0.0, mass = 200 * Constants.amu)
 gstrain  = bto.add_global_strain(value=jnp.array([0.01,0.01,0.01,0,0,0]), mass = 200 * Constants.amu * L**3)
 
@@ -35,6 +37,7 @@ bto.add_dipole_onsite_interaction('self_onsite', field_ID="dipole", K2=config["o
 bto.add_dipole_interaction_1st_shell('short_range_1', field_ID="dipole", j1=config["short_range"]["j1"], j2=config["short_range"]["j2"])
 bto.add_dipole_interaction_2nd_shell('short_range_2', field_ID="dipole", j3=config["short_range"]["j3"], j4=config["short_range"]["j4"], j5=config["short_range"]["j5"])
 bto.add_dipole_interaction_3rd_shell('short_range_3', field_ID="dipole", j6=config["short_range"]["j6"], j7=config["short_range"]["j7"])
+## because "dipole_field" is actually the soft mode in unit of length (Angstrom). Here the prefactor includes the Born effective charge squared.
 bto.add_dipole_dipole_interaction('dipole_ewald', field_ID="dipole", prefactor = config["born"]["Z_star"]**2 / config["born"]["epsilon_inf"] )
 bto.add_homo_elastic_interaction('homo_elastic', field_ID="gstrain", B11=config["elastic"]["B11"], B12=config["elastic"]["B12"], B44=config["elastic"]["B44"])
 bto.add_homo_strain_dipole_interaction('homo_strain_dipole', field_1_ID="gstrain", field_2_ID="dipole", B1xx=config["elastic_dipole"]["B1xx"], B1yy=config["elastic_dipole"]["B1yy"], B4yz=config["elastic_dipole"]["B4yz"])

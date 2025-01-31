@@ -130,13 +130,13 @@ def get_short_range_1stnn_on_AmBnLattice(lattice, m, n):
                 energy += (p[1] - p[0]) * jnp.sum(f[..., axis] * f_shifted[..., axis])
         ## z-axis
         ## A-type interaction, including A-I interfacial interaction
-        field_1 = jnp.concat([field[:,:,[-1]], field_A], axis=2)
-        field_2 = jnp.concat([field_A, field[:,:,[m-1]]], axis=2)
+        field_1 = jnp.concatenate([field[:,:,[-1]], field_A], axis=2)
+        field_2 = jnp.concatenate([field_A, field[:,:,[m-1]]], axis=2)
         energy += para_A[0] * jnp.sum(field_1 * field_2)
         energy += (para_A[1] - para_A[0]) * jnp.sum(field_1[..., 2] * field_2[..., 2])
         ## B-type interaction, including B-I interfacial interaction
-        field_1 = jnp.concat([field[:,:,[m-1]], field_B], axis=2)
-        field_2 = jnp.concat([field_B, field[:,:,[-1]]], axis=2)
+        field_1 = jnp.concatenate([field[:,:,[m-1]], field_B], axis=2)
+        field_2 = jnp.concatenate([field_B, field[:,:,[-1]]], axis=2)
         energy += para_B[0] * jnp.sum(field_1 * field_2)
         energy += (para_B[1] - para_B[0]) * jnp.sum(field_1[..., 2] * field_2[..., 2])
         return energy
@@ -213,9 +213,9 @@ def get_short_range_2ednn_on_AmBnLattice(lattice, m, n):
         for axis_pair in [(0,2), (1,2)]:
             ## A-type interaction, including A-I interfacial interaction
             j3, j4, j5 = para_A
-            f = jnp.concat([field[:,:,[-1]], field_A], axis=2)
-            f1 = jnp.roll(jnp.concat([field_A, field[:,:,[m-1]]], axis=2), -1, axis=axis_pair[0])
-            f2 = jnp.roll(jnp.concat([field_A, field[:,:,[m-1]]], axis=2), 1, axis=axis_pair[0])
+            f = jnp.concatenate([field[:,:,[-1]], field_A], axis=2)
+            f1 = jnp.roll(jnp.concatenate([field_A, field[:,:,[m-1]]], axis=2), -1, axis=axis_pair[0])
+            f2 = jnp.roll(jnp.concatenate([field_A, field[:,:,[m-1]]], axis=2), 1, axis=axis_pair[0])
             # Uni-axis interactions
             energy += j3 * jnp.sum(f * (f1 + f2))
             energy += (j4 - j3) * jnp.sum(f[..., 3 - axis_pair[0] - axis_pair[1]] * (f1 + f2)[..., 3 - axis_pair[0] - axis_pair[1]])
@@ -224,9 +224,9 @@ def get_short_range_2ednn_on_AmBnLattice(lattice, m, n):
             
             ## B-type interaction, including B-I interfacial interaction
             j3, j4, j5 = para_B
-            f = jnp.concat([field[:,:,[m-1]], field_B], axis=2)
-            f1 = jnp.roll(jnp.concat([field_B, field[:,:,[-1]]], axis=2), -1, axis=axis_pair[0])
-            f2 = jnp.roll(jnp.concat([field_B, field[:,:,[-1]]], axis=2), 1, axis=axis_pair[0])
+            f = jnp.concatenate([field[:,:,[m-1]], field_B], axis=2)
+            f1 = jnp.roll(jnp.concatenate([field_B, field[:,:,[-1]]], axis=2), -1, axis=axis_pair[0])
+            f2 = jnp.roll(jnp.concatenate([field_B, field[:,:,[-1]]], axis=2), 1, axis=axis_pair[0])
             # Uni-axis interactions
             energy += j3 * jnp.sum(f * (f1 + f2))
             energy += (j4 - j3) * jnp.sum(f[..., 3 - axis_pair[0] - axis_pair[1]] * (f1 + f2)[..., 3 - axis_pair[0] - axis_pair[1]])
@@ -316,8 +316,8 @@ def get_short_range_3rdnn_on_AmBnLattice(lattice, m, n):
         r_3 = c_3 * j7 + c_0 * j6
         r_4 = c_4 * j7 + c_0 * j6
         ## sum up the interaction
-        f1 = jnp.concat([field_I2, field_A], axis=2)
-        f2 = jnp.concat([field_A, field_I1], axis=2)
+        f1 = jnp.concatenate([field_I2, field_A], axis=2)
+        f2 = jnp.concatenate([field_A, field_I1], axis=2)
         energy += jnp.sum(f1 * jnp.dot( jnp.roll( f2, ( 1, 1), axis=(0,1)), r_1))
         energy += jnp.sum(f1 * jnp.dot( jnp.roll( f2, ( 1,-1), axis=(0,1)), r_2))
         energy += jnp.sum(f1 * jnp.dot( jnp.roll( f2, (-1, 1), axis=(0,1)), r_3))
@@ -331,8 +331,8 @@ def get_short_range_3rdnn_on_AmBnLattice(lattice, m, n):
         r_3 = c_3 * j7 + c_0 * j6
         r_4 = c_4 * j7 + c_0 * j6
         ## sum up the interaction
-        f1 = jnp.concat([field_I1, field_B], axis=2)
-        f2 = jnp.concat([field_B, field_I2], axis=2)
+        f1 = jnp.concatenate([field_I1, field_B], axis=2)
+        f2 = jnp.concatenate([field_B, field_I2], axis=2)
         energy += jnp.sum(f1 * jnp.dot( jnp.roll( f2, ( 1, 1), axis=(0,1)), r_1))
         energy += jnp.sum(f1 * jnp.dot( jnp.roll( f2, ( 1,-1), axis=(0,1)), r_2))
         energy += jnp.sum(f1 * jnp.dot( jnp.roll( f2, (-1, 1), axis=(0,1)), r_3))

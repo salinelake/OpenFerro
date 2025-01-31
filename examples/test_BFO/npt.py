@@ -13,7 +13,7 @@ logging.basicConfig(level=logging.INFO, filename='simulation.log')
 ##########################################################################################
 ## Define the lattice 
 ##########################################################################################
-L = 12
+L = 16
 config = json.load(open('BFO_internal.json'))
 latt_vecs = jnp.eye(3) * config['lattice']['a1']
 latt = of.SimpleCubic3D(L, L, L, latt_vecs[0], latt_vecs[1], latt_vecs[2])
@@ -113,11 +113,11 @@ print('Spin mode:', jnp.mean(spin_field.get_values()*sign_array[...,None], axis=
 ## NPT Heating simulation
 ##########################################################################################
 log_freq = 100
-dump_freq = 10000
-equlibration_time = 10 * Constants.ps
-sampling_time = 10 * Constants.ps
-dt = 0.0004 * Constants.ps   ## dt>=0.001ps will leads to inconvergence of SIB integrator.  ~0.036s/step.  50000steps=1800s=30min
-equlibration_steps = int(equlibration_time / dt)
+dump_freq = 1000
+# equlibration_time = 10 * Constants.ps
+sampling_time = 15 * Constants.ps
+dt = 0.0002 * Constants.ps   ## dt>=0.001ps will leads to inconvergence of SIB integrator. cpu ~0.036s/step.  50000steps=1800s=30min.  GPU 0.024s/step. 50000steps=1200s=20min
+# equlibration_steps = int(equlibration_time / dt)
 sampling_steps = int(sampling_time / dt)
 
 temp_list = np.array([100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1100, 1200, 1300, 1400]).astype(int)
@@ -127,23 +127,23 @@ simulation.init_velocity(mode='gaussian', temp=temp_list[0])
 for temperature in temp_list:
     dipole_field.set_integrator('isothermal', dt=dt, temp=temperature, tau=0.1)
     gstrain.set_integrator('isothermal', dt=dt, temp=temperature, tau=1)
-    lstrain_field.set_integrator('isothermal', dt=dt, temp=temperature, tau=1)
-    afd_field.set_integrator('isothermal', dt=dt, temp=temperature, tau=1)
+    lstrain_field.set_integrator('isothermal', dt=dt, temp=temperature, tau=0.1)
+    afd_field.set_integrator('isothermal', dt=dt, temp=temperature, tau=0.1)
     spin_field.set_integrator('isothermal', dt=dt, temp=temperature, alpha=1)
-    ## equilibration
-    logging.info('T={}K, NPT Equlibration'.format(temperature))
+    # ## equilibration
+    # logging.info('T={}K, NPT Equlibration'.format(temperature))
     simulation.remove_all_reporters()
-    simulation.run(equlibration_steps)
+    # simulation.run(equlibration_steps)
     # sampling
     logging.info('T={}K, NPT Sampling'.format(temperature))
     simulation.add_thermo_reporter(file='output/thermo_{}K.log'.format(temperature), log_interval=log_freq, 
         global_strain=True, excess_stress=True, volume=True, potential_energy=True, kinetic_energy=True, temperature=True)
-    simulation.add_field_reporter(file_prefix='output/field_{}K'.format(temperature), field_ID="dipole", log_interval=log_freq, 
-        field_average=True, dump_field=False)
+    simulation.add_field_reporter(file_prefix='output/field_{}K'.format(temperature), field_ID="dipole", log_interval=dump_freq, 
+        field_average=True, dump_field=True)
     simulation.add_field_reporter(file_prefix='output/AFD_{}K'.format(temperature), field_ID="AFD", log_interval=dump_freq, 
-        field_average=False, dump_field=True)
+        field_average=True, dump_field=True)
     simulation.add_field_reporter(file_prefix='output/spin_{}K'.format(temperature), field_ID="spin", log_interval=dump_freq, 
-        field_average=False, dump_field=True)
+        field_average=True, dump_field=True)
     simulation.run(sampling_steps)
     AFD = jnp.mean(afd_field.get_values()*sign_array[...,None], axis=(0,1,2))
     dipole = jnp.mean(dipole_field.get_values(), axis=(0,1,2))
