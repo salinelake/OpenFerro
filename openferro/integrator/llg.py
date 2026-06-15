@@ -207,7 +207,7 @@ class LLLangevinIntegrator(LLIntegrator):
             Random noise array
         """
         gaussian = jax.random.normal(key, field.get_values().shape) 
-        if field._sharding != gaussian.sharding:
+        if field._sharding is not None and field._sharding != gaussian.sharding:
             gaussian = jax.device_put(gaussian, field._sharding)
         return gaussian    
     
@@ -530,7 +530,7 @@ class LLSIBLangevinIntegrator(LLSIBIntegrator):
         self.noise_max = jnp.sqrt(2* jnp.abs(jnp.log(self.dt)))
     def get_noise(self, key, field):
         gaussian = jax.random.normal(key, field.get_values().shape)
-        if field._sharding != gaussian.sharding:
+        if field._sharding is not None and field._sharding != gaussian.sharding:
             gaussian = jax.device_put(gaussian, field._sharding)
         return gaussian    
     

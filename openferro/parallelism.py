@@ -9,7 +9,8 @@ This file is part of OpenFerro.
 import logging
 import numpy as np
 import jax
-from jax.sharding import Mesh, PartitionSpec, NamedSharding
+from jax.sharding import Mesh, NamedSharding, PartitionSpec
+
 
 class DeviceMesh:
     def __init__(self, devices=None, num_rows=None, num_cols=None):
@@ -28,37 +29,63 @@ class DeviceMesh:
         Raises
         ------
         ValueError
-            If only one device is available
+            If no devices are available
             If num_rows * num_cols does not match number of devices
         """
-        # if devices is None:
-        #     devices = np.array(jax.devices())
-        # else:
-        #     devices = np.array(devices)
-        # num_devices = len(devices)
-        # if num_devices == 1:
-        #     num_rows = 1
-        #     num_cols = 1
-        #     raise ValueError("Only one device is available. No parallelism is applied.")
-        # if num_rows is None or num_cols is None:
-        #     for i in range(int(np.sqrt(num_devices)), 0, -1):
-        #         if num_devices % i == 0:
-        #             num_rows = i
-        #             num_cols = num_devices // i
-        #             break
-        # else:
-        #     num_rows = int(num_rows)
-        #     num_cols = int(num_cols)
-        #     if num_rows * num_cols != num_devices:
-        #         raise ValueError("The number of devices does not match the configuration.")
-        # logging.info('The number of devices is {}'.format(num_devices))
-        # logging.info('The configuration of the devices is ({} x {})'.format(num_rows, num_cols))
-        # devices = devices.reshape(num_rows, num_cols)
-        # # Create a Mesh object to distribute a value across devices:
-        # self.mesh = Mesh(devices=devices, axis_names=('x', 'y'))
-        self.mesh = jax.make_mesh((num_rows, num_cols), ('x', 'y'))
+        if devices is None:
+            devices = jax.devices()
+        devices = np.asarray(devices, dtype=object)
+        num_devices = devices.size
+        if num_devices == 0:
+            raise ValueError("No devices are available for parallelism.")
 
-    
+        num_rows, num_cols = self._resolve_mesh_shape(
+            devices, num_devices, num_rows, num_cols
+        )
+
+        logging.info("The number of devices is {}".format(num_devices))
+        logging.info(
+            "The configuration of the devices is ({} x {})".format(
+                num_rows, num_cols
+            )
+        )
+
+        devices = devices.reshape(num_rows, num_cols)
+        self.mesh = Mesh(devices=devices, axis_names=('x', 'y'))
+
+    @staticmethod
+    def _resolve_mesh_shape(devices, num_devices, num_rows, num_cols):
+        if num_rows is None and num_cols is None:
+            if devices.ndim == 2:
+                return devices.shape
+            if devices.ndim != 1:
+                raise ValueError("devices must be a one- or two-dimensional array.")
+            for i in range(int(np.sqrt(num_devices)), 0, -1):
+                if num_devices % i == 0:
+                    return i, num_devices // i
+        elif num_rows is None:
+            num_cols = int(num_cols)
+            if num_cols <= 0:
+                raise ValueError("num_cols must be a positive integer.")
+            if num_devices % num_cols != 0:
+                raise ValueError("The number of devices does not match the configuration.")
+            return num_devices // num_cols, num_cols
+        elif num_cols is None:
+            num_rows = int(num_rows)
+            if num_rows <= 0:
+                raise ValueError("num_rows must be a positive integer.")
+            if num_devices % num_rows != 0:
+                raise ValueError("The number of devices does not match the configuration.")
+            return num_rows, num_devices // num_rows
+
+        num_rows = int(num_rows)
+        num_cols = int(num_cols)
+        if num_rows <= 0 or num_cols <= 0:
+            raise ValueError("num_rows and num_cols must be positive integers.")
+        if num_rows * num_cols != num_devices:
+            raise ValueError("The number of devices does not match the configuration.")
+        return num_rows, num_cols
+
     def partition_sharding(self):
         """
         Produce a NamedSharding object to distribute a value across devices, partitioning along the x and y axes.
@@ -70,7 +97,7 @@ class DeviceMesh:
         """
         sharding = NamedSharding(self.mesh, PartitionSpec('x', 'y'))
         return sharding
-    
+
     def replicate_sharding(self):
         """
         Produce a NamedSharding object to replicate a value across devices.
@@ -84,5 +111,3 @@ class DeviceMesh:
         """
         sharding = NamedSharding(self.mesh, PartitionSpec())
         return sharding
-
-  

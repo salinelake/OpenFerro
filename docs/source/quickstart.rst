@@ -34,6 +34,8 @@ You only need to add three lines to your code to enable multi-GPU parallelizatio
    from openferro.parallelism import DeviceMesh
    # if you have 4 GPUs, you can set num_rows=2, num_cols=2. If you have 2 GPUs, you can set num_rows=1, num_cols=2.
    gpu_mesh = DeviceMesh(num_rows=2, num_cols=2)   
+   # To use an explicit subset of devices, import jax and pass the device list:
+   # gpu_mesh = DeviceMesh(jax.devices()[:2], num_rows=1, num_cols=2)
    # Move all fields to GPUs after you have defined the system.
    system.move_fields_to_multi_devs(gpu_mesh)      
 

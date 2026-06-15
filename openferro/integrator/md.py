@@ -199,7 +199,7 @@ class LangevinIntegrator(Integrator):
             Random noise array
         """
         gaussian = jax.random.normal(key, field.get_velocity().shape) 
-        if field._sharding != gaussian.sharding:
+        if field._sharding is not None and field._sharding != gaussian.sharding:
             gaussian = jax.device_put(gaussian, field._sharding)
         return gaussian
         

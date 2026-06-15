@@ -774,7 +774,7 @@ class System:
         energy = 0.0
         for interaction_ID in self._self_interaction_dict:
             energy += self.calc_energy_by_ID(interaction_ID)
-            e = self.calc_energy_by_ID(interaction_ID)
+            # e = self.calc_energy_by_ID(interaction_ID)
             # logging.info('Energy from {}: {}'.format(interaction_ID, e))
         return energy
 
@@ -790,7 +790,7 @@ class System:
         energy = 0.0
         for interaction_ID in self._mutual_interaction_dict:
             energy += self.calc_energy_by_ID(interaction_ID)
-            e = self.calc_energy_by_ID(interaction_ID)
+            # e = self.calc_energy_by_ID(interaction_ID)
             # logging.info('Energy from {}: {}'.format(interaction_ID, e))
         return energy
 

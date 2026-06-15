@@ -74,7 +74,7 @@ This code will often be developed on Perlmutter supercomputer. In that case, Cod
 Activate the development environment on Perlmutter:
 ```bash
 module load python
-conda activate openferro_dev
+conda activate openferro_jax010
 ```
 
 Never run heavy CPU/GPU simulations on Perlmutter login nodes. On login nodes, only do lightweight actions such as `git pull`, editing small files, inspecting logs, or submitting/monitoring Slurm jobs.

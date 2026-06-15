@@ -9,9 +9,10 @@ setup(
     # packages=find_packages(),
     packages=['openferro'],
     description=DESCRIPTION,
-    python_requires=">=3.8",
+    python_requires=">=3.13",
     install_requires=[
         'numpy>=1.24.0',
-        'jax>=0.4.0',
+        'jax>=0.10.0',
+        'pytest'
     ],
 )
