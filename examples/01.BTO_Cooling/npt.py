@@ -81,5 +81,5 @@ for temperature in temp_list:
     simulation.add_thermo_reporter(file='output/thermo_{}K.log'.format(temperature), log_interval=log_freq, 
         global_strain=True, excess_stress=True, volume=True, potential_energy=True, kinetic_energy=True, temperature=True)
     simulation.add_field_reporter(file_prefix='output/field_{}K'.format(temperature), field_ID="dipole", log_interval=log_freq, 
-        field_average=True, dump_field=False)
+        field_average=True, dump_field=True)
     simulation.run(sampling_steps)

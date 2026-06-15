@@ -107,14 +107,14 @@ class Field:
         else:
             return self._velocity
 
-    def init_velocity(self, mode='zero',  temperature=None):
+    def init_velocity(self, mode='zero',  temperature=None, seed=42):
         if self._values is None:
             raise ValueError("Set field values before initializing velocity.")
         else:
             if mode == 'zero':
                 self._velocity = jnp.zeros_like(self._values)
             elif mode == 'gaussian':
-                key = jax.random.PRNGKey(np.random.randint(0, 1000000))
+                key = jax.random.PRNGKey(seed)
                 self._velocity = jax.random.normal(key, self._values.shape) * jnp.sqrt(1 / self._mass * Constants.kb * temperature)
             if self._sharding is not None:
                 self._velocity = jax.device_put(self._velocity, self._sharding)
@@ -351,8 +351,8 @@ class FieldSO3(FieldRn):
         else:
             return self._magnitude
         
-    def perturb(self, sigma):
-        key = jax.random.PRNGKey(np.random.randint(0, 1000000))
+    def perturb(self, sigma, seed=42):
+        key = jax.random.PRNGKey(seed)
         self._values = self._values / jnp.linalg.norm(self._values, axis=-1, keepdims=True)
         self._values += jax.random.normal(key, self._values.shape) * sigma
         self.normalize()

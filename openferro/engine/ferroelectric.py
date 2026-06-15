@@ -182,7 +182,7 @@ def short_range_2ednn_isotropic(field, parameters):
         energy += j5 * jnp.sum(f[..., [axis_pair[0], axis_pair[1]]] * (f1 - f2)[..., [axis_pair[1], axis_pair[0]]])
 
     return energy
-
+ 
 def get_short_range_3rdnn_isotropic():
     """
     Returns the engine of short-range interaction of third nearest neighbors for a R^3 field defined on a lattice with periodic boundary conditions.

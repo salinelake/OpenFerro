@@ -101,7 +101,7 @@ class System:
         """
         for ID in self._fields_dict.keys():
             self._fields_dict[ID].to_multi_devs(mesh)
-    
+
     def add_field(self, ID, ftype='scalar', dim=None, value=None, mass=1.0):
         """
         Add a predefined field to the system.
@@ -278,7 +278,7 @@ class System:
         self._add_interaction_sanity_check(ID)
         field = self.get_field_by_ID(field_ID)
         interaction = self_interaction( field_ID)
-        energy_engine = get_dipole_dipole_ewald(field.lattice, sharding=field._sharding)
+        energy_engine = get_dipole_dipole_ewald(field.lattice)
         interaction.set_energy_engine(energy_engine, enable_jit=enable_jit)
         interaction.create_force_engine(enable_jit=enable_jit)
         interaction.set_parameters(jnp.array([prefactor]))

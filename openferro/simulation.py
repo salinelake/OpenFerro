@@ -327,7 +327,7 @@ class SimulationNVTLangevin(SimulationNVE):
                     logging.info('Time for updating field {}: {:.8f}s'.format(type(field), timer()-t0))
         return
 
-    def run(self, nsteps=1, profile=False):
+    def run(self, nsteps=1, profile=False, seed=42):
         """
         Run the simulation.
 
@@ -348,8 +348,9 @@ class SimulationNVTLangevin(SimulationNVE):
             if field.integrator is None:
                 raise ValueError('Please set the integrator for the field %s before running the simulation' % type(field))
         ## generate all the needed random keys in advance
-        key = jax.random.PRNGKey(np.random.randint(0, 1000000))
+        key = jax.random.PRNGKey(seed)
         keys = jax.random.split(key, nsteps * self.nfields)
+        # print('this is processor', jax.process_index(), 'the key is', keys)
         ## run the simulation
         self.initialize_reporters()
         for id_step in range(nsteps):

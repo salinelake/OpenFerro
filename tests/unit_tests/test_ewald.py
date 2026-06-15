@@ -1,4 +1,4 @@
-from openferro.ewald import *
+from openferro.engine.ewald import *
 from openferro.lattice import BravaisLattice3D
 from jax import jit, grad
 
@@ -56,3 +56,6 @@ def test_ewald():
 #     E = energy_fast(field,  paras)
 #     t_list.append(time() - t0)
 # print("energy Scaling test: ", t_list)
+
+if __name__ == "__main__":
+    test_ewald()
