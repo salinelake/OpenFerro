@@ -37,6 +37,7 @@ Key Features
    logic
    core_components
    guide_custum_engine
+   ewald_performance
 
 .. toctree::
    :maxdepth: 2

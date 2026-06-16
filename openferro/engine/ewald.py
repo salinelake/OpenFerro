@@ -2,70 +2,152 @@
 Functions for Ewald summation
 """
 # This file is part of OpenFerro.
+from time import time as timer
 
 import numpy as np
 import jax
-from jax import jit
+from jax import grad, jit
 import jax.numpy as jnp
+
 from openferro.units import Constants
-from time import time as timer
+ 
 
-def get_UkGG(l1,l2,l3, n1, n2, n3, b, sigma):
-    """Getting UkGG in Voigt notation.
-    Voigt notation of a symmetric 3X3 matrix: Six elements are respectively (0,0), (1,1), (2,2), (1,2), (0,2), (0,1)-entry of a symmetric 3X3 matrix. 
-    Slightly different from the original Voigt notation. We do not double count the fourth, fifth, and sixth elements here. 
+def _canonical_float_dtype(dtype):
+    return jnp.asarray(1.0).dtype if dtype is None else jnp.dtype(dtype)
+
+
+
+def _dipole_dipole_ewald_setup(latt, dtype=None):
+    dtype = _canonical_float_dtype(dtype)
+    l1, l2, l3 = latt.size
+    latt_vec = np.asarray(latt.latt_vec, dtype=np.float64)
+    a1 = float(latt_vec[0, 0])
+    a2 = float(latt_vec[1, 1])
+    a3 = float(latt_vec[2, 2])
+
+    ref_volume = a1 * a2 * a3 * l1 * l2 * l3
+    a = np.array([a1, a2, a3], dtype=np.float64)
+    b_np = 2 * np.pi / a
+    bmax = np.max(b_np)
+    amin = 2 * np.pi / bmax
+    alpha = 5 / amin
+    gcut = 2 * np.pi * alpha
+    sigma = 1.0 / alpha / np.sqrt(2.0)
+
+    coef_ksum = 1 / 2.0 / ref_volume / Constants.epsilon0
+    coef_rsum = 1 / 2.0 / np.pi / Constants.epsilon0 * alpha**3 / 3.0 / np.sqrt(np.pi)
+
+    n1 = int(gcut / b_np[0])
+    n2 = int(gcut / b_np[1])
+    n3 = int(gcut / b_np[2])
+
+    return {
+        "shape": (l1, l2, l3),
+        "b": jnp.asarray(b_np, dtype=dtype),
+        "sigma": jnp.asarray(sigma, dtype=dtype),
+        "coef_ksum": jnp.asarray(coef_ksum, dtype=dtype),
+        "coef_rsum": jnp.asarray(coef_rsum, dtype=dtype),
+        "replicas": (n1, n2, n3),
+        "dtype": dtype,
+    }
+
+
+def get_UkGG(l1, l2, l3, n1, n2, n3, b, sigma, dtype=None, sharding=None):
+    """Get the reciprocal-space Ewald kernel in Voigt notation.
+
+    Voigt notation stores the six independent entries of the symmetric
+    3x3 kernel in the order xx, yy, zz, yz, xz, xy.
+
+    Parameters
+    ----------
+    l1, l2, l3 : int
+        Lattice dimensions.
+    n1, n2, n3 : int
+        Reciprocal-cell replica counts in each direction.
+    b : array_like
+        Reciprocal lattice vector magnitudes.
+    sigma : float
+        Ewald Gaussian width.
+    dtype : dtype, optional
+        Floating-point dtype used for the stored kernel.
+    sharding : jax.sharding.Sharding, optional
+        Sharding used for the returned kernel.
+
+    Returns
+    -------
+    jax.Array
+        Kernel with shape ``(l1, l2, l3, 6)``.
     """
-    ## reciprocal space grid for first Brillouin zone (shifted)
-    G_grid_1stBZ = jnp.stack( jnp.meshgrid(
-        jnp.arange(0, l1) / l1 * b[0],
-        jnp.arange(0, l2) / l2 * b[1],
-        jnp.arange(0, l3) / l3 * b[2],
-        indexing='ij'), axis=-1)   # (l1, l2, l3, 3)
-    
-    ## plain version of UkGG
-    # UkGG = jnp.zeros((l1, l2, l3, 3, 3))
-    # if sharding is not None:
-    #     G_grid_1stBZ = jax.device_put(G_grid_1stBZ, sharding)
-    #     UkGG = jax.device_put(UkGG, sharding)
-    # for i1 in range(-n1,n1):
-    #     for i2 in range(-n2,n2):
-    #         for i3 in range(-n3,n3):
-    #             G_grid = G_grid_1stBZ + jnp.array([i1*b[0], i2*b[1], i3*b[2]]).reshape(1,1,1,3) # (l1, l2, l3, 3)
-    #             Uk_coef = jnp.exp( - 0.5 * sigma**2 * jnp.sum(G_grid**2, axis=-1) ) / jnp.sum(G_grid**2, axis=-1)   # (l1, l2, l3)
-    #             if i1==0 and i2==0 and i3==0:
-    #                 Uk_coef = Uk_coef.at[0,0,0].set(0.0)
-    #             UkGG += G_grid[:,:,:,None,:] * G_grid[:,:,:,:,None] * Uk_coef[:,:,:,None,None]
+    dtype = _canonical_float_dtype(dtype)
+    b = jnp.asarray(b, dtype=dtype)
+    sigma = jnp.asarray(sigma, dtype=dtype)
+    l1, l2, l3 = int(l1), int(l2), int(l3)
 
-    ## memory-saving version of UkGG with Voigt notation
-    def _get_Uk_coef(G_grid_1stBZ, i1, i2, i3):
-        G_grid = G_grid_1stBZ + jnp.array([i1*b[0], i2*b[1], i3*b[2]]).reshape(1,1,1,3) # (l1, l2, l3, 3)
-        Uk_coef = jnp.exp( - 0.5 * sigma**2 * jnp.sum(G_grid**2, axis=-1) ) / jnp.sum(G_grid**2, axis=-1)   # (l1, l2, l3)
+    G_grid_1stBZ = jnp.stack(jnp.meshgrid(
+        jnp.arange(0, l1, dtype=dtype) / l1 * b[0],
+        jnp.arange(0, l2, dtype=dtype) / l2 * b[1],
+        jnp.arange(0, l3, dtype=dtype) / l3 * b[2],
+        indexing='ij'), axis=-1)
+
+    if sharding is not None:
+        G_grid_1stBZ = jax.device_put(G_grid_1stBZ, sharding)
+
+    def _get_Uk_coef(G_grid_1stBZ, offset):
+        G_grid = G_grid_1stBZ + offset.reshape(1, 1, 1, 3)
+        G2 = jnp.sum(G_grid**2, axis=-1)
+        Uk_coef = jnp.where(
+            G2 > 0.0,
+            jnp.exp(-0.5 * sigma**2 * G2) / G2,
+            jnp.zeros_like(G2),
+        )
         return G_grid, Uk_coef
 
     def _modify_UkGG(UkGG, G_grid, Uk_coef):
         addition = jnp.stack(
-               [G_grid[...,0]**2 * Uk_coef, 
-                G_grid[...,1]**2 * Uk_coef, 
-                G_grid[...,2]**2 * Uk_coef,
-                G_grid[..., 1] * G_grid[..., 2] * Uk_coef,  # Voigt notation of entry-(1,2)
-                G_grid[..., 0] * G_grid[..., 2] * Uk_coef,  # Voigt notation of entry-(0,2)
-                G_grid[..., 0] * G_grid[..., 1] * Uk_coef],   # Voigt notation of entry-(0,1)
+            [G_grid[..., 0]**2 * Uk_coef,
+             G_grid[..., 1]**2 * Uk_coef,
+             G_grid[..., 2]**2 * Uk_coef,
+             G_grid[..., 1] * G_grid[..., 2] * Uk_coef,
+             G_grid[..., 0] * G_grid[..., 2] * Uk_coef,
+             G_grid[..., 0] * G_grid[..., 1] * Uk_coef],
             axis=-1)
         return UkGG + addition
 
     get_Uk_coef = jit(_get_Uk_coef)
     modify_UkGG = jit(_modify_UkGG)
-    UkGG = jnp.zeros((l1, l2, l3, 6))
-    for i1 in range(-n1,n1):
-        for i2 in range(-n2,n2):
-            for i3 in range(-n3,n3):
-                G_grid, Uk_coef = get_Uk_coef(G_grid_1stBZ, i1*1.0, i2*1.0, i3*1.0)
-                if i1==0 and i2==0 and i3==0:
-                    Uk_coef = Uk_coef.at[0,0,0].set(0.0)
+    UkGG = jnp.zeros((l1, l2, l3, 6), dtype=dtype)
+    if sharding is not None:
+        UkGG = jax.device_put(UkGG, sharding)
+
+    for i1 in range(-n1, n1):
+        for i2 in range(-n2, n2):
+            for i3 in range(-n3, n3):
+                offset = jnp.asarray([i1 * b[0], i2 * b[1], i3 * b[2]], dtype=dtype)
+                G_grid, Uk_coef = get_Uk_coef(G_grid_1stBZ, offset)
                 UkGG = modify_UkGG(UkGG, G_grid, Uk_coef)
     return UkGG
 
-def get_dipole_dipole_ewald(latt):
+
+def apply_ewald_kernel_fft(field_fft, UkGG):
+    """Apply the Voigt-form Ewald kernel to a Fourier-space vector field."""
+    field_fft_x = field_fft[..., 0]
+    field_fft_y = field_fft[..., 1]
+    field_fft_z = field_fft[..., 2]
+    kernel_field_fft = jnp.stack([
+        UkGG[..., 0] * field_fft_x + UkGG[..., 5] * field_fft_y + UkGG[..., 4] * field_fft_z,
+        UkGG[..., 5] * field_fft_x + UkGG[..., 1] * field_fft_y + UkGG[..., 3] * field_fft_z,
+        UkGG[..., 4] * field_fft_x + UkGG[..., 3] * field_fft_y + UkGG[..., 2] * field_fft_z,
+    ], axis=-1)
+    return kernel_field_fft
+
+
+def calc_ewald_reciprocal_sum(field_fft, UkGG):
+    """Calculate ``sum_k conj(F_k) dot UkGG_k dot F_k``."""
+    kernel_field_fft = apply_ewald_kernel_fft(field_fft, UkGG)
+    return jnp.real(jnp.sum(jnp.conj(field_fft) * kernel_field_fft))
+
+
+def get_dipole_dipole_ewald(latt, dtype=None, sharding=None):
     """Returns the function to calculate the energy of dipole-dipole interaction.
 
     Implemented according to Sec.5.3 of "Wang, D., et al. 'Ewald summation for 
@@ -76,6 +158,8 @@ def get_dipole_dipole_ewald(latt):
     ----------
     latt : Lattice
         The lattice object containing size and lattice vectors
+    dtype : dtype, optional
+        Floating-point dtype used for precomputed Ewald coefficients.
     sharding : jax.sharding.Sharding, optional
         Sharding specification for distributed arrays
 
@@ -84,32 +168,16 @@ def get_dipole_dipole_ewald(latt):
     callable
         Function that calculates dipole-dipole interaction energy
     """
-    l1, l2, l3 = latt.size
-    a1, a2, a3 = latt.latt_vec
-    a1 = a1[0]
-    a2 = a2[1]
-    a3 = a3[2]
-    ref_volume = a1 * a2 * a3 * l1 * l2 * l3
-    a = jnp.array([a1 , a2 , a3 ])
-    b = 2 * jnp.pi / a
-    bmax = jnp.max(b)
-    amin = 2 * np.pi / bmax
-    alpha = 5 / amin
-    gcut = 2 * np.pi * alpha
-    sigma = 1.0 / alpha / jnp.sqrt(2.0)   ## the ewald sigma parameter
-    
-    ## get coefficients
-    coef_ksum = 1 / 2.0 / ref_volume / Constants.epsilon0
-    coef_rsum = 1 / 2.0 / jnp.pi / Constants.epsilon0 * alpha**3 / 3.0 / jnp.sqrt(jnp.pi) 
+    setup = _dipole_dipole_ewald_setup(latt, dtype=dtype)
+    l1, l2, l3 = setup["shape"]
+    n1, n2, n3 = setup["replicas"]
 
-    ## repeatation of Brillouin Zone
-    n1 = int(gcut / b[0])
-    n2 = int(gcut / b[1])
-    n3 = int(gcut / b[2])
-
-    ## get UkGG in Voigt notation
-    ## partition sharding of UkGG is problematic for multi-node parallelization.   Replicate sharding no difference to no sharding.
-    UkGG = get_UkGG(l1, l2, l3, n1, n2, n3, b, sigma)
+    UkGG = get_UkGG(
+        l1, l2, l3, n1, n2, n3, setup["b"], setup["sigma"],
+        dtype=setup["dtype"], sharding=sharding,
+    )
+    coef_ksum = setup["coef_ksum"]
+    coef_rsum = setup["coef_rsum"]
 
     def energy_engine(field, parameters):
         """Calculate the energy of dipole-dipole interaction using Ewald summation.
@@ -126,23 +194,111 @@ def get_dipole_dipole_ewald(latt):
         float
             The dipole-dipole interaction energy
         """
-        prefactor = parameters[0]
-        ## calculate reciprocal space sum. UkGG is a symmetric (l1, l2, l3, 3, 3) matrix, so we only need to calculate half of it.
-        F_fft3 = jnp.fft.fftn(field, axes=(0,1,2))  # (l1, l2, l3, 3)
-
-        ######### compute the summation over k-space
-        ewald_ksum = ((F_fft3.real[..., 0]**2 + F_fft3.imag[..., 0]**2) * UkGG[..., 0]).sum()
-        ewald_ksum += ((F_fft3.real[..., 1]**2 + F_fft3.imag[..., 1]**2) * UkGG[..., 1]).sum()
-        ewald_ksum += ((F_fft3.real[..., 2]**2 + F_fft3.imag[..., 2]**2) * UkGG[..., 2]).sum()
-        ewald_ksum += 2 * ((F_fft3.real[..., 0] * F_fft3.real[..., 1] + F_fft3.imag[..., 0] * F_fft3.imag[..., 1]) * UkGG[..., 5]).sum()
-        ewald_ksum += 2 * ((F_fft3.real[..., 0] * F_fft3.real[..., 2] + F_fft3.imag[..., 0] * F_fft3.imag[..., 2]) * UkGG[..., 4]).sum()
-        ewald_ksum += 2 * ((F_fft3.real[..., 1] * F_fft3.real[..., 2] + F_fft3.imag[..., 1] * F_fft3.imag[..., 2]) * UkGG[..., 3]).sum()
-
-        ######### compute the summation over real space
+        prefactor = jnp.asarray(parameters[0], dtype=setup["dtype"])
+        field_fft = jnp.fft.fftn(field, axes=(0,1,2))
+        ewald_ksum = calc_ewald_reciprocal_sum(field_fft, UkGG)
         ewald_rsum = jnp.sum(field**2)
-        return (coef_ksum * ewald_ksum - coef_rsum * ewald_rsum) * prefactor
+        energy = (coef_ksum * ewald_ksum - coef_rsum * ewald_rsum) * prefactor
+        return energy
     return energy_engine
  
+
+
+def estimate_dipole_dipole_ewald_memory(latt, dtype=None):
+    """Estimate tracked Ewald array sizes in bytes.
+
+    The estimate covers arrays that are explicit in OpenFerro's Ewald path.
+    Backend FFT workspaces, compiler temporaries, and autodiff residuals are
+    not included because they are backend- and version-dependent.
+    """
+    dtype = _canonical_float_dtype(dtype)
+    l1, l2, l3 = latt.size
+    nsites = l1 * l2 * l3
+    float_bytes = np.dtype(dtype).itemsize
+    complex_bytes = np.dtype(np.complex64 if float_bytes <= 4 else np.complex128).itemsize
+    arrays = {
+        "field": nsites * 3 * float_bytes,
+        "UkGG": nsites * 6 * float_bytes,
+        "field_fft": nsites * 3 * complex_bytes,
+        "kernel_field_fft": nsites * 3 * complex_bytes,
+    }
+    return {
+        "shape": (l1, l2, l3),
+        "nsites": nsites,
+        "dtype": str(dtype),
+        "arrays": arrays,
+        "tracked_total": sum(arrays.values()),
+        "notes": (
+            "FFT workspaces, compiler temporaries, and autodiff residuals are "
+            "not included in this lower-bound estimate."
+        ),
+    }
+
+
+def benchmark_dipole_dipole_ewald(
+    latt,
+    field=None,
+    prefactor=1.0,
+    repeat=3,
+    seed=0,
+    dtype=None,
+    sharding=None,
+    include_force=False,
+):
+    """Run a lightweight Ewald energy benchmark.
+
+    Set ``include_force=True`` to benchmark the current autodiff force path.
+    This helper is intended for small profiling runs and does not implement an
+    explicit force engine.
+    """
+    dtype = _canonical_float_dtype(dtype)
+    l1, l2, l3 = latt.size
+    if field is None:
+        key = jax.random.PRNGKey(seed)
+        field = jax.random.normal(key, (l1, l2, l3, 3), dtype=dtype)
+    else:
+        field = jnp.asarray(field, dtype=dtype)
+    if sharding is not None:
+        field = jax.device_put(field, sharding)
+
+    energy_engine = jit(get_dipole_dipole_ewald(latt, dtype=dtype, sharding=sharding))
+    parameters = jnp.asarray([prefactor], dtype=dtype)
+
+    t0 = timer()
+    energy = energy_engine(field, parameters)
+    jax.block_until_ready(energy)
+    compile_and_first_eval_seconds = timer() - t0
+
+    t0 = timer()
+    for _ in range(repeat):
+        energy = energy_engine(field, parameters)
+    jax.block_until_ready(energy)
+    energy_seconds = (timer() - t0) / repeat
+
+    result = {
+        "shape": (l1, l2, l3),
+        "dtype": str(dtype),
+        "repeat": repeat,
+        "compile_and_first_eval_seconds": compile_and_first_eval_seconds,
+        "energy_seconds": energy_seconds,
+        "energy": float(energy),
+        "memory_estimate": estimate_dipole_dipole_ewald_memory(latt, dtype=dtype),
+    }
+
+    if include_force:
+        force_engine = jit(grad(energy_engine, argnums=0))
+        t0 = timer()
+        force = force_engine(field, parameters)
+        jax.block_until_ready(force)
+        result["force_compile_and_first_eval_seconds"] = timer() - t0
+
+        t0 = timer()
+        for _ in range(repeat):
+            force = force_engine(field, parameters)
+        jax.block_until_ready(force)
+        result["force_seconds"] = (timer() - t0) / repeat
+
+    return result
 
 """
 Archived versions of Ewald summation with higher memory usage. For testing purpose only.
