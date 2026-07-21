@@ -239,11 +239,14 @@ def get_short_range_3rdnn_isotropic():
         r_4 = c_4 * j7 + c_0 * j6
 
         ## sum up the interaction
+        # Use broadcast-mul + sum instead of jnp.dot/@/einsum. On multi-GPU
+        # sharded fields, autodiff through dot_general can bitcast (l1,l2,l3,3)
+        # to (l1*l2*l3,3) while keeping a 4D sharding, which XLA rejects.
         f = field
-        fr_sum = jnp.dot( jnp.roll( f, ( 1, 1, 1), axis=(0,1,2)), r_1)
-        fr_sum += jnp.dot( jnp.roll( f, ( 1,-1, 1), axis=(0,1,2)), r_2)
-        fr_sum += jnp.dot( jnp.roll( f, (-1, 1, 1), axis=(0,1,2)), r_3)
-        fr_sum += jnp.dot( jnp.roll( f, (-1,-1, 1), axis=(0,1,2)), r_4)
+        fr_sum = (jnp.roll(f, (1, 1, 1), axis=(0, 1, 2))[..., :, None] * r_1).sum(-2)
+        fr_sum += (jnp.roll(f, (1, -1, 1), axis=(0, 1, 2))[..., :, None] * r_2).sum(-2)
+        fr_sum += (jnp.roll(f, (-1, 1, 1), axis=(0, 1, 2))[..., :, None] * r_3).sum(-2)
+        fr_sum += (jnp.roll(f, (-1, -1, 1), axis=(0, 1, 2))[..., :, None] * r_4).sum(-2)
         energy = jnp.sum(f * fr_sum)
         return energy
     return short_range_3rdnn_isotropic
