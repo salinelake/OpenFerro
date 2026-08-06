@@ -8,19 +8,24 @@ OpenFerro Documentation
 
 OpenFerro is a Python package for on-lattice atomistic dynamics simulation. Built on `JAX <https://github.com/google/jax>`_, OpenFerro provides a high-performance framework for simulating lattice Hamiltonian models with GPU acceleration and auto-differentiation capabilities.
 
+.. warning::
+   OpenFerro is a research alpha. Review :doc:`feature_status` before using
+   available Hamiltonians or integrators for scientific production.
+
 Key Features
 ------------
 
-* **GPU Support**: Highly efficient for large-scale simulations with multi-GPU parallelization
-* **Auto-differentiable**: Native support for enhanced sampling and Hamiltonian optimization
-* **Modular Design**: Easy implementation of new interaction terms without deep codebase knowledge
-* **Flexible Architecture**: Supports simultaneous simulation of R^n and SO(3) local order parameters
+* **JAX Execution**: CPU/GPU backends with experimental multi-device sharding
+* **Auto-differentiable**: Forces derived from scalar custom energy functions
+* **Modular Design**: Custom interactions use small, pure energy functions
+* **Flexible Fields**: R^n and fixed-magnitude SO(3) local order parameters
 
 .. toctree::
    :maxdepth: 2
    :caption: Getting Started
 
    installation
+   feature_status
    quickstart
 
 .. toctree::

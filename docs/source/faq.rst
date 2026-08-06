@@ -2,13 +2,15 @@ FAQ
 =====
 
 Troubleshooting
---------------
+---------------
 
-**I got the warning "Constant folding an instruction is taking > *s"**
+**JAX reports that constant folding is taking a long time**
 
-This is a warning from JAX, which means that JAX is folding the constant instruction. 
-This may appear when you are running a simulation with a large lattice containing let's say 1 million sites. 
-This is not a problem, and you can ignore it.
+Constant folding occurs during JIT compilation. For large captured constants,
+including an Ewald kernel, the warning can indicate material startup time or
+memory use. Measure compilation separately from steady-state execution and do
+not dismiss repeated warnings without checking a compile profile and array
+placement.
 
 
 **The simulation takes a long time to run the first step**

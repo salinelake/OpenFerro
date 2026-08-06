@@ -1,6 +1,11 @@
 API Reference
 =============
 
+.. important::
+   API availability does not imply scientific validation. Consult
+   :doc:`feature_status` before selecting an engine or integrator.
+
+
 System
 ------
 
@@ -28,6 +33,10 @@ Lattice
 Hamiltonian
 --------------------------
 
+.. warning::
+   Except where the feature matrix says otherwise, built-in Hamiltonian
+   engines are experimental pending per-term reference validation.
+
 Elastic
 ^^^^^^^
 
@@ -40,6 +49,23 @@ Ferroelectric
 ^^^^^^^^^^^^^
 
 .. automodule:: openferro.engine.ferroelectric
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+
+Ferroelectric Superlattice
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. automodule:: openferro.engine.ferroelectric_superlatt
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Multiferroic
+^^^^^^^^^^^^
+
+.. automodule:: openferro.engine.multiferroic
    :members:
    :undoc-members:
    :show-inheritance:
@@ -63,6 +89,10 @@ Ewald
 
 Integrators
 -----------
+
+.. warning::
+   All bundled MD, Langevin, and LLG/SIB integrators are experimental until
+   the Milestone B reference suite is complete.
 
 Base
 ^^^^

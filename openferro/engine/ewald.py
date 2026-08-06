@@ -19,11 +19,29 @@ def _canonical_float_dtype(dtype):
 
 def _dipole_dipole_ewald_setup(latt, dtype=None):
     dtype = _canonical_float_dtype(dtype)
-    l1, l2, l3 = latt.size
+    if getattr(latt, "dim", None) != 3:
+        raise ValueError("Dipole Ewald summation requires a three-dimensional lattice.")
+
+    l1, l2, l3 = (int(value) for value in np.asarray(latt.size).tolist())
+    if min(l1, l2, l3) <= 0:
+        raise ValueError("Dipole Ewald lattice sizes must be positive integers.")
+
     latt_vec = np.asarray(latt.latt_vec, dtype=np.float64)
-    a1 = float(latt_vec[0, 0])
-    a2 = float(latt_vec[1, 1])
-    a3 = float(latt_vec[2, 2])
+    if latt_vec.shape != (3, 3) or not np.all(np.isfinite(latt_vec)):
+        raise ValueError("Dipole Ewald lattice vectors must be a finite 3x3 array.")
+
+    diagonal = np.diag(latt_vec)
+    if np.any(diagonal < 0.0) or not np.allclose(
+        latt_vec, np.diag(diagonal), rtol=0.0, atol=1e-12
+    ):
+        raise NotImplementedError(
+            "Dipole Ewald summation currently supports only positive, axis-aligned "
+            "orthogonal primitive vectors; rotated and skew cells are unsupported."
+        )
+    if np.any(diagonal == 0.0):
+        raise ValueError("Dipole Ewald lattice vectors must be nondegenerate.")
+
+    a1, a2, a3 = (float(value) for value in diagonal)
 
     ref_volume = a1 * a2 * a3 * l1 * l2 * l3
     a = np.array([a1, a2, a3], dtype=np.float64)
@@ -212,8 +230,8 @@ def estimate_dipole_dipole_ewald_memory(latt, dtype=None):
     not included because they are backend- and version-dependent.
     """
     dtype = _canonical_float_dtype(dtype)
-    l1, l2, l3 = latt.size
-    nsites = l1 * l2 * l3
+    l1, l2, l3 = (int(value) for value in np.asarray(latt.size).tolist())
+    nsites = int(l1 * l2 * l3)
     float_bytes = np.dtype(dtype).itemsize
     complex_bytes = np.dtype(np.complex64 if float_bytes <= 4 else np.complex128).itemsize
     arrays = {
@@ -252,7 +270,7 @@ def benchmark_dipole_dipole_ewald(
     explicit force engine.
     """
     dtype = _canonical_float_dtype(dtype)
-    l1, l2, l3 = latt.size
+    l1, l2, l3 = (int(value) for value in np.asarray(latt.size).tolist())
     if field is None:
         key = jax.random.PRNGKey(seed)
         field = jax.random.normal(key, (l1, l2, l3, 3), dtype=dtype)

@@ -7,12 +7,15 @@ A universal framework for on-lattice atomistic dynamics simulation
 # About OpenFerro
 OpenFerro is a Python package for on-lattice atomistic dynamics simulation. OpenFerro is based on [JAX](https://github.com/google/jax), a high-performance linear algebra package supporting auto-differentiation and GPU acceleration.
 OpenFerro is designed to minimize the effort required to build on-lattice Hamiltonian models, and to perform molecular dynamics (MD) and Landau-Lifshitz-Gilbert simulations. 
+
+> [!IMPORTANT]
+> OpenFerro is a research alpha. Check the [feature-status matrix](docs/source/feature_status.rst) before treating an available engine, integrator, or distributed path as scientifically validated.
  
 # Highlighted features
-* **Multi-GPU Acceleration**, highly efficient for large-scale simulations.
-* **Auto-differentiable**, will have native support for enhanced sampling and Hamiltonian optimization.
-* **Modularized**, easy to implement new interaction term as a plug-in python function. No need to modify source code. OpenFerro handles the rest, including graident calculation and GPU acceleration.
-* **Flexible**, supports simultaneous simulation of $R^d$ and SO(3) local order parameters. Fields with other symmetries can also be implemented.
+* **JAX execution**, with CPU/GPU backends and experimental multi-device sharding.
+* **Auto-differentiable**, deriving forces from scalar custom energy functions.
+* **Modular**, adding custom interaction energies without modifying package source.
+* **Flexible fields**, including $R^d$ and fixed-magnitude SO(3) local order parameters.
 
 
 # Installation
@@ -55,7 +58,7 @@ OpenFerro simulates dynamical evolution of local order parameters with molecular
 See the [documentation](https://openferro.readthedocs.io/en/latest/theory-dynamics.html) for equations of motion used in NVE, NVT, NPT, and structure-optimization simulations. The isothermal condition is maintained by the second fluctuation-dissipation theorem.
 
 ### Integrator
-Supported integrators (see [documentation](https://openferro.readthedocs.io/en/latest/api.html#integrators) for details):
+Available experimental integrators (see the [feature-status matrix](docs/source/feature_status.rst) and [API documentation](https://openferro.readthedocs.io/en/latest/api.html#integrators)):
 - MD: Leapfrog (NVE), Mid-point Langevin (NVT, NPT, see J. Phys. Chem. A 2019, 123, 28, 6056-6079)
 - LLG: Semi-implicit B (SIB) scheme (see J. Phys.: Condens. Matter 22 (2010) 176001)
 
@@ -83,7 +86,7 @@ The code for this superlattices simulation will be added to the [examples](https
 
 
 # Benchmark
-Running OpenFerro on a GPU node can bring over 100X speedup compared to a CPU node. See [example](https://github.com/salinelake/OpenFerro/tree/main/examples/Profiling_GPU) for details.
+The [profiling example](https://github.com/salinelake/OpenFerro/tree/main/examples/Profiling_GPU) contains a historical GPU/CPU illustration. It is not a reproducible performance claim; synchronized, metadata-rich baselines remain planned work.
 
 <p align="center" >
   <img width="30%" src="/examples/Profiling_GPU/GPU_benchmark.png" />

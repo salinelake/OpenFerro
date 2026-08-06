@@ -35,9 +35,9 @@ class ConservativeLLIntegrator(Integrator):
         Parameters
         ----------
         M : jax.Array
-            The magnetization (shape=(*, 3))
+            The magnetization (shape=(..., 3))
         B : jax.Array
-            The magnetic field (shape=(*, 3))
+            The magnetic field (shape=(..., 3))
         gamma : float
             The gyromagnetic ratio
         dt : float
@@ -46,7 +46,7 @@ class ConservativeLLIntegrator(Integrator):
         Returns
         -------
         jax.Array
-            The updated magnetization (shape=(*, 3))
+            The updated magnetization (shape=(..., 3))
         """
         R = SO3_rotation(B, gamma * dt)
         return (R * M[..., None, :]).sum(-1)
@@ -90,7 +90,7 @@ class LLIntegrator(ConservativeLLIntegrator):
     
     The equation of motion is
 
-    dM/dt = -gamma M x B - (gamma * alpha / |M|) * M x (M x B)
+    dM/dt = -gamma M x B - (gamma * alpha / norm(M)) * M x (M x B)
     
     Here gamma=(gyromagnetic ratio)/ (1+alpha^2) is the renormalized gyromagnetic ratio for simulating LLG equation in Landau-Lifshitz form.
 
@@ -105,23 +105,23 @@ class LLIntegrator(ConservativeLLIntegrator):
     """
     def _step_b(self, M, B, alpha, Ms):
         """
-        Update the magnetic field B by adding the term ( alpha / |M|) * (M x B)
+        Update the magnetic field B by adding the term ( alpha / norm(M)) * (M x B)
 
         Parameters
         ----------
         M : jax.Array
-            The magnetization (shape=(*, 3))
+            The magnetization (shape=(..., 3))
         B : jax.Array
-            The magnetic field (shape=(*, 3))
+            The magnetic field (shape=(..., 3))
         alpha : float
             The Gilbert damping constant
         Ms : jax.Array
-            The magnitude of the magnetization (shape=(*,))
+            The magnitude of the magnetization (shape=(...,))
 
         Returns
         -------
         jax.Array
-            The updated magnetic field (shape=(*, 3))
+            The updated magnetic field (shape=(..., 3))
         """
         return B + alpha / Ms[..., None] * jnp.cross(M, B)
  
@@ -168,10 +168,10 @@ class LLLangevinIntegrator(LLIntegrator):
     See Eriksson, Olle, et al. Atomistic spin dynamics: foundations and applications. Oxford university press, 2017, Sec.7.4.5 for details.
     
     The equation of motion is:
-    dM/dt = -gamma M x (B + b) - (gamma * alpha / |M|) * M x (M x (B + b))
+    dM/dt = -gamma M x (B + b) - (gamma * alpha / norm(M)) * M x (M x (B + b))
     
     b is the stochastic force <b_i_alpha(t) b_j_beta(s)> = 2 * D * delta_ij * delta_alpha_beta * delta(t-s)
-    A steady Boltzmann state requires D= alpha/(1+alpha^2) * kbT / gamma / |m|
+    A steady Boltzmann state requires D= alpha/(1+alpha^2) * kbT / gamma / norm(m)
 
     Parameters
     ----------
@@ -266,7 +266,7 @@ class ConservativeLLSIBIntegrator(Integrator):
     max_iter : int, optional
         Maximum number of iterations for fixed-point iterations
     tol : float, optional
-        Tolerance for convergence. Convergence is declared if Average[|M_new - M_old|/Ms] < tol
+        Tolerance for convergence. Convergence is declared if Average[norm(M_new - M_old)/Ms] < tol
     """
     def _update_x(self, M, Ms, Y, B, step_size):
         """
@@ -357,7 +357,7 @@ class LLSIBIntegrator(Integrator):
     
     The equation of motion is
     
-    dM/dt = -gamma M x B - (gamma * alpha / |M|) * M x (M x B)
+    dM/dt = -gamma M x B - (gamma * alpha / norm(M)) * M x (M x B)
         
     Here gamma=(gyromagnetic ratio)/ (1+alpha^2) is the renormalized gyromagnetic ratio for simulating LLG equation in Landau-Lifshitz form.
     Let M[i] be the spin configuration at time step i, Y[i] be the auxiliary spin configuration at time step i+1.
@@ -381,7 +381,7 @@ class LLSIBIntegrator(Integrator):
     max_iter : int, optional
         Maximum number of iterations for fixed-point iterations
     tol : float, optional
-        Tolerance for convergence. Convergence is declared if Average[|M_new - M_old|/Ms averaged over lattice] < tol
+        Tolerance for convergence. Convergence is declared if Average[norm(M_new - M_old)/Ms averaged over lattice] < tol
     """
     def _update_x(self, M, Ms, Y, B, step_size):
         """
@@ -412,23 +412,23 @@ class LLSIBIntegrator(Integrator):
     
     def _update_b(self, M, B, alpha, Ms):
         """
-        Update the magnetic field B by adding the term ( alpha / |M|) * (M x B)
+        Update the magnetic field B by adding the term ( alpha / norm(M)) * (M x B)
 
         Parameters
         ----------
         M : jax.Array
-            The magnetization (shape=(*, 3))
+            The magnetization (shape=(..., 3))
         B : jax.Array
-            The magnetic field (shape=(*, 3))
+            The magnetic field (shape=(..., 3))
         alpha : float
             The Gilbert damping constant
         Ms : jax.Array
-            The magnitude of the magnetization (shape=(*,))
+            The magnitude of the magnetization (shape=(...,))
 
         Returns
         -------
         jax.Array
-            The updated magnetic field (shape=(*, 3))
+            The updated magnetic field (shape=(..., 3))
         """
         return B + alpha * jnp.cross(M, B) / Ms[..., None]
  
@@ -499,11 +499,11 @@ class LLSIBLangevinIntegrator(LLSIBIntegrator):
     
     The equation of motion is
 
-    dM/dt = -gamma M x (B + b) - (gamma * alpha / |M|) * M x (M x (B + b))
+    dM/dt = -gamma M x (B + b) - (gamma * alpha / norm(M)) * M x (M x (B + b))
         
     Here gamma=(gyromagnetic ratio)/ (1+alpha^2) is the renormalized gyromagnetic ratio for simulating LLG equation in Landau-Lifshitz form.
     b is the stochastic force <b_i_alpha(t) b_j_beta(s)> = 2 * D * delta_ij * delta_alpha_beta * delta(t-s)
-    A steady Boltzmann state requires D= alpha/(1+alpha^2) * kbT / gamma / |m|
+    A steady Boltzmann state requires D= alpha/(1+alpha^2) * kbT / gamma / norm(m)
 
     Let M[i] be the spin configuration at time step i, Y[i] be the auxiliary spin configuration at time step i+1.
     Let B(M[i]) be the effective magnetic field including also the dissipative damping term and the stochastic force.
@@ -550,7 +550,7 @@ class LLSIBLangevinIntegrator(LLSIBIntegrator):
         Returns
         -------
         Field
-            The updated field with new spin configuration (shape=(*, 3))
+            The updated field with new spin configuration (shape=(..., 3))
         """
         M = field.get_values()
         Ms = field.get_magnitude()

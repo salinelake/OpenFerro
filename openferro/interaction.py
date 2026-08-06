@@ -222,7 +222,7 @@ class mutual_interaction(interaction_base):
         gradient = self.force_engine(f1, f2, self.parameters)
         return (- gradient[0], - gradient[1])
 
-class triple_interaction:
+class triple_interaction(interaction_base):
     """
     A class to specify the mutual interaction between three fields.
 

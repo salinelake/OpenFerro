@@ -22,6 +22,9 @@ from openferro.engine.ewald import get_dipole_dipole_ewald
 from openferro.parallelism import DeviceMesh
 
 
+_DEFAULT_FIELD_MASS = object()
+
+
 class System:
     """
     A class to define a physical system.
@@ -102,7 +105,7 @@ class System:
         for ID in self._fields_dict.keys():
             self._fields_dict[ID].to_multi_devs(mesh)
 
-    def add_field(self, ID, ftype='scalar', dim=None, value=None, mass=1.0):
+    def add_field(self, ID, ftype='scalar', dim=None, value=None, mass=_DEFAULT_FIELD_MASS):
         """
         Add a predefined field to the system.
 
@@ -111,13 +114,15 @@ class System:
         ID : str
             ID of the field
         ftype : str, optional
-            Type of the field. Can be 'scalar', 'SO3', 'LocalStrain3D', etc
+            Type of field: ``scalar``, ``R3``, ``Rn``, ``SO3``, or
+            ``LocalStrain3D``. The default is ``scalar``.
         dim : int, optional
             Dimension of the field. Only used for Rn fields
         value : array-like, optional
             Initial value of the field. Will be broadcasted to the shape of the field
         mass : float or array-like, optional
-            Mass of the field. When mass is a float, it will be broadcasted to the shape of the field
+            Mass of the field. When omitted, Rn-like fields use 1.0 and SO(3)
+            fields remain massless.
 
         Returns
         -------
@@ -131,29 +136,50 @@ class System:
         ValueError
             If field type is unknown
         """
-        ## sanity check
         if ID in self._fields_dict:
             raise ValueError("Field with this ID already exists. Pick another ID")
         if ID == 'gstrain':
             raise ValueError("The ID 'gstrain' is reserved for global strain field. Please pick another ID.")
-        ## add field
-        if ftype == 'Rn':
-            init = jnp.array(value) if value is not None else jnp.zeros(dim)
-            self._fields_dict[ID] = FieldRn(self.lattice, ID, dim)
-            self._fields_dict[ID].set_values(jnp.zeros((self.lattice.size[0], self.lattice.size[1], self.lattice.size[2], dim)) + init)
+
+        if ftype in ('scalar', 'FieldScalar'):
+            field = FieldScalar(self.lattice, ID)
+            default_value = 0.0
+        elif ftype in ('R3', 'FieldR3'):
+            field = FieldR3(self.lattice, ID)
+            default_value = jnp.zeros(3)
+        elif ftype == 'Rn':
+            if isinstance(dim, bool) or not isinstance(dim, (int, np.integer)) or dim <= 0:
+                raise ValueError("Rn field dimension must be a positive integer.")
+            field = FieldRn(self.lattice, ID, int(dim))
+            default_value = jnp.zeros(dim)
         elif ftype == 'SO3':
-            init = jnp.array(value) if value is not None else jnp.array([0,0,1.0])
-            self._fields_dict[ID] = FieldSO3(self.lattice, ID)
-            self._fields_dict[ID].set_values(jnp.zeros((self.lattice.size[0], self.lattice.size[1], self.lattice.size[2], 3)) + init)
+            field = FieldSO3(self.lattice, ID)
+            default_value = jnp.array([0.0, 0.0, 1.0])
         elif ftype == 'LocalStrain3D':
-            init = jnp.array(value) if value is not None else jnp.zeros(3)
-            self._fields_dict[ID] = LocalStrain3D(self.lattice, ID)
-            self._fields_dict[ID].set_values(jnp.zeros((self.lattice.size[0], self.lattice.size[1], self.lattice.size[2], 3)) + init)
+            field = LocalStrain3D(self.lattice, ID)
+            default_value = jnp.zeros(3)
         else:
-            raise ValueError("Unknown field type. ")
+            raise ValueError(
+                f"Unknown field type {ftype!r}. Expected scalar, R3, Rn, SO3, "
+                "or LocalStrain3D."
+            )
+
+        initial_value = default_value if value is None else value
+        try:
+            initial_values = jnp.broadcast_to(jnp.asarray(initial_value), field.get_values().shape)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                f"Initial value for field {ID!r} cannot broadcast to {field.get_values().shape}."
+            ) from exc
+        field.set_values(initial_values)
+
+        if mass is _DEFAULT_FIELD_MASS:
+            mass = None if isinstance(field, FieldSO3) else 1.0
         if mass is not None:
-            self._fields_dict[ID].set_mass(mass)
-        return self._fields_dict[ID]
+            field.set_mass(mass)
+
+        self._fields_dict[ID] = field
+        return field
 
     def add_global_strain(self, value=None, mass=1):
         """
@@ -173,20 +199,32 @@ class System:
 
         Raises
         ------
-        AssertionError
-            If value is provided but not a 6D vector
+        ValueError
+            If reserved IDs already exist or value is not a 6D vector
         """
         ID = 'gstrain'
-        if value is not None:
-            assert len(value) == 6, "Global strain must be a 6D vector"
-            init = jnp.array(value)
-        else:
-            init = jnp.zeros(6)
-        self._fields_dict[ID] = GlobalStrain(self.lattice, ID)
-        self._fields_dict[ID].set_values(jnp.zeros((  6)) + init)
-        self.add_pressure(0.0)
-        self._fields_dict[ID].set_mass(mass)
-        return self._fields_dict[ID]
+        if ID in self._fields_dict:
+            raise ValueError("Global strain field 'gstrain' already exists.")
+        if 'pV' in self.interaction_dict:
+            raise ValueError("Pressure interaction 'pV' already exists.")
+
+        init = jnp.zeros(6) if value is None else jnp.asarray(value)
+        if init.shape != (6,):
+            raise ValueError("Global strain must be a 6D vector with shape (6,).")
+
+        field = GlobalStrain(self.lattice, ID)
+        field.set_values(init)
+        if mass is not None:
+            field.set_mass(mass)
+
+        self._fields_dict[ID] = field
+        try:
+            self.add_pressure(0.0)
+        except Exception:
+            self._fields_dict.pop(ID, None)
+            self._self_interaction_dict.pop('pV', None)
+            raise
+        return field
     
     """
     Methods for interactions
@@ -227,9 +265,11 @@ class System:
             return self._self_interaction_dict[interaction_ID]
         elif interaction_ID in self._mutual_interaction_dict:
             return self._mutual_interaction_dict[interaction_ID]
+        elif interaction_ID in self._triple_interaction_dict:
+            return self._triple_interaction_dict[interaction_ID]
         else:
-            raise ValueError("Interaction with ID {} does not exist. Existing interactions: {} {}".format(interaction_ID, 
-                self._self_interaction_dict.keys(), self._mutual_interaction_dict.keys()))
+            raise ValueError("Interaction with ID {} does not exist. Existing interactions: {}".format(
+                interaction_ID, self.interaction_dict.keys()))
  
     def _add_interaction_sanity_check(self, ID):
         """
@@ -719,8 +759,8 @@ class System:
             field3 = self.get_field_by_ID(interaction.field_3_ID)
             energy = interaction.calc_energy(field1, field2, field3)
         else:
-            raise ValueError("Interaction with ID {} does not exist. Existing interactions: {} {}".format(interaction_ID, 
-                self._self_interaction_dict.keys(), self._mutual_interaction_dict.keys()))
+            raise ValueError("Interaction with ID {} does not exist. Existing interactions: {}".format(
+                interaction_ID, self.interaction_dict.keys()))
         return energy            
 
     def calc_force_by_ID(self, interaction_ID):
@@ -758,8 +798,8 @@ class System:
             field3 = self.get_field_by_ID(interaction.field_3_ID)
             force = interaction.calc_force(field1, field2, field3)
         else:
-            raise ValueError("Interaction with this ID does not exist. Existing interactions: ", 
-                self._self_interaction_dict.keys(), self._mutual_interaction_dict.keys())
+            raise ValueError("Interaction with ID {} does not exist. Existing interactions: {}".format(
+                interaction_ID, self.interaction_dict.keys()))
         return force
 
     def calc_total_self_energy(self):

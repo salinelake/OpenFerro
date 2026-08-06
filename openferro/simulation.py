@@ -28,10 +28,45 @@ class Simulation:
     ----------
     system : System
         The physical system to simulate
+    seed : int, optional
+        Seed for the simulation-owned random stream, by default 42
+    key : array_like, optional
+        JAX ``PRNGKey`` state. When supplied, it takes precedence over ``seed``.
     """
-    def __init__(self, system):
+    def __init__(self, system, seed=42, key=None):
         self.system = system
         self.reporters = []
+        self.reset_random_key(seed=seed, key=key)
+
+    def reset_random_key(self, seed=42, key=None):
+        """Reset the simulation-owned random stream.
+
+        Parameters
+        ----------
+        seed : int, optional
+            Seed used to create a JAX ``PRNGKey``, by default 42
+        key : array_like, optional
+            Existing JAX ``PRNGKey`` state. When supplied, it takes precedence
+            over ``seed``.
+        """
+        if key is not None:
+            key = jnp.asarray(key)
+            if key.shape != (2,) or key.dtype != jnp.uint32:
+                raise ValueError("key must be a uint32 JAX PRNGKey with shape (2,).")
+            self._random_key = key
+            return
+        if isinstance(seed, bool) or not isinstance(seed, (int, np.integer)):
+            raise TypeError("seed must be an integer.")
+        self._random_key = jax.random.PRNGKey(int(seed))
+
+    def get_random_key(self):
+        """Return the current random key for restart or checkpoint storage."""
+        return self._random_key
+
+    def _next_random_keys(self, count):
+        keys = jax.random.split(self._random_key, count + 1)
+        self._random_key = keys[0]
+        return keys[1:]
     
     def clear_reporters(self):
         self.reporters = []
@@ -100,8 +135,9 @@ class Simulation:
     
 
     def init_velocity(self, mode='zero', temp=None):
-        for field in self.all_fields:
-            field.init_velocity(mode=mode, temperature=temp)
+        keys = self._next_random_keys(len(self.all_fields))
+        for field, key in zip(self.all_fields, keys):
+            field.init_velocity(mode=mode, temperature=temp, key=key)
 
     def _step(self):
         """
@@ -133,6 +169,9 @@ class MDMinimize(Simulation):
         self.max_iter = max_iter
         self.tol = tol
         self.all_fields = self.system.get_all_fields()
+        self.converged = False
+        self.iterations = 0
+        self.max_force_by_field = {}
             
     def _step(self, variable_cell):
         """
@@ -177,6 +216,10 @@ class MDMinimize(Simulation):
             If pressure specified for fixed cell minimization
             If integrator not set for any field
         """
+        active_fields = [
+            field for field in self.all_fields
+            if variable_cell or not isinstance(field, GlobalStrain)
+        ]
         ## sanity check
         if variable_cell:
             if pressure is None:
@@ -187,28 +230,37 @@ class MDMinimize(Simulation):
                 pV_param = self.system.get_interaction_by_ID('pV').get_parameters()
                 pV_param_new = [pressure * Constants.bar, pV_param[1]]
                 self.system.get_interaction_by_ID('pV').set_parameters(pV_param_new)
-            for field in self.all_fields:
+            for field in active_fields:
                 if field.integrator is None:
                     raise ValueError('Please set the integrator for the field %s for variable-cell structural minimization' % type(field))
         else:
             if pressure is not None:
                 raise ValueError('Specifying pressure is not allowed for fixed-cell structural minimization')
-            for field in [field for field in self.all_fields if not isinstance(field, GlobalStrain)]:
+            for field in active_fields:
                 if field.integrator is None:
                     raise ValueError('Please set the integrator for the field %s for fixed-cell structural minimization' % type(field))
         ## structural relaxation
         self.initialize_reporters()
+        self.converged = False
+        self.iterations = 0
+        self.max_force_by_field = {}
         for i in range(self.max_iter):
             self._step(variable_cell)
             self.step_reporters()
-            converged = []
-            for field in self.all_fields:
-                if jnp.max(jnp.abs(field.get_force())) < self.tol:
-                    converged.append(True)
-                else:
-                    converged.append(False)
-            if all(converged):
+            self.iterations = i + 1
+            self.max_force_by_field = {
+                field.ID: float(jax.device_get(jnp.max(jnp.abs(field.get_force()))))
+                for field in active_fields
+            }
+            if all(force < self.tol for force in self.max_force_by_field.values()):
+                self.converged = True
                 break
+        if not self.converged:
+            logging.warning(
+                "Minimization did not converge after %d iterations; maximum forces: %s",
+                self.iterations,
+                self.max_force_by_field,
+            )
 
 class SimulationNVE(Simulation):
     """
@@ -218,9 +270,13 @@ class SimulationNVE(Simulation):
     ----------
     system : System
         The physical system to simulate
+    seed : int, optional
+        Seed for the simulation-owned random stream, by default 42
+    key : array_like, optional
+        Existing JAX ``PRNGKey`` state, by default None
     """
-    def __init__(self, system):
-        super().__init__(system)
+    def __init__(self, system, seed=42, key=None):
+        super().__init__(system, seed=seed, key=key)
         ## get all fields, excluding the global strain field
         self.SO3_fields = self.system.get_all_SO3_fields()
         self.non_SO3_fields = [field for field in self.system.get_all_non_SO3_fields() if not isinstance(field, GlobalStrain)]
@@ -291,9 +347,13 @@ class SimulationNVTLangevin(SimulationNVE):
     ----------
     system : System
         The physical system to simulate
+    seed : int, optional
+        Seed for the simulation-owned random stream, by default 42
+    key : array_like, optional
+        Existing JAX ``PRNGKey`` state, by default None
     """
-    def __init__(self, system):
-        super().__init__(system)
+    def __init__(self, system, seed=42, key=None):
+        super().__init__(system, seed=seed, key=key)
 
     def _step(self, keys, profile=False):
         """
@@ -327,7 +387,7 @@ class SimulationNVTLangevin(SimulationNVE):
                     logging.info('Time for updating field {}: {:.8f}s'.format(type(field), timer()-t0))
         return
 
-    def run(self, nsteps=1, profile=False, seed=42):
+    def run(self, nsteps=1, profile=False, seed=None):
         """
         Run the simulation.
 
@@ -337,6 +397,9 @@ class SimulationNVTLangevin(SimulationNVE):
             Number of steps to run, by default 1
         profile : bool, optional
             Whether to profile timing, by default False
+        seed : int, optional
+            Reset the random stream before this run. When omitted, the stream
+            continues from previous initialization and run calls.
 
         Raises
         ------
@@ -347,16 +410,14 @@ class SimulationNVTLangevin(SimulationNVE):
         for field in self.all_fields:
             if field.integrator is None:
                 raise ValueError('Please set the integrator for the field %s before running the simulation' % type(field))
-        ## generate all the needed random keys in advance
-        key = jax.random.PRNGKey(seed)
-        keys = jax.random.split(key, nsteps * self.nfields)
-        # print('this is processor', jax.process_index(), 'the key is', keys)
+        if seed is not None:
+            self.reset_random_key(seed=seed)
         ## run the simulation
         self.initialize_reporters()
         for id_step in range(nsteps):
             if profile:
                 t0 = timer()
-            subkeys = keys[id_step * self.nfields:(id_step+1) * self.nfields]
+            subkeys = self._next_random_keys(self.nfields)
             self._step(subkeys, profile)
             self.step_reporters()
             if profile:
@@ -373,9 +434,13 @@ class SimulationNPTLangevin(SimulationNVTLangevin):
         The physical system to simulate
     pressure : float, optional
         External pressure in bar, by default 0.0
+    seed : int, optional
+        Seed for the simulation-owned random stream, by default 42
+    key : array_like, optional
+        Existing JAX ``PRNGKey`` state, by default None
     """
-    def __init__(self, system, pressure=0.0):
-        super().__init__(system)
+    def __init__(self, system, pressure=0.0, seed=42, key=None):
+        super().__init__(system, seed=seed, key=key)
         ## set pressure
         self.pressure = pressure
         pV_param = self.system.get_interaction_by_ID('pV').get_parameters()

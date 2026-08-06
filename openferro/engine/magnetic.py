@@ -5,6 +5,13 @@ Functions that define a term in the magnetic Hamiltonian. They will be added int
 
 import jax.numpy as jnp
 
+__all__ = [
+    "get_isotropic_exchange_energy_engine",
+    "cubic_anisotropy_energy",
+    "external_field_energy",
+]
+
+
 def get_isotropic_exchange_energy_engine(rollers):
     """Returns the exchange energy engine for a R^3 field defined on a lattice with periodic boundary conditions.
 
@@ -63,7 +70,10 @@ def Dzyaloshinskii_Moriya_energy(field, parameters):
     float
         The Dzyaloshinskii-Moriya energy
     """
-    pass
+    raise NotImplementedError(
+        "Dzyaloshinskii-Moriya energy requires a validated bond and orientation "
+        "convention and is not implemented."
+    )
 
 def external_field_energy(field, parameters):
     """Returns the external field energy of the field.
@@ -80,6 +90,8 @@ def external_field_energy(field, parameters):
     float
         The external field energy: -field·B_ext
     """
-    B_ext = parameters[0]
+    B_ext = jnp.asarray(parameters)
+    if B_ext.shape != (3,):
+        raise ValueError("External magnetic field parameters must have shape (3,).")
     energy = - jnp.sum(field * B_ext)
     return energy

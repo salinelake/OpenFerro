@@ -1,0 +1,53 @@
+[build-system]
+requires = ["setuptools>=77", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "OpenFerro"
+version = "0.1.0"
+description = "JAX-based framework for on-lattice atomistic dynamics"
+readme = "README.md"
+requires-python = ">=3.13,<3.15"
+license = "MIT"
+authors = [
+    {name = "Pinchen Xie", email = "pinchenxie@lbl.gov"},
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Scientific/Engineering :: Physics",
+]
+dependencies = [
+    "numpy>=2.0,<3",
+    "jax>=0.10,<0.12",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=9,<10",
+]
+package = [
+    "build>=1.2,<2",
+    "twine>=6,<7",
+]
+docs = [
+    "sphinx>=8,<10",
+    "sphinx-rtd-theme>=3,<4",
+]
+
+[project.urls]
+Documentation = "https://openferro.readthedocs.io/"
+Issues = "https://github.com/salinelake/OpenFerro/issues"
+Repository = "https://github.com/salinelake/OpenFerro"
+
+[tool.setuptools.packages.find]
+include = ["openferro*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests/unit_tests", "tests/packaging"]
+markers = [
+    "packaging: builds and installs distribution artifacts",
+]

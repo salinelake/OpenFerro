@@ -107,17 +107,29 @@ class Field:
         else:
             return self._velocity
 
-    def init_velocity(self, mode='zero',  temperature=None, seed=42):
+    def init_velocity(self, mode='zero', temperature=None, seed=42, key=None):
         if self._values is None:
             raise ValueError("Set field values before initializing velocity.")
+        if mode == 'zero':
+            self._velocity = jnp.zeros_like(self._values)
+        elif mode == 'gaussian':
+            if temperature is None:
+                raise ValueError("Temperature is required for Gaussian velocities.")
+            if self._mass is None:
+                raise ValueError("Mass must be set before initializing Gaussian velocities.")
+            random_key = (
+                jax.random.PRNGKey(seed)
+                if key is None
+                else key
+            )
+            self._velocity = (
+                jax.random.normal(random_key, self._values.shape)
+                * jnp.sqrt(Constants.kb * temperature / self._mass)
+            )
         else:
-            if mode == 'zero':
-                self._velocity = jnp.zeros_like(self._values)
-            elif mode == 'gaussian':
-                key = jax.random.PRNGKey(seed)
-                self._velocity = jax.random.normal(key, self._values.shape) * jnp.sqrt(1 / self._mass * Constants.kb * temperature)
-            if self._sharding is not None:
-                self._velocity = jax.device_put(self._velocity, self._sharding)
+            raise ValueError(f"Unknown velocity initialization mode {mode!r}.")
+        if self._sharding is not None:
+            self._velocity = jax.device_put(self._velocity, self._sharding)
     
     """
     These methods are used to handle the force of the field.
@@ -269,8 +281,26 @@ class FieldRn(Field):
         value : array_like
             Value to set at location
         """
-        assert type(loc) is tuple and len(loc) == self.ldim, "Location must be a tuple of length equal to the dimension of the lattice"
-        self._values[loc] = value
+        if not isinstance(loc, tuple) or len(loc) != self.ldim:
+            raise ValueError(
+                "Location must be a tuple with one integer index per lattice dimension."
+            )
+        if not all(isinstance(index, (int, np.integer)) for index in loc):
+            raise TypeError("Location indices must be integers.")
+        for index, extent in zip(loc, self._values.shape[:-1]):
+            if index < -extent or index >= extent:
+                raise IndexError(f"Field location {loc} is outside shape {self._values.shape[:-1]}.")
+
+        value = jnp.asarray(value)
+        if value.ndim == 0 and self.fdim == 1:
+            value = value.reshape((1,))
+        if value.shape != (self.fdim,):
+            raise ValueError(f"Local field value must have shape ({self.fdim},).")
+
+        values = self._values.at[loc].set(value)
+        if self._sharding is not None:
+            values = jax.device_put(values, self._sharding)
+        self._values = values
         return
 
     def set_integrator(self, integrator_class, dt, temp=None, tau=None):
@@ -330,19 +360,57 @@ class FieldSO3(FieldRn):
     def __init__(self, lattice, ID, unit=None):
         super().__init__(lattice, ID, dim=3, unit=unit)
         self._magnitude = jnp.ones(self.shape[:-1])
+        self._values = self._values.at[..., 2].set(self._magnitude)
         self.integrator_class = {'optimization': LLSIBIntegrator,
                                  'adiabatic': ConservativeLLSIBIntegrator,
                                  'isothermal': LLSIBLangevinIntegrator}
 
+    def _normalize_values(self, values):
+        norms = jnp.linalg.norm(values, axis=-1, keepdims=True)
+        invalid = jnp.any((norms <= 0.0) | ~jnp.isfinite(norms))
+        if bool(jax.device_get(invalid)):
+            raise ValueError("SO(3) field vectors must be finite and nonzero.")
+        return values / norms * self._magnitude[..., None]
+
+    def set_values(self, values):
+        """Set orientations and normalize them to the configured magnitude."""
+        values = jnp.asarray(values)
+        expected_shape = tuple(int(extent) for extent in self.shape)
+        if values.shape != expected_shape:
+            raise ValueError(f"SO(3) field values must have shape {expected_shape}.")
+        values = self._normalize_values(values)
+        if self._sharding is not None:
+            values = jax.device_put(values, self._sharding)
+        self._values = values
+
+    def set_local_value(self, loc, value):
+        """Set one orientation and preserve the field magnitude invariant."""
+        value = jnp.asarray(value)
+        if value.shape != (3,):
+            raise ValueError("Local SO(3) field value must have shape (3,).")
+        invalid = jnp.any(~jnp.isfinite(value)) | (jnp.linalg.norm(value) <= 0.0)
+        if bool(jax.device_get(invalid)):
+            raise ValueError("SO(3) field vectors must be finite and nonzero.")
+        super().set_local_value(loc, value)
+        self.normalize()
+
     def set_magnitude(self, magnitude):
         if self._values is None:
             raise ValueError("Field has no values. Set values before setting magnitude.")
-        elif jnp.isscalar(magnitude):
-            self._magnitude = jnp.ones(self.shape[:-1]) * magnitude
-        elif magnitude.shape == self._values.shape[:-1]:
-            self._magnitude = magnitude
-        else:
-            raise ValueError("Magnitude must be a scalar or an array of the same size as the all but the last dimension of the field values.")
+
+        magnitude = jnp.asarray(magnitude)
+        if magnitude.ndim == 0:
+            magnitude = jnp.ones(self.shape[:-1]) * magnitude
+        elif magnitude.shape != self._values.shape[:-1]:
+            raise ValueError(
+                "Magnitude must be a scalar or an array matching the lattice shape."
+            )
+        invalid = jnp.any((magnitude <= 0.0) | ~jnp.isfinite(magnitude))
+        if bool(jax.device_get(invalid)):
+            raise ValueError("SO(3) field magnitude must be finite and strictly positive.")
+        if self._sharding is not None:
+            magnitude = jax.device_put(magnitude, self._sharding)
+        self._magnitude = magnitude
         self.normalize()
 
     def get_magnitude(self):
@@ -350,25 +418,33 @@ class FieldSO3(FieldRn):
             raise ValueError("Magnitude is not set")
         else:
             return self._magnitude
-        
+
     def perturb(self, sigma, seed=42):
         key = jax.random.PRNGKey(seed)
-        self._values = self._values / jnp.linalg.norm(self._values, axis=-1, keepdims=True)
+        norms = jnp.linalg.norm(self._values, axis=-1, keepdims=True)
+        invalid = jnp.any((norms <= 0.0) | ~jnp.isfinite(norms))
+        if bool(jax.device_get(invalid)):
+            raise ValueError("SO(3) field vectors must be finite and nonzero.")
+        self._values = self._values / norms
         self._values += jax.random.normal(key, self._values.shape) * sigma
         self.normalize()
         return
-    
+
     def normalize(self):
         if self._values is None:
             raise ValueError("Field has no values. Set values before normalizing.")
         elif self._magnitude is None:
             raise ValueError("Magnitude is not set. Set magnitude before normalizing.")
         else:
-            self._values = self._values / jnp.linalg.norm(self._values, axis=-1, keepdims=True) * self._magnitude[..., None]
+            values = self._normalize_values(self._values)
+            if self._sharding is not None:
+                values = jax.device_put(values, self._sharding)
+            self._values = values
         return
     
-    def init_velocity(self, mode='zero',  temperature=None):
-        pass
+    def init_velocity(self, mode='zero', temperature=None, seed=42, key=None):
+        del mode, temperature, seed, key
+        return
 
     def to_multi_devs(self, mesh: DeviceMesh):
         sharding = mesh.partition_sharding()
