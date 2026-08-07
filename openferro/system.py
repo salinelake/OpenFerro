@@ -23,6 +23,14 @@ from openferro.parallelism import DeviceMesh
 
 
 _DEFAULT_FIELD_MASS = object()
+_PRESSURE_VOLUME_ENGINES = {
+    "determinant": pV_energy,
+    "linearized_small_strain": pV_energy_linearized,
+}
+_PRESSURE_VOLUME_FUNCTIONS = {
+    "determinant": deformed_volume,
+    "linearized_small_strain": linearized_volume,
+}
 
 
 class System:
@@ -44,6 +52,7 @@ class System:
         self._self_interaction_dict = {}
         self._mutual_interaction_dict = {}
         self._triple_interaction_dict = {}
+        self._pressure_volume_mode = None
         
     def __repr__(self):
         return f"System with lattice {self.lattice} and fields {self._fields_dict.keys()}"
@@ -92,6 +101,25 @@ class System:
     
     def get_all_non_SO3_fields(self):
         return [field for field in self.get_all_fields() if not isinstance(field, FieldSO3)]
+
+    def calc_volume(self):
+        """Calculate the current supercell volume.
+
+        Returns the reference volume for a fixed-cell system. Variable-cell
+        systems use the pressure-volume convention selected when global strain
+        was added.
+
+        Returns
+        -------
+        float or jax.Array
+            Supercell volume in Angstrom cubed.
+        """
+        if "gstrain" not in self._fields_dict:
+            return self.lattice.ref_volume
+        mode = self._pressure_volume_mode or "determinant"
+        volume_function = _PRESSURE_VOLUME_FUNCTIONS[mode]
+        strain = self.get_field_by_ID("gstrain").get_values()
+        return volume_function(strain, self.lattice.ref_volume)
 
     def move_fields_to_multi_devs(self, mesh: DeviceMesh):
         """
@@ -181,7 +209,7 @@ class System:
         self._fields_dict[ID] = field
         return field
 
-    def add_global_strain(self, value=None, mass=1):
+    def add_global_strain(self, value=None, mass=1, pressure_volume="determinant"):
         """
         Add a global strain to the system. Allow variable cell simulation.
 
@@ -191,6 +219,10 @@ class System:
             Initial value of the global strain
         mass : float, optional
             Effective mass of the global strain for the barostat
+        pressure_volume : {"determinant", "linearized_small_strain"}, optional
+            Volume convention for pressure energy and reporting. The default
+            uses ``det(I + epsilon)``; the linearized option is retained for
+            controlled comparison and compatibility.
 
         Returns
         -------
@@ -207,6 +239,11 @@ class System:
             raise ValueError("Global strain field 'gstrain' already exists.")
         if 'pV' in self.interaction_dict:
             raise ValueError("Pressure interaction 'pV' already exists.")
+        if pressure_volume not in _PRESSURE_VOLUME_ENGINES:
+            raise ValueError(
+                "pressure_volume must be 'determinant' or "
+                "'linearized_small_strain'."
+            )
 
         init = jnp.zeros(6) if value is None else jnp.asarray(value)
         if init.shape != (6,):
@@ -219,10 +256,11 @@ class System:
 
         self._fields_dict[ID] = field
         try:
-            self.add_pressure(0.0)
+            self.add_pressure(0.0, volume_mode=pressure_volume)
         except Exception:
             self._fields_dict.pop(ID, None)
             self._self_interaction_dict.pop('pV', None)
+            self._pressure_volume_mode = None
             raise
         return field
     
@@ -318,7 +356,11 @@ class System:
         self._add_interaction_sanity_check(ID)
         field = self.get_field_by_ID(field_ID)
         interaction = self_interaction( field_ID)
-        energy_engine = get_dipole_dipole_ewald(field.lattice)
+        energy_engine = get_dipole_dipole_ewald(
+            field.lattice,
+            dtype=field.get_values().dtype,
+            sharding=field._sharding,
+        )
         interaction.set_energy_engine(energy_engine, enable_jit=enable_jit)
         interaction.create_force_engine(enable_jit=enable_jit)
         interaction.set_parameters(jnp.array([prefactor]))
@@ -391,7 +433,7 @@ class System:
         self._self_interaction_dict[ID] = interaction
         return interaction
 
-    def add_pressure(self, pressure):
+    def add_pressure(self, pressure, volume_mode="determinant"):
         """
         Add a pressure term (pV) to the Hamiltonian.
 
@@ -402,6 +444,8 @@ class System:
         ----------
         pressure : float
             Pressure in bars
+        volume_mode : {"determinant", "linearized_small_strain"}, optional
+            Volume convention used by the pressure energy.
 
         Returns
         -------
@@ -413,6 +457,11 @@ class System:
         ValueError
             If pV term already exists or if gstrain field is invalid
         """
+        if volume_mode not in _PRESSURE_VOLUME_ENGINES:
+            raise ValueError(
+                "volume_mode must be 'determinant' or "
+                "'linearized_small_strain'."
+            )
         _pres = pressure * Constants.bar  # bar -> eV/Angstrom^3
         ## interaction ID sanity check
         ID = 'pV'
@@ -425,11 +474,13 @@ class System:
             raise ValueError("I find a field with ID <gstrain>, but it is not a global strain field. Please rename the field or remove it. Then add the global strain field to the system.")
         ## add the interaction
         interaction = self_interaction(field_ID)
-        interaction.set_energy_engine(energy_engine=pV_energy, enable_jit=True)
+        energy_engine = _PRESSURE_VOLUME_ENGINES[volume_mode]
+        interaction.set_energy_engine(energy_engine=energy_engine, enable_jit=True)
         interaction.create_force_engine(enable_jit=True)
         parameters = jnp.array([_pres, self.lattice.ref_volume]) 
         interaction.set_parameters(parameters)
         self._self_interaction_dict[ID] = interaction
+        self._pressure_volume_mode = volume_mode
         return interaction
 
     ## elastic-dipole interactions
@@ -484,9 +535,17 @@ class System:
         self._self_interaction_dict[ID] = interaction
         return interaction
 
-    def _add_isotropic_exchange_interaction_by_rollers(self, ID, field_ID, coupling, rollers, enable_jit=True):
+    def _add_isotropic_exchange_interaction_by_rollers(
+        self,
+        ID,
+        field_ID,
+        coupling,
+        rollers,
+        enable_jit=True,
+        bond_counting="unique",
+    ):
         """
-        Add the isotropic exchange interaction term H=sum_{i~j} Jij*Si*Sj to the Hamiltonian.
+        Add ``E = -sum_<ij> J_ij m_i dot m_j`` to the Hamiltonian.
 
         Parameters
         ----------
@@ -500,6 +559,9 @@ class System:
             List of rolling functions for specifying the neighbouring relationship
         enable_jit : bool, optional
             Whether to use JIT compilation
+        bond_counting : {"unique", "ordered"}, optional
+            ``"unique"`` uses each half-shell roller once. ``"ordered"``
+            reproduces the legacy factor-of-two convention.
 
         Returns
         -------
@@ -507,7 +569,9 @@ class System:
             The created interaction
         """
         self._add_interaction_sanity_check(ID)
-        energy_engine = get_isotropic_exchange_energy_engine(rollers)
+        energy_engine = get_isotropic_exchange_energy_engine(
+            rollers, bond_counting=bond_counting
+        )
         interaction = self_interaction(field_ID)
         interaction.set_energy_engine(energy_engine, enable_jit=enable_jit)
         interaction.create_force_engine(enable_jit=enable_jit)
@@ -515,7 +579,14 @@ class System:
         self._self_interaction_dict[ID] = interaction
         return interaction
 
-    def add_isotropic_exchange_interaction_1st_shell(self, ID, field_ID, coupling, enable_jit=True):
+    def add_isotropic_exchange_interaction_1st_shell(
+        self,
+        ID,
+        field_ID,
+        coupling,
+        enable_jit=True,
+        bond_counting="unique",
+    ):
         """
         Add the first shell isotropic exchange interaction term.
 
@@ -531,6 +602,9 @@ class System:
             Coupling constant
         enable_jit : bool, optional
             Whether to use JIT compilation
+        bond_counting : {"unique", "ordered"}, optional
+            Pair-counting convention. The default counts each bond once;
+            ``"ordered"`` restores the pre-Milestone-B factor of two.
 
         Returns
         -------
@@ -538,10 +612,23 @@ class System:
             The created interaction
         """
         interaction = self._add_isotropic_exchange_interaction_by_rollers(
-            ID, field_ID, coupling, self.lattice.first_shell_roller, enable_jit=enable_jit)
+            ID,
+            field_ID,
+            coupling,
+            self.lattice.first_shell_roller,
+            enable_jit=enable_jit,
+            bond_counting=bond_counting,
+        )
         return interaction
 
-    def add_isotropic_exchange_interaction_2nd_shell(self, ID, field_ID, coupling, enable_jit=True):
+    def add_isotropic_exchange_interaction_2nd_shell(
+        self,
+        ID,
+        field_ID,
+        coupling,
+        enable_jit=True,
+        bond_counting="unique",
+    ):
         """
         Add the second shell isotropic exchange interaction term.
 
@@ -557,6 +644,9 @@ class System:
             Coupling constant
         enable_jit : bool, optional
             Whether to use JIT compilation
+        bond_counting : {"unique", "ordered"}, optional
+            Pair-counting convention. The default counts each bond once;
+            ``"ordered"`` restores the pre-Milestone-B factor of two.
 
         Returns
         -------
@@ -564,10 +654,23 @@ class System:
             The created interaction
         """
         interaction = self._add_isotropic_exchange_interaction_by_rollers(
-            ID, field_ID, coupling, self.lattice.second_shell_roller, enable_jit=enable_jit)
+            ID,
+            field_ID,
+            coupling,
+            self.lattice.second_shell_roller,
+            enable_jit=enable_jit,
+            bond_counting=bond_counting,
+        )
         return interaction
     
-    def add_isotropic_exchange_interaction_3rd_shell(self, ID, field_ID, coupling, enable_jit=True):
+    def add_isotropic_exchange_interaction_3rd_shell(
+        self,
+        ID,
+        field_ID,
+        coupling,
+        enable_jit=True,
+        bond_counting="unique",
+    ):
         """
         Add the third shell isotropic exchange interaction term.
 
@@ -583,6 +686,9 @@ class System:
             Coupling constant
         enable_jit : bool, optional
             Whether to use JIT compilation
+        bond_counting : {"unique", "ordered"}, optional
+            Pair-counting convention. The default counts each bond once;
+            ``"ordered"`` restores the pre-Milestone-B factor of two.
 
         Returns
         -------
@@ -590,10 +696,23 @@ class System:
             The created interaction
         """
         interaction = self._add_isotropic_exchange_interaction_by_rollers(
-            ID, field_ID, coupling, self.lattice.third_shell_roller, enable_jit=enable_jit)
+            ID,
+            field_ID,
+            coupling,
+            self.lattice.third_shell_roller,
+            enable_jit=enable_jit,
+            bond_counting=bond_counting,
+        )
         return interaction
     
-    def add_isotropic_exchange_interaction_4th_shell(self, ID, field_ID, coupling, enable_jit=True):
+    def add_isotropic_exchange_interaction_4th_shell(
+        self,
+        ID,
+        field_ID,
+        coupling,
+        enable_jit=True,
+        bond_counting="unique",
+    ):
         """
         Add the fourth shell isotropic exchange interaction term.
 
@@ -609,6 +728,9 @@ class System:
             Coupling constant
         enable_jit : bool, optional
             Whether to use JIT compilation
+        bond_counting : {"unique", "ordered"}, optional
+            Pair-counting convention. The default counts each bond once;
+            ``"ordered"`` restores the pre-Milestone-B factor of two.
 
         Returns
         -------
@@ -616,7 +738,13 @@ class System:
             The created interaction
         """
         interaction = self._add_isotropic_exchange_interaction_by_rollers(
-            ID, field_ID, coupling, self.lattice.fourth_shell_roller, enable_jit=enable_jit)
+            ID,
+            field_ID,
+            coupling,
+            self.lattice.fourth_shell_roller,
+            enable_jit=enable_jit,
+            bond_counting=bond_counting,
+        )
         return interaction
     """
     Methods for adding custom interactions to the Hamiltonian. Energy engines should be provided by the user.

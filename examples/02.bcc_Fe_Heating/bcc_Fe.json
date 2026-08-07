@@ -1,0 +1,44 @@
+{
+    "schema_version": 1,
+    "model": {
+        "id": "bcc_Fe_Tao_2005",
+        "material": "bcc Fe",
+        "method": "classical Heisenberg model",
+        "kind": "classical_heisenberg",
+        "citation": {
+            "text": "Tao et al., Phys. Rev. Lett. 95, 087207 (2005)",
+            "doi": "10.1103/PhysRevLett.95.087207"
+        }
+    },
+    "lattice": {
+        "type": "body_centered_cubic",
+        "lattice_constant_angstrom": 2.8665,
+        "shells": 4
+    },
+    "units": {
+        "moment": "mu_B",
+        "exchange_source": "mRy",
+        "exchange_engine": "eV/mu_B^2"
+    },
+    "conventions": {
+        "source_pair_counting": "ordered",
+        "engine_pair_counting": "unique",
+        "conversion": "J_engine = 2 * J_source * unit_to_eV / moment_mu_B**2"
+    },
+    "parameters": {
+        "moment_mu_B": 2.23,
+        "exchange_source_values": [
+            1.33767484769984,
+            0.75703576545650,
+            -0.05975437643846,
+            -0.08819834160658
+        ]
+    },
+    "reference_observable": {
+        "name": "uniform_ferromagnetic_exchange_energy_per_site",
+        "configuration": [0, 0, 1],
+        "value": -0.16884393947740303,
+        "units": "eV/site",
+        "atol": 1e-12
+    }
+}

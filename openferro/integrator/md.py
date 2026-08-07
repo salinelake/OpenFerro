@@ -5,11 +5,26 @@ This file is part of OpenFerro.
 
 """
 
+import math
+import numbers
+
 import jax
 from jax import jit
 import jax.numpy as jnp
-from openferro.units import Constants
+
 from openferro.integrator.base import Integrator
+from openferro.units import Constants
+
+
+def _validate_finite_scalar(name, value, *, minimum=0.0, strict=False):
+    if (
+        isinstance(value, bool)
+        or not isinstance(value, numbers.Real)
+        or not math.isfinite(float(value))
+        or (value <= minimum if strict else value < minimum)
+    ):
+        relation = "greater than" if strict else "at least"
+        raise ValueError(f"{name} must be finite and {relation} {minimum}.")
 
 
 class GradientDescentIntegrator(Integrator):
@@ -75,13 +90,18 @@ class GradientDescentIntegrator_Strain(GradientDescentIntegrator):
     
 class LeapFrogIntegrator(Integrator):
     """
-    Leapfrog integrator.
+    Leapfrog integrator with velocities stored at half time steps.
+
+    At state ``(x_n, v_(n-1/2))``, one step applies a full kick followed by a
+    full drift and stores ``(x_(n+1), v_(n+1/2))``.
 
     Parameters
     ----------
     dt : float
         Time step size
     """
+    velocity_time_offset = -0.5
+
     def _step_xp(self, x, v, f, m, dt):
         v += f / m * dt
         x += v * dt
@@ -142,12 +162,12 @@ class LeapFrogIntegrator_Strain(LeapFrogIntegrator):
 
 class LangevinIntegrator(Integrator):
     """
-    Langevin integrator as in J. Phys. Chem. A 2019, 123, 28, 6056-6079.
-    ABOBA scheme: exp(i L dt) = exp(i Lx dt/2)exp(i Lt dt)exp(i Lx dt/2)exp(i Lp dt)
-    
-    Lx/2: half-step position update (_step_x)
-    Lt: velocity update from damping and noise (_step_t)
-    Lp: full-step velocity update (_step_p)
+    LFMiddle Langevin integrator with half-step velocities.
+
+    Following J. Phys. Chem. A 123, 6056-6079 (2019), the stored state is
+    ``(x_n, v_(n-1/2))`` and a step applies ``B-A-O-A``: a full force kick,
+    half drift, exact Ornstein-Uhlenbeck thermostat, and half drift. The final
+    kick of velocity-Verlet middle is merged with the next step's first kick.
 
     Parameters
     ----------
@@ -158,6 +178,8 @@ class LangevinIntegrator(Integrator):
     tau : float
         Relaxation time
     """
+    velocity_time_offset = -0.5
+
     def _step_p(self, v, f, m, dt):
         v += f / m * dt
         return v
@@ -172,12 +194,14 @@ class LangevinIntegrator(Integrator):
 
     def __init__(self, dt, temp, tau):
         super().__init__(dt)
-        self.temp = temp
-        self.kbT = Constants.kb * temp
-        self.tau = tau
-        self.gamma = 1.0 / tau
-        self.z1 = jnp.exp(-dt * self.gamma)
-        self.z2 = jnp.sqrt(1 - jnp.exp(-2 * dt * self.gamma))
+        _validate_finite_scalar("Temperature", temp)
+        _validate_finite_scalar("Relaxation time tau", tau, strict=True)
+        self.temp = float(temp)
+        self.kbT = Constants.kb * self.temp
+        self.tau = float(tau)
+        self.gamma = 1.0 / self.tau
+        self.z1 = jnp.exp(-self.dt * self.gamma)
+        self.z2 = jnp.sqrt(1 - jnp.exp(-2 * self.dt * self.gamma))
         self.step_p = jit(self._step_p)
         self.step_x = jit(self._step_x)
         self.step_t = jit(self._step_t)
@@ -198,7 +222,8 @@ class LangevinIntegrator(Integrator):
         jax.Array
             Random noise array
         """
-        gaussian = jax.random.normal(key, field.get_velocity().shape) 
+        velocity = field.get_velocity()
+        gaussian = jax.random.normal(key, velocity.shape, dtype=velocity.dtype)
         if field._sharding is not None and field._sharding != gaussian.sharding:
             gaussian = jax.device_put(gaussian, field._sharding)
         return gaussian

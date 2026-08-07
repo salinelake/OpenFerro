@@ -8,7 +8,12 @@ That being said, apparently, OpenFerro does not deal with all atomic degrees of 
 
 In the following, we introduce the equations of motion (EOM) for different ensembles. We will use `local order parameters` and `field` interchangeably.
 Without loss of generality, we will assume a lattice system (site index :math:`n\in[1,N]`) with a :math:`R^d` field :math:`u=(u_n)`, a :math:`SO(3)` field :math:`s=(s_n)`, and a global strain tensor :math:`\eta`.
-The extension to more fields is straightforward. The system Hamiltonian is given by :math:`E(u,s,\eta)`. The effective mass of the field :math:`u` is :math:`m_u`. The :math:`SO(3)` field is massless [#]_. The fixed scalar magnitude associated with the :math:`SO(3)` field is :math:`M`. The mass of the global strain tensor is :math:`m_\eta`.
+Additional unconstrained fields follow the same orchestration. Simulation with
+more than one coupled :math:`SO(3)` field is not implemented because SIB needs
+a simultaneous implicit stage. The system Hamiltonian is given by
+:math:`E(u,s,\eta)`. The effective mass of the field :math:`u` is :math:`m_u`.
+The :math:`SO(3)` field is massless [#]_. The fixed scalar magnitude associated
+with it is :math:`M`. The mass of the global strain tensor is :math:`m_\eta`.
 
 
 NVE ensemble
@@ -55,7 +60,15 @@ In OpenFerro, the local order parameters do not scale with global strain. So one
 .. math::
    m_\eta \frac{d^2 \eta}{dt^2} = -\frac{\partial (E(u,s,\eta) + P V)}{\partial \eta} - \gamma_\eta m_\eta \frac{d \eta}{dt} + \sqrt{2\gamma_\eta m_\eta k_B T} \xi_\eta
 
-Here, :math:`V=(1+\eta_{xx}+\eta_{yy}+\eta_{zz}) V_0` is the volume of the system. :math:`V_0` is the reference volume of the unit cell, which is set by the user. :math:`\xi_\eta` is a random force with zero mean and unit variance. Note that :math:`\xi_\eta` is not correlated with :math:`\xi_n`. Do not confuse the two. 
+Here, :math:`V=V_0\det(I+\eta)` is the default system volume, with engineering
+Voigt shear components divided by two when constructing the symmetric tensor
+:math:`\eta`. :math:`V_0` is the reference volume set by the user. A selectable
+linearized compatibility mode uses
+:math:`V=V_0(1+\eta_{xx}+\eta_{yy}+\eta_{zz})`. :math:`\xi_\eta` is a random
+force with zero mean and unit variance and is not correlated with :math:`\xi_n`.
+
+The discrete leapfrog/LFMiddle velocity timing, SIB midpoint stages, and
+restart state are specified in :doc:`scientific_conventions`.
 
 Structure Optimization
 ----------------------

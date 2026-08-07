@@ -10,6 +10,102 @@ This file is part of OpenFerro.
 
 import jax.numpy as jnp
 
+
+def deformed_volume(global_strain, reference_volume):
+    """Return the volume from the engineering-Voigt strain determinant.
+
+    The Voigt components are ``(e_xx, e_yy, e_zz, 2e_yz, 2e_xz,
+    2e_xy)``. They define the symmetric strain tensor ``epsilon`` used in the
+    deformation mapping ``F = I + epsilon``. The returned volume is
+    ``V0 * det(F)``.
+
+    Parameters
+    ----------
+    global_strain : jnp.ndarray
+        Homogeneous engineering-Voigt strain, shape ``(6,)``.
+    reference_volume : float
+        Unstrained supercell volume in Angstrom cubed.
+
+    Returns
+    -------
+    jnp.ndarray
+        Deformed supercell volume in Angstrom cubed.
+    """
+    if global_strain.shape != (6,):
+        raise ValueError("Global strain must have shape (6,).")
+    exx, eyy, ezz, gyz, gxz, gxy = global_strain
+    strain_tensor = jnp.stack(
+        (
+            jnp.stack((exx, gxy / 2.0, gxz / 2.0)),
+            jnp.stack((gxy / 2.0, eyy, gyz / 2.0)),
+            jnp.stack((gxz / 2.0, gyz / 2.0, ezz)),
+        )
+    )
+    deformation = jnp.eye(3, dtype=global_strain.dtype) + strain_tensor
+    return reference_volume * jnp.linalg.det(deformation)
+
+
+def deformed_volume_change(global_strain, reference_volume):
+    """Return the determinant-based volume change.
+
+    Parameters
+    ----------
+    global_strain : jnp.ndarray
+        Homogeneous engineering-Voigt strain, shape ``(6,)``.
+    reference_volume : float
+        Unstrained supercell volume in Angstrom cubed.
+
+    Returns
+    -------
+    jnp.ndarray
+        The deformed volume change ``V - V0`` in Angstrom cubed.
+    """
+    return deformed_volume(global_strain, reference_volume) - reference_volume
+
+
+def linearized_volume(global_strain, reference_volume):
+    """Return the first-order volume used by the compatibility mode.
+
+    The Voigt components are ``(e_xx, e_yy, e_zz, 2e_yz, 2e_xz,
+    2e_xy)``. This helper returns the first-order expansion
+    ``V0 * (1 + e_xx + e_yy + e_zz)`` and is retained for comparison with the
+    determinant-based default.
+
+    Parameters
+    ----------
+    global_strain : jnp.ndarray
+        Homogeneous Voigt strain, shape ``(6,)``.
+    reference_volume : float
+        Unstrained supercell volume in Angstrom cubed.
+
+    Returns
+    -------
+    jnp.ndarray
+        Linearized supercell volume in Angstrom cubed.
+    """
+    if global_strain.shape != (6,):
+        raise ValueError("Global strain must have shape (6,).")
+    return reference_volume * (1.0 + jnp.sum(global_strain[:3]))
+
+
+def linearized_volume_change(global_strain, reference_volume):
+    """Return the volume change under the small-strain convention.
+
+    Parameters
+    ----------
+    global_strain : jnp.ndarray
+        Homogeneous Voigt strain, shape ``(6,)``.
+    reference_volume : float
+        Unstrained supercell volume in Angstrom cubed.
+
+    Returns
+    -------
+    jnp.ndarray
+        The linearized volume change ``V - V0`` in Angstrom cubed.
+    """
+    return linearized_volume(global_strain, reference_volume) - reference_volume
+
+
 def homo_elastic_energy(global_strain, parameters):
     """
     Returns the homogeneous elastic energy of a strain field.
@@ -38,7 +134,7 @@ def homo_elastic_energy(global_strain, parameters):
 
 def pV_energy(global_strain, parameters):
     """
-    Returns pressure * (volume - reference volume)
+    Return pressure times the determinant-based volume change.
 
     Parameters
     ----------
@@ -53,10 +149,27 @@ def pV_energy(global_strain, parameters):
         The pV energy
     """
     pres, vol_ref = parameters
-    
-    gs = global_strain
-    pV = ( gs[:3].sum()) * pres * vol_ref # TODO: change this to (1+gs[0]) * (1+gs[1]) * (1+gs[2]) * vol_ref * pres
-    return pV
+    return pres * deformed_volume_change(global_strain, vol_ref)
+
+
+def pV_energy_linearized(global_strain, parameters):
+    """Return pressure energy under the first-order compatibility convention.
+
+    Parameters
+    ----------
+    global_strain : jnp.ndarray
+        Homogeneous engineering-Voigt strain, shape ``(6,)``.
+    parameters : jnp.ndarray
+        Pressure in eV/Angstrom cubed and reference volume in Angstrom cubed.
+
+    Returns
+    -------
+    jnp.ndarray
+        Pressure times the linearized volume change.
+    """
+    pres, vol_ref = parameters
+    return pres * linearized_volume_change(global_strain, vol_ref)
+
 
 def inhomo_elastic_energy(local_displacement, parameters):
     """
@@ -80,7 +193,8 @@ def inhomo_elastic_energy(local_displacement, parameters):
     B11, B12, B44 = parameters
     g11 = B11 / 4
     g12 = B12 / 8
-    g44 = B44 / 8 # TODO: check if this should be g44 = B44 / 4
+    # Zhong, Vanderbilt, and Rabe, PRB 52, 6301 (1995), Eq. (13).
+    g44 = B44 / 8
 
     ## get the inhomogeneous strain energy
     ls = local_displacement

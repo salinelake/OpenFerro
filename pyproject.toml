@@ -50,4 +50,8 @@ include = ["openferro*"]
 testpaths = ["tests/unit_tests", "tests/packaging"]
 markers = [
     "packaging: builds and installs distribution artifacts",
+    "scientific: validates a documented physical equation or numerical invariant",
+    "stochastic: validates fixed-seed stochastic behavior or equilibrium statistics",
+    "gpu: requires a GPU backend",
+    "slow: takes materially longer than the lightweight unit suite",
 ]

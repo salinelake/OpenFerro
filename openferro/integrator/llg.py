@@ -4,13 +4,70 @@ Integrators for Landau-Lifshitz equations of motion. Fields are constrained to h
 This file is part of OpenFerro.
 """
 
+import logging
+import math
+import numbers
+
 import jax
 from jax import jit
 import jax.numpy as jnp
+
+from openferro.integrator.base import Integrator
 from openferro.units import Constants
 from openferro.utilities import SO3_rotation
-import logging
-from openferro.integrator.base import Integrator
+
+
+def _validate_finite_scalar(name, value, *, minimum=0.0, strict=False):
+    if (
+        isinstance(value, bool)
+        or not isinstance(value, numbers.Real)
+        or not math.isfinite(float(value))
+        or (value <= minimum if strict else value < minimum)
+    ):
+        relation = "greater than" if strict else "at least"
+        raise ValueError(f"{name} must be finite and {relation} {minimum}.")
+
+
+def _validate_sib_options(max_iter, tol):
+    if isinstance(max_iter, bool) or not isinstance(max_iter, int) or max_iter <= 0:
+        raise ValueError("SIB max_iter must be a positive integer.")
+    _validate_finite_scalar("SIB tolerance", tol, strict=True)
+
+
+def _solve_sib_stage(integrator, field, M, Ms, initial, B, stage):
+    value = initial
+    converged = False
+    for iteration in range(1, integrator.max_iter + 1):
+        value, difference = integrator.update_x(
+            M, Ms, value, B, integrator.dt * integrator.gamma
+        )
+        if bool(jax.device_get(difference < integrator.tol)):
+            converged = True
+            break
+
+    integrator.last_iterations[stage] = iteration
+    integrator.last_converged[stage] = converged
+    if not converged:
+        logging.warning(
+            "SIB integrator for field '%s' did not converge in %s after %d "
+            "iterations (tolerance %g). Decrease dt or increase max_iter.",
+            field.ID,
+            stage,
+            integrator.max_iter,
+            integrator.tol,
+        )
+    return value
+
+
+def _force_at_sib_midpoint(field, M, predictor, force_updater):
+    midpoint = (M + predictor) / 2.0
+    field._set_values_for_force_evaluation(midpoint)
+    try:
+        force_updater()
+        force = field.get_force()
+    finally:
+        field._set_values_for_force_evaluation(M)
+    return midpoint, force
 
 
 class ConservativeLLIntegrator(Integrator):
@@ -56,7 +113,8 @@ class ConservativeLLIntegrator(Integrator):
         if gamma is None:
             self.gamma = Constants.electron_gyro_ratio
         else:
-            self.gamma = gamma
+            _validate_finite_scalar("Gyromagnetic ratio", gamma, strict=True)
+            self.gamma = float(gamma)
         self.step_x = jit(self._step_x)
 
     def step(self, field, force_updater=None):
@@ -126,13 +184,14 @@ class LLIntegrator(ConservativeLLIntegrator):
         return B + alpha / Ms[..., None] * jnp.cross(M, B)
  
     def __init__(self, dt, alpha, gamma=None):
+        _validate_finite_scalar("Gilbert damping alpha", alpha)
         super().__init__(dt, gamma)
         ## get the renormalized gyromagnetic ratio for simulating LLG equation in Landau-Lifshitz form
         if gamma is None:
             self.gamma = Constants.electron_gyro_ratio / (1 + alpha**2)
         else:
             self.gamma = gamma / (1 + alpha**2)
-        self.alpha = alpha
+        self.alpha = float(alpha)
         self.step_b = jit(self._step_b)
 
     def step(self, field, force_updater=None):
@@ -186,8 +245,9 @@ class LLLangevinIntegrator(LLIntegrator):
     """
  
     def __init__(self, dt, temp, alpha, gamma=None):
+        _validate_finite_scalar("Temperature", temp)
         super().__init__(dt, alpha, gamma)
-        self.kbT = Constants.kb * temp
+        self.kbT = Constants.kb * float(temp)
         self.D_base = self.alpha/(1+self.alpha**2) * self.kbT / self.gamma  
 
     def get_noise(self, key, field):
@@ -206,7 +266,8 @@ class LLLangevinIntegrator(LLIntegrator):
         jax.Array
             Random noise array
         """
-        gaussian = jax.random.normal(key, field.get_values().shape) 
+        values = field.get_values()
+        gaussian = jax.random.normal(key, values.shape, dtype=values.dtype)
         if field._sharding is not None and field._sharding != gaussian.sharding:
             gaussian = jax.device_put(gaussian, field._sharding)
         return gaussian    
@@ -297,12 +358,16 @@ class ConservativeLLSIBIntegrator(Integrator):
     
     def __init__(self, dt, gamma=None, max_iter=10, tol=1e-6):
         super().__init__(dt)
+        _validate_sib_options(max_iter, tol)
         if gamma is None:
             self.gamma = Constants.electron_gyro_ratio
         else:
-            self.gamma = gamma
+            _validate_finite_scalar("Gyromagnetic ratio", gamma, strict=True)
+            self.gamma = float(gamma)
         self.max_iter = max_iter  
-        self.tol = tol
+        self.tol = float(tol)
+        self.last_iterations = {}
+        self.last_converged = {}
         self.update_x = jit(self._update_x)
     
     def step(self, field, force_updater):
@@ -325,27 +390,9 @@ class ConservativeLLSIBIntegrator(Integrator):
         M = field.get_values()
         Ms = field.get_magnitude()
         B = field.get_force()
-        Y = M.copy()
-        ## step 1
-        for i in range(self.max_iter):
-            Y, normalized_diff_avg = self.update_x(M, Ms, Y, B, self.dt * self.gamma)
-            if normalized_diff_avg < self.tol:
-                break
-            if i == self.max_iter - 1:
-                logging.warning("SIB integrator for field '{}' does not converge: fixed-point iterations for step 1 exceed {}. The current tolerance for convergence is {} (in terms of |M_new - M_old|/Ms, averaged over lattice).".format(field.ID, self.max_iter, self.tol))
-                logging.warning("If this warning happens frequently, consider decreasing the time step.")
-        ## set the current configuration as the auxiliary configuration Y, then update the force
-        field.set_values( (Y + M)/2 )
-        force_updater()
-        B = field.get_force()
-        ## step 2
-        for i in range(self.max_iter):
-            Y, normalized_diff_avg = self.update_x(M, Ms, Y, B, self.dt * self.gamma)
-            if normalized_diff_avg < self.tol:
-                break
-            if i == self.max_iter - 1:
-                logging.warning("SIB integrator for field '{}' does not converge: fixed-point iterations for step 2 exceed {}. The current tolerance for convergence is {} (in terms of |M_new - M_old|/Ms, averaged over lattice).".format(field.ID, self.max_iter, self.tol))
-                logging.warning("If this warning happens frequently, consider decreasing the time step dt.")
+        Y = _solve_sib_stage(self, field, M, Ms, M, B, "predictor")
+        _, B = _force_at_sib_midpoint(field, M, Y, force_updater)
+        Y = _solve_sib_stage(self, field, M, Ms, Y, B, "corrector")
         field.set_values(Y)
         return field
 
@@ -434,14 +481,19 @@ class LLSIBIntegrator(Integrator):
  
     def __init__(self, dt, alpha, gamma=None, max_iter=10, tol=1e-6):
         super().__init__(dt)
+        _validate_finite_scalar("Gilbert damping alpha", alpha)
+        _validate_sib_options(max_iter, tol)
         ## get the renormalized gyromagnetic ratio for simulating LLG equation in Landau-Lifshitz form
-        self.alpha = alpha
+        self.alpha = float(alpha)
         if gamma is None:
             self.gamma = Constants.electron_gyro_ratio / (1 + alpha**2)
         else:
-            self.gamma = gamma / (1 + alpha**2)
+            _validate_finite_scalar("Gyromagnetic ratio", gamma, strict=True)
+            self.gamma = float(gamma) / (1 + alpha**2)
         self.max_iter = max_iter  
-        self.tol = tol
+        self.tol = float(tol)
+        self.last_iterations = {}
+        self.last_converged = {}
         self.update_x = jit(self._update_x)
         self.update_b = jit(self._update_b)
 
@@ -466,28 +518,10 @@ class LLSIBIntegrator(Integrator):
         Ms = field.get_magnitude()
         B = field.get_force()
         B = self.update_b(M, B, self.alpha, Ms)
-        Y = M.copy()
-        ## step 1
-        for i in range(self.max_iter):
-            Y, normalized_diff_avg = self.update_x(M, Ms, Y, B, self.dt * self.gamma)
-            if normalized_diff_avg < self.tol:
-                break
-            if i == self.max_iter - 1:
-                logging.warning("SIB integrator for field '{}' does not converge: fixed-point iterations for step 1 exceed {}. The current tolerance for convergence is {} (in terms of |M_new - M_old|/Ms, averaged over lattice).".format(field.ID, self.max_iter, self.tol))
-                logging.warning("If this warning happens frequently, consider decreasing the time step.")
-        ## set the current configuration as the auxiliary configuration Y, then update the force
-        field.set_values( (Y + M)/2 )
-        force_updater()
-        B = field.get_force()
-        B = self.update_b(M, B, self.alpha, Ms)
-        ## step 2
-        for i in range(self.max_iter):
-            Y, normalized_diff_avg = self.update_x(M, Ms, Y, B, self.dt * self.gamma)
-            if normalized_diff_avg < self.tol:
-                break
-            if i == self.max_iter - 1:
-                logging.warning("SIB integrator for field '{}' does not converge: fixed-point iterations for step 2 exceed {}. The current tolerance for convergence is {} (in terms of |M_new - M_old|/Ms, averaged over lattice).".format(field.ID, self.max_iter, self.tol))
-                logging.warning("If this warning happens frequently, consider decreasing the time step.")
+        Y = _solve_sib_stage(self, field, M, Ms, M, B, "predictor")
+        midpoint, B = _force_at_sib_midpoint(field, M, Y, force_updater)
+        B = self.update_b(midpoint, B, self.alpha, Ms)
+        Y = _solve_sib_stage(self, field, M, Ms, Y, B, "corrector")
         field.set_values(Y)
         return field
 
@@ -517,6 +551,7 @@ class LLSIBLangevinIntegrator(LLSIBIntegrator):
     """
  
     def __init__(self, dt, temp, alpha, gamma=None, max_iter=10, tol=1e-6):
+        _validate_finite_scalar("Temperature", temp)
         super().__init__(dt, alpha, gamma, max_iter, tol)
         """
         Args:
@@ -525,11 +560,12 @@ class LLSIBLangevinIntegrator(LLSIBIntegrator):
             alpha: the Gilbert damping constant
             gamma: the gyromagnetic ratio
         """
-        self.kbT = Constants.kb * temp
+        self.kbT = Constants.kb * float(temp)
         self.D_base = self.alpha/(1+self.alpha**2) * self.kbT / self.gamma  
         self.noise_max = jnp.sqrt(2* jnp.abs(jnp.log(self.dt)))
     def get_noise(self, key, field):
-        gaussian = jax.random.normal(key, field.get_values().shape)
+        values = field.get_values()
+        gaussian = jax.random.normal(key, values.shape, dtype=values.dtype)
         if field._sharding is not None and field._sharding != gaussian.sharding:
             gaussian = jax.device_put(gaussian, field._sharding)
         return gaussian    
@@ -558,33 +594,14 @@ class LLSIBLangevinIntegrator(LLSIBIntegrator):
         force_updater()
         B = field.get_force()
         gaussian = self.get_noise(key, field)
-        # gaussian = jnp.clip(gaussian, -self.noise_max, self.noise_max)
+        gaussian = jnp.clip(gaussian, -self.noise_max, self.noise_max)
         gaussian *= (2 * self.D_base / Ms[..., None] / self.dt)**0.5
         B += gaussian
         B = self.update_b(M, B, self.alpha, Ms)
-        Y = M.copy()
-        ## step 1
-        for i in range(self.max_iter):
-            Y, normalized_diff_avg = self.update_x(M, Ms, Y, B, self.dt * self.gamma)
-            if normalized_diff_avg < self.tol:
-                break
-            if i == self.max_iter - 1:
-                logging.warning("SIB integrator for field '{}' does not converge: fixed-point iterations for step 1 exceed {}. The current tolerance for convergence is {} (in terms of |M_new - M_old|/Ms, averaged over lattice).".format(field.ID, self.max_iter, self.tol))
-                logging.warning("If this warning happens frequently, consider decreasing the time step.")
-        ## set the current configuration as the auxiliary configuration Y
-        field.set_values( (Y + M)/2 )
-        ## get the effective magnetic field for step 2
-        force_updater()
-        B = field.get_force()
+        Y = _solve_sib_stage(self, field, M, Ms, M, B, "predictor")
+        midpoint, B = _force_at_sib_midpoint(field, M, Y, force_updater)
         B += gaussian
-        B = self.update_b(field.get_values(), B, self.alpha, Ms)
-        ## step 2
-        for i in range(self.max_iter):
-            Y, normalized_diff_avg = self.update_x(M, Ms, Y, B, self.dt * self.gamma)
-            if normalized_diff_avg < self.tol:
-                break
-            if i == self.max_iter - 1:
-                logging.warning("SIB integrator for field '{}' does not converge: fixed-point iterations for step 2 exceed {}. The current tolerance for convergence is {} (in terms of |M_new - M_old|/Ms, averaged over lattice).".format(field.ID, self.max_iter, self.tol))
-                logging.warning("If this warning happens frequently, consider decreasing the time step.")
+        B = self.update_b(midpoint, B, self.alpha, Ms)
+        Y = _solve_sib_stage(self, field, M, Ms, Y, B, "corrector")
         field.set_values(Y)
         return field

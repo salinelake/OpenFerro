@@ -74,15 +74,19 @@ class Field:
     def set_mass(self, mass):
         if self._values is None:
             raise ValueError("Set field values before setting mass.")
-        else:
-            assert jnp.min(mass) >= 0.0, "Mass must be non-negative"
-            if jnp.isscalar(mass):
-                self._mass = jnp.zeros_like(self._values[..., 0]) + mass
-                self._mass = self._mass[..., None]
-            elif mass.shape == self._values[..., 0].shape:
-                self._mass = mass[..., None]
-            else:
-                raise ValueError("Mass must be a scalar or an array of the same size as the all but the last dimension of the field values.")
+        mass = jnp.asarray(mass)
+        if mass.ndim == 0:
+            mass = jnp.zeros_like(self._values[..., 0]) + mass
+        elif mass.shape != self._values.shape[:-1]:
+            raise ValueError(
+                "Mass must be a scalar or an array matching the lattice shape."
+            )
+        invalid = jnp.any((mass <= 0.0) | ~jnp.isfinite(mass))
+        if bool(jax.device_get(invalid)):
+            raise ValueError("Mass must be finite and strictly positive.")
+        self._mass = mass[..., None]
+        if self._sharding is not None:
+            self._mass = jax.device_put(self._mass, self._sharding)
             
     def get_mass(self):
         if self._mass is None:
@@ -98,8 +102,13 @@ class Field:
         if self._values is None:
             raise ValueError("Field has no values. Set values before setting velocity.")
         else:
+            velocity = jnp.asarray(velocity)
             self.compare_shape(velocity, self._values)
-            self._velocity = velocity 
+            if bool(jax.device_get(jnp.any(~jnp.isfinite(velocity)))):
+                raise ValueError("Velocity must contain only finite values.")
+            self._velocity = velocity
+            if self._sharding is not None:
+                self._velocity = jax.device_put(self._velocity, self._sharding)
 
     def get_velocity(self):
         if self._velocity is None:
@@ -108,6 +117,12 @@ class Field:
             return self._velocity
 
     def init_velocity(self, mode='zero', temperature=None, seed=42, key=None):
+        """Initialize stored velocities.
+
+        Leapfrog and LFMiddle integrators interpret these values as half-step
+        velocities. A Gaussian draw is already stationary for that momentum
+        variable and requires no deterministic half-kick.
+        """
         if self._values is None:
             raise ValueError("Set field values before initializing velocity.")
         if mode == 'zero':
@@ -115,6 +130,12 @@ class Field:
         elif mode == 'gaussian':
             if temperature is None:
                 raise ValueError("Temperature is required for Gaussian velocities.")
+            if (
+                not np.isscalar(temperature)
+                or not np.isfinite(temperature)
+                or temperature < 0
+            ):
+                raise ValueError("Temperature must be finite and non-negative.")
             if self._mass is None:
                 raise ValueError("Mass must be set before initializing Gaussian velocities.")
             random_key = (
@@ -123,7 +144,9 @@ class Field:
                 else key
             )
             self._velocity = (
-                jax.random.normal(random_key, self._values.shape)
+                jax.random.normal(
+                    random_key, self._values.shape, dtype=self._values.dtype
+                )
                 * jnp.sqrt(Constants.kb * temperature / self._mass)
             )
         else:
@@ -383,6 +406,18 @@ class FieldSO3(FieldRn):
             values = jax.device_put(values, self._sharding)
         self._values = values
 
+    def _set_values_for_force_evaluation(self, values):
+        """Set a finite unconstrained SIB stage value without normalization."""
+        values = jnp.asarray(values)
+        expected_shape = tuple(int(extent) for extent in self.shape)
+        if values.shape != expected_shape:
+            raise ValueError(f"SO(3) stage values must have shape {expected_shape}.")
+        if bool(jax.device_get(jnp.any(~jnp.isfinite(values)))):
+            raise ValueError("SO(3) stage values must be finite.")
+        if self._sharding is not None:
+            values = jax.device_put(values, self._sharding)
+        self._values = values
+
     def set_local_value(self, loc, value):
         """Set one orientation and preserve the field magnitude invariant."""
         value = jnp.asarray(value)
@@ -596,7 +631,12 @@ class LocalStrain3D(FieldRn):
 
 class GlobalStrain(Field):
     """
-    The homogeneous strain is represented by the strain tensor with Voigt convention, which is a 6-dimensional vector.
+    Homogeneous strain in engineering Voigt notation.
+
+    Values are ordered as ``(e_xx, e_yy, e_zz, 2e_yz, 2e_xz, 2e_xy)``.
+    Pressure and volume reporting use ``det(I + epsilon)`` by default. The
+    first-order trace volume remains available as an explicit compatibility
+    mode when the field is added to a system.
     """
     def __init__(self, lattice, ID):
         super().__init__(lattice, ID)

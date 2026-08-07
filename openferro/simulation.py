@@ -67,6 +67,14 @@ class Simulation:
         keys = jax.random.split(self._random_key, count + 1)
         self._random_key = keys[0]
         return keys[1:]
+
+    @staticmethod
+    def _validate_so3_field_count(fields):
+        if len(fields) > 1:
+            raise NotImplementedError(
+                "Coupled dynamics for multiple SO(3) fields require a "
+                "simultaneous SIB solve and are not supported."
+            )
     
     def clear_reporters(self):
         self.reporters = []
@@ -216,6 +224,7 @@ class MDMinimize(Simulation):
             If pressure specified for fixed cell minimization
             If integrator not set for any field
         """
+        self._validate_so3_field_count(self.system.get_all_SO3_fields())
         active_fields = [
             field for field in self.all_fields
             if variable_cell or not isinstance(field, GlobalStrain)
@@ -329,6 +338,7 @@ class SimulationNVE(Simulation):
         ValueError
             If integrator not set for any field
         """
+        self._validate_so3_field_count(self.SO3_fields)
         ## sanity check
         for field in self.all_fields:
             if field.integrator is None:
@@ -406,6 +416,7 @@ class SimulationNVTLangevin(SimulationNVE):
         ValueError
             If integrator not set for any field
         """
+        self._validate_so3_field_count(self.SO3_fields)
         ## sanity check
         for field in self.all_fields:
             if field.integrator is None:

@@ -34,6 +34,7 @@ Key Features
 
    theory-lattice-model
    theory-dynamics
+   scientific_conventions
 
 .. toctree::
    :maxdepth: 2
@@ -59,7 +60,7 @@ Check the ``examples/`` directory for various simulation examples:
 
 * BaTiO3 cooling simulation
 * bcc Fe heating
-* Simple cubic Ising model
+* Simple-cubic classical Heisenberg model (historical directory name retained)
 * PbTiO3/SrTiO3 superlattice
 
 Contributing

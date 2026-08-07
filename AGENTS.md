@@ -68,7 +68,7 @@ There is no broad test harness or formatter configuration in the repo. Use the s
 - If a numerical change affects physical behavior, add or update a focused test or example check when practical.
 - Before finishing, report what was changed and which validation commands were run or skipped.
 
-## Using Perlmutter for development
+## Development Environment
 This code will be developed on Perlmutter supercomputer, and sometimes Della supercomputer. Codex CLI will run on login node. Use `hostname` to check the supercomputer you are on.
 
 Activate the development environment on Perlmutter:

@@ -12,21 +12,34 @@ __all__ = [
 ]
 
 
-def get_isotropic_exchange_energy_engine(rollers):
-    """Returns the exchange energy engine for a R^3 field defined on a lattice with periodic boundary conditions.
+def get_isotropic_exchange_energy_engine(rollers, bond_counting="unique"):
+    """Return an isotropic exchange engine for a periodic vector field.
+
+    The default convention is
+    ``E = -sum_(i,d in half-shell) J * m_i dot m_(i-d)``, so each physical
+    undirected displacement bond occurs once. Rollers must therefore enumerate
+    one half of a neighbor shell. ``bond_counting="ordered"`` retains the
+    pre-Milestone-B convention and multiplies this sum by two.
 
     Parameters
     ----------
     rollers : list
         List of jnp.roll functions specifying the neighbors
+    bond_counting : {"unique", "ordered"}, optional
+        Pair-counting convention. ``"ordered"`` is provided only for explicit
+        compatibility with earlier parameter sets.
 
     Returns
     -------
     callable
         Energy engine function
     """
+    if bond_counting not in {"unique", "ordered"}:
+        raise ValueError("bond_counting must be 'unique' or 'ordered'.")
+    multiplicity = 1.0 if bond_counting == "unique" else 2.0
+
     def energy_engine(field, parameters):
-        coupling = - parameters[0] * 2  #  the double counting should be made under adopted convention
+        coupling = -parameters[0] * multiplicity
         energy = 0
         for roller in rollers:
             field_rolled = roller(field)

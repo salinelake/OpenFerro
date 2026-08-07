@@ -212,6 +212,14 @@ def get_dipole_dipole_ewald(latt, dtype=None, sharding=None):
         float
             The dipole-dipole interaction energy
         """
+        if field.shape != (l1, l2, l3, 3):
+            raise ValueError(
+                "Dipole field must have shape "
+                f"{(l1, l2, l3, 3)} for this Ewald engine."
+            )
+        parameters = jnp.asarray(parameters)
+        if parameters.shape != (1,):
+            raise ValueError("Dipole Ewald parameters must have shape (1,).")
         prefactor = jnp.asarray(parameters[0], dtype=setup["dtype"])
         field_fft = jnp.fft.fftn(field, axes=(0,1,2))
         ewald_ksum = calc_ewald_reciprocal_sum(field_fft, UkGG)

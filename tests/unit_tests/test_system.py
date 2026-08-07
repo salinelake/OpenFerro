@@ -32,6 +32,10 @@ def test_add_global_strain_validates_before_mutating_system():
     with pytest.raises(ValueError, match="does not exist"):
         system.get_interaction_by_ID("pV")
 
+    with pytest.raises(ValueError, match="pressure_volume"):
+        system.add_global_strain(pressure_volume="unsupported")
+    assert "gstrain" not in {field.ID for field in system.get_all_fields()}
+
 
 def test_preexisting_pressure_term_blocks_global_strain_without_partial_field():
     system = System(SimpleCubic3D(1, 1, 1))
@@ -47,8 +51,9 @@ def test_preexisting_pressure_term_blocks_global_strain_without_partial_field():
 def test_pressure_registration_failure_rolls_back_global_strain(monkeypatch):
     system = System(SimpleCubic3D(1, 1, 1))
 
-    def fail_after_partial_registration(pressure):
+    def fail_after_partial_registration(pressure, volume_mode="determinant"):
         del pressure
+        del volume_mode
         system._self_interaction_dict["pV"] = object()
         raise RuntimeError("pressure setup failed")
 

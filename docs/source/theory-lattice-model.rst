@@ -42,7 +42,7 @@ local dipole fields :math:`\mathbf{u}_{n}\in R^3`, local strain :math:`\eta^{\te
 -- Hamiltonian:
 See [Physical Review B 52.9 (1995): 6301](https://journals.aps.org/prb/abstract/10.1103/PhysRevB.52.6301) for details of the Hamiltonian.
 
-- **Magnetic materials: Toy Ising model**
+- **Magnetic materials: simple-cubic classical Heisenberg model**
 
 -- Variables:
 spin fields :math:`\mathbf{u}_{n}\in SO(3)`. 
@@ -51,25 +51,28 @@ spin fields :math:`\mathbf{u}_{n}\in SO(3)`.
 
 .. math::
 
-   E = \sum_{n\sim m} J \mathbf{s}_n \cdot \mathbf{s}_m
+   E = -\sum_{\langle n,m\rangle} J \mathbf{s}_n \cdot \mathbf{s}_m
 
-Here, :math:`n\sim m` means a nearest-neighbor pair. :math:`J` is the exchange coupling.
+Here, :math:`\langle n,m\rangle` is a unique undirected nearest-neighbor
+displacement bond. Positive :math:`J` is ferromagnetic. The field contains
+continuous fixed-magnitude vectors, not discrete Ising variables.
 
 - **Magnetic materials: Bcc Iron**
 
 -- Variables:
-local dipole fields :math:`\mathbf{s}_{n}\in SO(3)`. 
+local spin fields :math:`\mathbf{s}_{n}\in SO(3)`.
 
 -- Hamiltonian:
 
 .. math::
 
-   E = \sum_{n,m} J_{nm} \mathbf{s}_n \cdot \mathbf{s}_m
+   E = -\sum_{\langle n,m\rangle} J_{nm} \mathbf{s}_n \cdot \mathbf{s}_m
 
-Here :math:`n,m` are summed over all pairs. :math:`J_{nm}` is the exchange coupling between site :math:`n` and :math:`m`. The exchange interaction can be cut off at a certain distance. For example, if the exchange interaction is cut off at the fourth shell. We have :math:`J_{nm}\in (J_1, J_2, J_3, J_4)`. 
+OpenFerro's engine sums unique displacement bonds. The bcc Fe source instead
+uses ordered unit-spin pairs, so its four published shell values require the
+conversion in :doc:`scientific_conventions`.
 See [PRL 95, 087207 (2005)](https://journals.aps.org/prl/abstract/10.1103/PhysRevLett.95.087207) for details of the Hamiltonian.
 
 - **Multiferroic materials: BiFeO3**
 
 See [PRL 99, 227602 (2007)](https://journals.aps.org/prl/abstract/10.1103/PhysRevLett.99.227602) for one possible realization of the Hamiltonian.
-

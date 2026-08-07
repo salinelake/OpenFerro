@@ -12,6 +12,48 @@ from openferro.lattice import (
     BodyCenteredCubic3D,
     BravaisLattice3D,
     Hexagonal3D,
+    SimpleCubic3D,
+)
+
+
+SC_SHELL_SHIFTS = (
+    ((1, 0, 0), (0, 1, 0), (0, 0, 1)),
+    (
+        (1, 1, 0),
+        (-1, 1, 0),
+        (1, 0, 1),
+        (-1, 0, 1),
+        (0, 1, 1),
+        (0, -1, 1),
+    ),
+    ((1, 1, 1), (-1, 1, 1), (1, -1, 1), (-1, -1, 1)),
+)
+
+BCC_SHELL_SHIFTS = (
+    ((1, 0, 0), (0, 1, 0), (0, 0, 1), (1, 1, 1)),
+    ((0, 1, 1), (1, 0, 1), (1, 1, 0)),
+    (
+        (1, 2, 1),
+        (2, 1, 1),
+        (1, 1, 2),
+        (-1, 0, 1),
+        (0, 1, -1),
+        (1, -1, 0),
+    ),
+    (
+        (1, 2, 2),
+        (0, 2, 1),
+        (0, 1, 2),
+        (-1, 1, 1),
+        (2, 1, 2),
+        (1, 0, 2),
+        (2, 0, 1),
+        (1, -1, 1),
+        (2, 2, 1),
+        (2, 1, 0),
+        (1, 2, 0),
+        (1, 1, -1),
+    ),
 )
 
 
@@ -90,3 +132,44 @@ def test_ewald_memory_estimate_is_json_serializable():
     assert json.loads(json.dumps(estimate))["shape"] == [3, 2, 2]
     assert type(estimate["nsites"]) is int
     assert all(type(value) is int for value in estimate["arrays"].values())
+
+
+@pytest.mark.scientific
+@pytest.mark.parametrize(
+    ("lattice", "expected_shells", "expected_distances"),
+    [
+        (SimpleCubic3D(7, 7, 7), SC_SHELL_SHIFTS, (1.0, 2.0, 3.0)),
+        (
+            BodyCenteredCubic3D(7, 7, 7),
+            BCC_SHELL_SHIFTS,
+            (0.75, 1.0, 2.0, 2.75),
+        ),
+    ],
+)
+def test_neighbor_shell_rollers_match_displacements_and_coordination(
+    lattice, expected_shells, expected_distances
+):
+    encoded = np.arange(7**3).reshape((7, 7, 7))
+    roller_shells = (
+        lattice.first_shell_roller,
+        lattice.second_shell_roller,
+        lattice.third_shell_roller,
+    )
+    if isinstance(lattice, BodyCenteredCubic3D):
+        roller_shells += (lattice.fourth_shell_roller,)
+
+    primitive = np.asarray(lattice.latt_vec)
+    for rollers, shifts, squared_distance in zip(
+        roller_shells, expected_shells, expected_distances
+    ):
+        assert len(rollers) == len(shifts)
+        physical_vectors = []
+        for roller, shift in zip(rollers, shifts):
+            actual = np.asarray(roller(jnp.asarray(encoded)))
+            expected = np.roll(encoded, shift=shift, axis=(0, 1, 2))
+            np.testing.assert_array_equal(actual, expected)
+            vector = np.asarray(shift) @ primitive
+            np.testing.assert_allclose(np.dot(vector, vector), squared_distance)
+            physical_vectors.extend((tuple(vector), tuple(-vector)))
+
+        assert len(set(physical_vectors)) == 2 * len(shifts)

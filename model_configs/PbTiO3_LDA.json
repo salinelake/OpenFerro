@@ -1,5 +1,15 @@
-
-{   "name": "PbTiO3-LDA[PRB 95 054111 (2017)]",
+{
+    "schema_version": 1,
+    "model": {
+        "id": "PbTiO3_LDA",
+        "material": "PbTiO3",
+        "method": "LDA effective Hamiltonian",
+        "kind": "ferroelectric_effective_hamiltonian",
+        "citation": {
+            "text": "Paul et al., Phys. Rev. B 95, 054111 (2017)",
+            "doi": "10.1103/PhysRevB.95.054111"
+        }
+    },
     "lattice": {
         "a1": 3.95,
         "a2": 3.95,
@@ -8,32 +18,60 @@
         "beta": 0,
         "gamma": 0
     },
-    "onsite": {
-        "k2": 1.17,
-        "alpha":15.17,
-        "gamma":-15.51
+    "units": {
+        "lattice": "angstrom",
+        "local_mode": "angstrom",
+        "energy": "eV",
+        "onsite_k2": "eV/angstrom^2",
+        "onsite_quartic": "eV/angstrom^4",
+        "short_range": "eV/angstrom^2",
+        "elastic": "eV/cell",
+        "elastic_dipole": "eV/angstrom^2",
+        "born_effective_charge": "elementary_charge",
+        "dielectric": "dimensionless"
     },
-    "short_range": {
-        "j1": 1.17,
-        "j2": -1.35,
-        "j3": 4.98,
-        "j4": 0.22,
-        "j5": -0.018,
-        "j6": -0.083,
-        "j7": -0.204
+    "conventions": {
+        "local_mode": "soft_mode_displacement",
+        "strain_voigt": "(exx,eyy,ezz,2eyz,2exz,2exy)",
+        "short_range_bonds": "unique_undirected",
+        "pressure_volume": "determinant",
+        "ewald_geometry": "axis_aligned_orthogonal"
     },
-    "elastic": {
-        "B11": 129.8,
-        "B12": 56.6,
-        "B44": 38.8
+    "parameters": {
+        "onsite": {
+            "k2": 1.17,
+            "alpha": 15.17,
+            "gamma": -15.51
+        },
+        "short_range": {
+            "j1": 1.17,
+            "j2": -1.35,
+            "j3": 4.98,
+            "j4": 0.22,
+            "j5": -0.018,
+            "j6": -0.083,
+            "j7": -0.204
+        },
+        "elastic": {
+            "B11": 129.8,
+            "B12": 56.6,
+            "B44": 38.8
+        },
+        "elastic_dipole": {
+            "B1xx": -75.25,
+            "B1yy": 0,
+            "B4yz": -2.89
+        },
+        "born": {
+            "Z_star": 9.37,
+            "epsilon_inf": 7.95
+        }
     },
-    "elastic_dipole": {
-        "B1xx": -75.25,
-        "B1yy": 0,
-        "B4yz": -2.89
-    },
-    "born": {
-        "Z_star": 9.37,
-        "epsilon_inf":7.95
+    "reference_observable": {
+        "name": "uniform_local_mode_energy_per_site_without_ewald",
+        "configuration": [0.01, -0.02, 0.015],
+        "value": 0.01609190845625,
+        "units": "eV/site",
+        "atol": 1e-12
     }
 }

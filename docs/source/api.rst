@@ -31,11 +31,11 @@ Lattice
    :show-inheritance:
 
 Hamiltonian
---------------------------
+-----------
 
 .. warning::
-   Except where the feature matrix says otherwise, built-in Hamiltonian
-   engines are experimental pending per-term reference validation.
+   Built-in engines outside the promoted scope in :doc:`feature_status` remain
+   experimental and require independent validation.
 
 Elastic
 ^^^^^^^
@@ -91,8 +91,8 @@ Integrators
 -----------
 
 .. warning::
-   All bundled MD, Langevin, and LLG/SIB integrators are experimental until
-   the Milestone B reference suite is complete.
+   Only the classes and field aliases marked stable in :doc:`feature_status`
+   are covered by the Milestone B reference suite.
 
 Base
 ^^^^
@@ -167,4 +167,4 @@ Parallelism
 .. automodule:: openferro.parallelism
    :members:
    :undoc-members:
-   :show-inheritance: 
+   :show-inheritance:
