@@ -13,14 +13,6 @@ from openferro.simulation import SimulationNVTLangevin
 from openferro.units import Constants
 
 
-EXAMPLE_DIR = Path(__file__).resolve().parent
-
-
-def _load_model_record(path):
-    with Path(path).open(encoding="utf-8") as stream:
-        return json.load(stream)
-
-
 def _exchange_couplings(config):
     conventions = config["conventions"]
     if conventions["engine_pair_counting"] != "unique":
@@ -63,13 +55,9 @@ def build_system(config, size):
         lattice_constant * jnp.asarray((0.0, 0.0, 1.0)),
     )
     system = of.System(lattice)
-    spin = system.add_field(
-        ID="spin", ftype="SO3", value=jnp.asarray((0.0, 0.0, 1.0))
-    )
+    spin = system.add_field(ID="spin", ftype="SO3", value=jnp.asarray((0.0, 0.0, 1.0)))
     spin.set_magnitude(config["parameters"]["moment_mu_B"])
     couplings = _exchange_couplings(config)
-    if len(couplings) != 1 or config["lattice"]["shells"] != 1:
-        raise ValueError("The simple-cubic record must declare one exchange shell.")
     system.add_isotropic_exchange_interaction_1st_shell(
         ID="exchange_1_shell",
         field_ID="spin",
@@ -80,33 +68,17 @@ def build_system(config, size):
 
 def parse_args(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "--config",
-        type=Path,
-        default=EXAMPLE_DIR / "sc_Heisenberg.json",
-        help="Documented magnetic JSON model record.",
-    )
-    parser.add_argument("--size", type=int, default=None, help="Cubic supercell size.")
-    parser.add_argument(
-        "--output-dir",
-        type=Path,
-        default=EXAMPLE_DIR / "output",
-        help="Directory for logs and field reports.",
-    )
+    parser.add_argument("--config", type=Path, default="sc_Heisenberg.json", help="magnetic JSON model record.")
+    parser.add_argument("--size", type=int, default=20, help="Cubic supercell size.")
+    parser.add_argument("--output-dir", type=Path, default="output", help="Directory for logs and field reports.")
     parser.add_argument("--seed", type=int, default=42, help="Simulation RNG seed.")
-    parser.add_argument(
-        "--tiny",
-        action="store_true",
-        help="Run a two-site-per-axis CPU smoke calculation.",
-    )
+    parser.add_argument("--tiny", action="store_true", help="Run a two-site-per-axis CPU smoke calculation.")
     return parser.parse_args(argv)
 
 
 def main(argv=None):
     args = parse_args(argv)
-    size = args.size if args.size is not None else (2 if args.tiny else 20)
-    if size < 2:
-        raise ValueError("size must be at least 2 for the configured interactions.")
+    size = 2 if args.tiny else args.size
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
     logging.basicConfig(
@@ -114,7 +86,7 @@ def main(argv=None):
         filename=args.output_dir / "simulation.log",
         force=True,
     )
-    config = _load_model_record(args.config)
+    config = json.load(args.config.open(encoding="utf-8"))
     system, spin = build_system(config, size)
 
     dt = 0.0002

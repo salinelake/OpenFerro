@@ -2,11 +2,29 @@ import numpy as np
 import jax.numpy as jnp
 
 from openferro.lattice import SimpleCubic3D
+from openferro.interaction import self_interaction
 from openferro.system import System
 
 
 def _trilinear_energy(field1, field2, field3, parameters):
     return parameters[0] * jnp.sum(field1 * field2 * field3)
+
+
+def _weighted_quadratic_energy(field, weights, parameters):
+    return parameters[0] * jnp.sum(weights * field**2)
+
+
+def test_self_interaction_passes_engine_data_to_energy_and_force():
+    system = System(SimpleCubic3D(1, 1, 1))
+    field = system.add_field("a", ftype="Rn", dim=1, value=2.0, mass=None)
+    interaction = self_interaction("a")
+    interaction.set_engine_data(jnp.full(field.get_values().shape, 3.0))
+    interaction.set_energy_engine(_weighted_quadratic_energy)
+    interaction.create_force_engine()
+    interaction.set_parameters([2.0])
+
+    np.testing.assert_allclose(interaction.calc_energy(field), 24.0)
+    np.testing.assert_allclose(interaction.calc_force(field), -24.0)
 
 
 def test_triple_interaction_energy_lookup_and_force():

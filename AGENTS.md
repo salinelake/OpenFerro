@@ -74,7 +74,7 @@ This code will be developed on Perlmutter supercomputer, and sometimes Della sup
 Activate the development environment on Perlmutter:
 ```bash
 module load python
-conda activate openferro_jax010
+conda activate of_dev
 ```
 
 For Della, activate the development environment:

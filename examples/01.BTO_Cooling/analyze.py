@@ -9,7 +9,9 @@ mpl.rcParams['lines.marker'] = 'o'
 mpl.rcParams['legend.fontsize'] = 8
 mpl.rcParams['legend.frameon'] = False
 
-temp_list = np.array([  200,210,220,230,240,250,260,270,280,290,300,310,320, 350, 400]).astype(int)
+temp_list =  [320, 310, 300, 290, 280, 270, 260, 250, 240, 230, 220, 210, 200, 190, 180, 170, 160, 150]
+temp_list = np.flip(np.array(temp_list).astype(int))
+
 field_list = []
 strain_list = []
 dipole2polar = 9.956 / 3.9477**3 * 16.0217646  # eA -> C/m^2
@@ -64,4 +66,4 @@ ax[1].set_ylim(0,2.2)
 ax[1].legend()
 
 plt.tight_layout()
-plt.savefig('field_avg_test.png')
+plt.savefig('field_avg.png')

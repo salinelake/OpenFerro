@@ -5,8 +5,8 @@ import numpy as np
 import pytest
 
 from openferro.engine.ewald import (
+    build_dipole_dipole_ewald,
     estimate_dipole_dipole_ewald_memory,
-    get_dipole_dipole_ewald,
 )
 from openferro.lattice import (
     BodyCenteredCubic3D,
@@ -121,7 +121,7 @@ def test_ewald_rejects_rotated_and_skew_cells(vectors):
     lattice = BravaisLattice3D(1, 1, 1, *vectors)
 
     with pytest.raises(NotImplementedError, match="rotated and skew"):
-        get_dipole_dipole_ewald(lattice)
+        build_dipole_dipole_ewald(lattice)
 
 
 def test_ewald_memory_estimate_is_json_serializable():

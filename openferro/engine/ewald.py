@@ -165,8 +165,8 @@ def calc_ewald_reciprocal_sum(field_fft, UkGG):
     return jnp.real(jnp.sum(jnp.conj(field_fft) * kernel_field_fft))
 
 
-def get_dipole_dipole_ewald(latt, dtype=None, sharding=None):
-    """Returns the function to calculate the energy of dipole-dipole interaction.
+def build_dipole_dipole_ewald(latt, dtype=None, sharding=None):
+    """Build the dipole-dipole Ewald energy engine and reciprocal kernel.
 
     Implemented according to Sec.5.3 of "Wang, D., et al. 'Ewald summation for 
     ferroelectric perovksites with charges and dipoles.' Computational Materials 
@@ -183,27 +183,33 @@ def get_dipole_dipole_ewald(latt, dtype=None, sharding=None):
 
     Returns
     -------
-    callable
-        Function that calculates dipole-dipole interaction energy
+    energy_engine : callable
+        Function with signature ``energy_engine(field, UkGG, parameters)``.
+    UkGG : jax.Array
+        Precomputed reciprocal-space Ewald kernel. When ``sharding`` is given,
+        the kernel uses the same device sharding.
     """
     setup = _dipole_dipole_ewald_setup(latt, dtype=dtype)
     l1, l2, l3 = setup["shape"]
     n1, n2, n3 = setup["replicas"]
+    engine_dtype = setup["dtype"]
 
     UkGG = get_UkGG(
         l1, l2, l3, n1, n2, n3, setup["b"], setup["sigma"],
-        dtype=setup["dtype"], sharding=sharding,
+        dtype=engine_dtype, sharding=sharding,
     )
     coef_ksum = setup["coef_ksum"]
     coef_rsum = setup["coef_rsum"]
 
-    def energy_engine(field, parameters):
+    def energy_engine(field, UkGG, parameters):
         """Calculate the energy of dipole-dipole interaction using Ewald summation.
 
         Parameters
         ----------
         field : ndarray
             The values of the field, shape=(l1, l2, l3, 3)
+        UkGG : ndarray
+            Reciprocal-space Ewald kernel, shape=(l1, l2, l3, 6)
         parameters : ndarray
             Array of parameters
 
@@ -220,14 +226,14 @@ def get_dipole_dipole_ewald(latt, dtype=None, sharding=None):
         parameters = jnp.asarray(parameters)
         if parameters.shape != (1,):
             raise ValueError("Dipole Ewald parameters must have shape (1,).")
-        prefactor = jnp.asarray(parameters[0], dtype=setup["dtype"])
-        field_fft = jnp.fft.fftn(field, axes=(0,1,2))
+        prefactor = jnp.asarray(parameters[0], dtype=engine_dtype)
+        field_fft = jnp.fft.fftn(field, axes=(0, 1, 2))
         ewald_ksum = calc_ewald_reciprocal_sum(field_fft, UkGG)
         ewald_rsum = jnp.sum(field**2)
         energy = (coef_ksum * ewald_ksum - coef_rsum * ewald_rsum) * prefactor
         return energy
-    return energy_engine
- 
+    return energy_engine, UkGG
+
 
 
 def estimate_dipole_dipole_ewald_memory(latt, dtype=None):
@@ -287,17 +293,20 @@ def benchmark_dipole_dipole_ewald(
     if sharding is not None:
         field = jax.device_put(field, sharding)
 
-    energy_engine = jit(get_dipole_dipole_ewald(latt, dtype=dtype, sharding=sharding))
+    energy_engine, UkGG = build_dipole_dipole_ewald(
+        latt, dtype=dtype, sharding=sharding,
+    )
+    energy_engine = jit(energy_engine)
     parameters = jnp.asarray([prefactor], dtype=dtype)
 
     t0 = timer()
-    energy = energy_engine(field, parameters)
+    energy = energy_engine(field, UkGG, parameters)
     jax.block_until_ready(energy)
     compile_and_first_eval_seconds = timer() - t0
 
     t0 = timer()
     for _ in range(repeat):
-        energy = energy_engine(field, parameters)
+        energy = energy_engine(field, UkGG, parameters)
     jax.block_until_ready(energy)
     energy_seconds = (timer() - t0) / repeat
 
@@ -314,13 +323,13 @@ def benchmark_dipole_dipole_ewald(
     if include_force:
         force_engine = jit(grad(energy_engine, argnums=0))
         t0 = timer()
-        force = force_engine(field, parameters)
+        force = force_engine(field, UkGG, parameters)
         jax.block_until_ready(force)
         result["force_compile_and_first_eval_seconds"] = timer() - t0
 
         t0 = timer()
         for _ in range(repeat):
-            force = force_engine(field, parameters)
+            force = force_engine(field, UkGG, parameters)
         jax.block_until_ready(force)
         result["force_seconds"] = (timer() - t0) / repeat
 

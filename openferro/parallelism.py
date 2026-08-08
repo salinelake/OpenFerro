@@ -15,7 +15,9 @@ from jax.sharding import Mesh, NamedSharding, PartitionSpec
 class DeviceMesh:
     def __init__(self, devices=None, num_rows=None, num_cols=None):
         """
-        Initialize the single-host multi-device parallelism. Get the mesh of the devices.
+        Initialize multi-device parallelism and construct the device mesh.
+
+        The devices may span processes after ``jax.distributed.initialize``.
 
         Parameters
         ----------

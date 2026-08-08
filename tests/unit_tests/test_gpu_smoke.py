@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 
 from openferro.engine.elastic import deformed_volume, linearized_volume
-from openferro.engine.ewald import get_dipole_dipole_ewald
+from openferro.engine.ewald import build_dipole_dipole_ewald
 from openferro.lattice import SimpleCubic3D
 from openferro.simulation import SimulationNPTLangevin, SimulationNVTLangevin
 from openferro.system import System
@@ -131,10 +131,10 @@ def test_gpu_ewald_energy_and_autodiff_force_are_finite_float32():
     )
     field = jnp.arange(24, dtype=jnp.float32).reshape((2, 2, 2, 3)) / 100
     parameters = jnp.asarray((1.7,), dtype=jnp.float32)
-    engine = get_dipole_dipole_ewald(lattice, dtype=jnp.float32)
+    engine, UkGG = build_dipole_dipole_ewald(lattice, dtype=jnp.float32)
     energy_and_force = jax.jit(jax.value_and_grad(engine, argnums=0))
 
-    energy, gradient = energy_and_force(field, parameters)
+    energy, gradient = energy_and_force(field, UkGG, parameters)
     energy.block_until_ready()
 
     assert energy.dtype == jnp.float32

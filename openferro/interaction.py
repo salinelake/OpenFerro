@@ -89,6 +89,16 @@ class self_interaction(interaction_base):
     def __init__(self, field_ID, parameters=None):
         super().__init__( parameters)
         self.field_ID = field_ID
+        self.engine_data = None
+
+    def set_engine_data(self, engine_data):
+        """Set immutable data passed explicitly to the energy and force engines.
+
+        This is intended for precomputed arrays such as a sharded Ewald kernel,
+        which must remain JAX arguments instead of JIT closure constants.
+        """
+        self.engine_data = engine_data
+
     def create_force_engine(self, enable_jit=True):
         """
         Derive the force engine of the interaction from the energy engine through automatic differentiation.
@@ -126,7 +136,12 @@ class self_interaction(interaction_base):
             The energy of the interaction
         """
         field_values = field.get_values()
+        if self.engine_data is not None:
+            return self.energy_engine(
+                field_values, self.engine_data, self.parameters,
+            )
         return self.energy_engine(field_values, self.parameters)
+
     def calc_force(self, field):
         """
         Calculate the force of the interaction for a given field.
@@ -142,8 +157,14 @@ class self_interaction(interaction_base):
             The gradient of the energy with respect to the field. It has the same shape as the field.
         """
         field_values = field.get_values()
-        gradient = self.force_engine(field_values, self.parameters)
+        if self.engine_data is not None:
+            gradient = self.force_engine(
+                field_values, self.engine_data, self.parameters,
+            )
+        else:
+            gradient = self.force_engine(field_values, self.parameters)
         return -gradient
+
 
 class mutual_interaction(interaction_base):
     """

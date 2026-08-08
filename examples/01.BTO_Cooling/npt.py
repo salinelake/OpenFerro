@@ -12,16 +12,7 @@ import openferro as of
 from openferro.simulation import MDMinimize, SimulationNPTLangevin
 from openferro.units import Constants
 
-
-EXAMPLE_DIR = Path(__file__).resolve().parent
-
-
-def _load_model_record(path):
-    with Path(path).open(encoding="utf-8") as stream:
-        return json.load(stream)
-
-
-def build_system(config, size, pressure_volume=None):
+def build_system(config, size):
     """Build the BaTiO3 system from a documented model record.
 
     Parameters
@@ -30,16 +21,8 @@ def build_system(config, size, pressure_volume=None):
         BaTiO3 model parameters, units, provenance, and conventions.
     size : int
         Cubic supercell extent.
-    pressure_volume : {"determinant", "linearized_small_strain"}, optional
-        Override the config's pressure-volume convention for comparison runs.
     """
-    if config["model"]["kind"] != "ferroelectric_effective_hamiltonian":
-        raise ValueError("The BTO example requires a ferroelectric model record.")
     lattice_parameters = config["lattice"]
-    if any(
-        lattice_parameters[angle] != 0 for angle in ("alpha", "beta", "gamma")
-    ):
-        raise ValueError("The BTO example requires an axis-aligned orthogonal cell.")
     lattice = of.SimpleCubic3D(
         size,
         size,
@@ -52,18 +35,11 @@ def build_system(config, size, pressure_volume=None):
     mass = 200 * Constants.amu
 
     # The field stores the soft-mode displacement in Angstrom, not its dipole.
-    dipole = system.add_field(
-        ID="dipole", ftype="Rn", dim=3, value=0.0, mass=mass
-    )
-    local_strain = system.add_field(
-        ID="lstrain", ftype="LocalStrain3D", value=0.0, mass=mass
-    )
-    if pressure_volume is None:
-        pressure_volume = config["conventions"]["pressure_volume"]
+    dipole = system.add_field(ID="dipole", ftype="Rn", dim=3, value=0.0, mass=mass)
+    local_strain = system.add_field(ID="lstrain", ftype="LocalStrain3D", value=0.0, mass=mass)
     global_strain = system.add_global_strain(
         value=jnp.asarray((0.01, 0.01, 0.01, 0.0, 0.0, 0.0)),
         mass=mass * size**3,
-        pressure_volume=pressure_volume,
     )
 
     parameters = config["parameters"]
@@ -138,39 +114,17 @@ def build_system(config, size, pressure_volume=None):
 
 def parse_args(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "--config",
-        type=Path,
-        default=EXAMPLE_DIR / "BaTiO3.json",
-        help="Documented ferroelectric JSON model record.",
-    )
-    parser.add_argument("--size", type=int, default=None, help="Cubic supercell size.")
-    parser.add_argument(
-        "--output-dir",
-        type=Path,
-        default=EXAMPLE_DIR / "output",
-        help="Directory for logs and field reports.",
-    )
+    parser.add_argument("--config", type=Path, default="BaTiO3.json", help="ferroelectric JSON model record.")
+    parser.add_argument("--size", type=int, default=24, help="Cubic supercell size.")
+    parser.add_argument("--output-dir", type=Path, default="output", help="Directory for logs and field reports.")
     parser.add_argument("--seed", type=int, default=42, help="Simulation RNG seed.")
-    parser.add_argument(
-        "--pressure-volume",
-        choices=("determinant", "linearized_small_strain"),
-        default=None,
-        help="Override the config's pressure-volume convention.",
-    )
-    parser.add_argument(
-        "--tiny",
-        action="store_true",
-        help="Run a two-site-per-axis CPU smoke calculation.",
-    )
+    parser.add_argument("--tiny", action="store_true", help="Run a two-site-per-axis CPU smoke calculation.")
     return parser.parse_args(argv)
 
 
 def main(argv=None):
     args = parse_args(argv)
-    size = args.size if args.size is not None else (2 if args.tiny else 20)
-    if size < 2:
-        raise ValueError("size must be at least 2 for the configured interactions.")
+    size = 2 if args.tiny else args.size
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
     logging.basicConfig(
@@ -178,20 +132,18 @@ def main(argv=None):
         filename=args.output_dir / "simulation.log",
         force=True,
     )
-    config = _load_model_record(args.config)
-    system, dipole, local_strain, global_strain = build_system(
-        config, size, pressure_volume=args.pressure_volume
-    )
+    config = json.load(args.config.open(encoding="utf-8"))
+    system, dipole, local_strain, global_strain = build_system(config, size)
     pressure_bar = -4.8e4
 
     logging.info("Structure relaxation")
     dipole.set_integrator("optimization", dt=0.0001)
     global_strain.set_integrator("optimization", dt=0.0001)
     local_strain.set_integrator("optimization", dt=0.0001)
-    minimizer = MDMinimize(system, max_iter=1 if args.tiny else 1000, tol=1e-5)
+    minimizer = MDMinimize(system, 1000, tol=1e-5)
     minimizer.add_thermo_reporter(
         file=str(args.output_dir / "optimization.log"),
-        log_interval=1 if args.tiny else 10,
+        log_interval= 10,
         global_strain=True,
         volume=True,
         potential_energy=True,
@@ -201,12 +153,16 @@ def main(argv=None):
     minimizer.run(variable_cell=True, pressure=pressure_bar)
 
     dt = 0.002
+    # temperatures = np.asarray([300] if args.tiny else [
+    #     400, 350, 320, 310, 300, 290, 280, 270, 260, 250, 240,
+    #     230, 220, 210, 200, 190, 180, 170, 160, 150, 140,
+    # ])
     temperatures = np.asarray([300] if args.tiny else [
-        400, 350, 320, 310, 300, 290, 280, 270, 260, 250, 240,
-        230, 220, 210, 200, 190, 180, 170, 160, 150, 140,
-    ])
+        320, 310, 300, 290, 280, 270, 260, 250, 240, 230, 220, 210, 200, 190, 180, 170, 160, 150
+        ]).astype(int)
+
     relax_steps = 1 if args.tiny else int(10 / dt)
-    sampling_steps = 1 if args.tiny else int(100 / dt)
+    sampling_steps = 1 if args.tiny else int(50 / dt)
     log_interval = 1 if args.tiny else 100
 
     simulation = SimulationNPTLangevin(system, pressure=pressure_bar, seed=args.seed)
@@ -237,7 +193,7 @@ def main(argv=None):
             field_ID="dipole",
             log_interval=log_interval,
             field_average=True,
-            dump_field=not args.tiny,
+            dump_field=False,
         )
         simulation.run(sampling_steps)
 

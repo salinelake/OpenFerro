@@ -2,6 +2,7 @@
 *slurm*out
 *.npy
 *.sh
+*.slurm
 archived/
 trash/
 scratch/

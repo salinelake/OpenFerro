@@ -6,13 +6,14 @@ import pytest
 from openferro.lattice import BravaisLattice3D
 from openferro.engine.ewald import (
     apply_ewald_kernel_fft,
+    build_dipole_dipole_ewald,
     calc_ewald_reciprocal_sum,
     dipole_dipole_ewald_plain,
     estimate_dipole_dipole_ewald_memory,
     get_UkGG,
-    get_dipole_dipole_ewald,
 )
 from openferro.parallelism import DeviceMesh
+from openferro.system import System
 from jax import jit
 from scientific_helpers import (
     assert_eager_jit_parity,
@@ -26,7 +27,7 @@ pytestmark = pytest.mark.scientific
 @pytest.fixture(scope="module")
 def reference_engines():
     return {
-        shape: get_dipole_dipole_ewald(
+        shape: build_dipole_dipole_ewald(
             BravaisLattice3D(*shape), dtype=jnp.float64
         )
         for shape in ((2, 2, 2), (3, 2, 2))
@@ -50,23 +51,27 @@ def test_ewald_matches_direct_reference(reference_engines, shape, configuration)
     }
 
     direct = dipole_dipole_ewald_plain(field, parameters)
-    fft = reference_engines[shape](field, jnp.array([1.0]))
+    engine, UkGG = reference_engines[shape]
+    fft = engine(field, UkGG, jnp.array([1.0]))
     np.testing.assert_allclose(fft, direct, rtol=2.0e-11, atol=2.0e-11)
 
 
 def test_ewald_zero_prefactor_scaling_and_cubic_symmetry(reference_engines):
     shape = (2, 2, 2)
     field = jnp.sin(jnp.arange(24).reshape(shape + (3,)) * 0.31)
-    engine = reference_engines[shape]
+    engine, UkGG = reference_engines[shape]
     permuted = jnp.transpose(field, (1, 0, 2, 3))[..., jnp.array([1, 0, 2])]
 
-    np.testing.assert_allclose(engine(jnp.zeros_like(field), jnp.array([1.0])), 0.0)
     np.testing.assert_allclose(
-        engine(field, jnp.array([2.5])), 2.5 * engine(field, jnp.array([1.0]))
+        engine(jnp.zeros_like(field), UkGG, jnp.array([1.0])), 0.0
     )
     np.testing.assert_allclose(
-        engine(permuted, jnp.array([1.0])),
-        engine(field, jnp.array([1.0])),
+        engine(field, UkGG, jnp.array([2.5])),
+        2.5 * engine(field, UkGG, jnp.array([1.0])),
+    )
+    np.testing.assert_allclose(
+        engine(permuted, UkGG, jnp.array([1.0])),
+        engine(field, UkGG, jnp.array([1.0])),
         rtol=2.0e-12,
         atol=2.0e-12,
     )
@@ -76,33 +81,55 @@ def test_ewald_force_jit_and_dtype_parity(reference_engines):
     shape = (2, 2, 2)
     field64 = jnp.sin(jnp.arange(24).reshape(shape + (3,)) * 0.23) * 0.1
     parameters64 = jnp.array([1.73], dtype=jnp.float64)
-    engine64 = reference_engines[shape]
+    engine64, UkGG64 = reference_engines[shape]
 
     assert_force_matches_finite_difference(
-        lambda value: engine64(value, parameters64),
+        lambda value: engine64(value, UkGG64, parameters64),
         field64,
         rtol=3.0e-6,
         atol=3.0e-7,
     )
-    assert_eager_jit_parity(engine64, field64, parameters64)
+    assert_eager_jit_parity(engine64, field64, UkGG64, parameters64)
 
-    engine32 = get_dipole_dipole_ewald(
+    engine32, UkGG32 = build_dipole_dipole_ewald(
         BravaisLattice3D(*shape), dtype=jnp.float32
     )
     energy32 = engine32(
-        field64.astype(jnp.float32), parameters64.astype(jnp.float32)
+        field64.astype(jnp.float32), UkGG32, parameters64.astype(jnp.float32)
     )
-    energy64 = engine64(field64, parameters64)
+    energy64 = engine64(field64, UkGG64, parameters64)
     # Float32 builds the reciprocal kernel through many accumulated replicas.
     np.testing.assert_allclose(energy32, energy64, rtol=3.0e-4, atol=3.0e-6)
 
 
 def test_ewald_engine_rejects_incompatible_shapes(reference_engines):
-    engine = reference_engines[(2, 2, 2)]
+    engine, UkGG = reference_engines[(2, 2, 2)]
     with pytest.raises(ValueError, match=r"shape \(2, 2, 2, 3\)"):
-        engine(jnp.zeros((2, 2, 3, 3)), jnp.array([1.0]))
+        engine(jnp.zeros((2, 2, 3, 3)), UkGG, jnp.array([1.0]))
     with pytest.raises(ValueError, match=r"parameters.*shape \(1,\)"):
-        engine(jnp.zeros((2, 2, 2, 3)), jnp.array([1.0, 2.0]))
+        engine(jnp.zeros((2, 2, 2, 3)), UkGG, jnp.array([1.0, 2.0]))
+
+
+def test_system_passes_ewald_kernel_to_energy_and_force():
+    system = System(BravaisLattice3D(2, 2, 2))
+    field = system.add_field(
+        "dipole",
+        ftype="Rn",
+        dim=3,
+        value=jnp.asarray([0.2, -0.1, 0.3]),
+        mass=None,
+    )
+    interaction = system.add_dipole_dipole_interaction(
+        "ewald", "dipole", prefactor=1.7
+    )
+
+    energy = system.calc_energy_by_ID("ewald")
+    force = system.calc_force_by_ID("ewald")
+
+    assert interaction.engine_data.shape == (2, 2, 2, 6)
+    assert bool(jnp.isfinite(energy))
+    assert force.shape == field.get_values().shape
+    assert bool(jnp.all(jnp.isfinite(force)))
 
 
 def test_ewald_reciprocal_sum_matches_component_form():
@@ -178,11 +205,17 @@ def test_ewald_coefficients_dtype_and_sharding():
     assert UkGG.sharding == sharding
 
     field = jnp.ones((2, 2, 2, 3), dtype=jnp.float32)
-    engine = jit(get_dipole_dipole_ewald(latt, dtype=field.dtype, sharding=sharding))
+    engine, sharded_UkGG = build_dipole_dipole_ewald(
+        latt, dtype=field.dtype, sharding=sharding
+    )
+    engine = jit(engine)
     sharded_field = jax.device_put(field, sharding)
-    energy = engine(sharded_field, jnp.array([1.0], dtype=field.dtype))
+    energy = engine(
+        sharded_field, sharded_UkGG, jnp.array([1.0], dtype=field.dtype)
+    )
 
     assert energy.dtype == field.dtype
+    assert sharded_UkGG.sharding == sharding
  
 # ## check dipole-dipole interaction force calculation
 # grad_slow = grad( dipole_dipole_ewald_plain  )

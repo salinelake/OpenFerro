@@ -34,7 +34,6 @@
         "local_mode": "soft_mode_displacement",
         "strain_voigt": "(exx,eyy,ezz,2eyz,2exz,2exy)",
         "short_range_bonds": "unique_undirected",
-        "pressure_volume": "determinant",
         "ewald_geometry": "axis_aligned_orthogonal"
     },
     "parameters": {

@@ -30,19 +30,28 @@ reverse pass.
 Sharding
 --------
 
-``get_dipole_dipole_ewald`` accepts an optional ``sharding`` argument. When a
-field is sharded across devices with ``DeviceMesh.partition_sharding()``, pass
-the same sharding to Ewald coefficient construction so ``UkGG`` follows the
-same logical partitioning:
+``build_dipole_dipole_ewald`` accepts an optional ``sharding`` argument and
+returns both the energy engine and ``UkGG``. Pass the kernel as an explicit
+engine argument so JAX can use a global array spanning multiple processes;
+such an array cannot be captured as a JIT closure constant. When a field is
+sharded with ``DeviceMesh.partition_sharding()``, use the same sharding for
+the kernel:
 
 .. code-block:: python
 
-   from openferro.engine.ewald import get_dipole_dipole_ewald
+   import jax
+
+   from openferro.engine.ewald import build_dipole_dipole_ewald
 
    sharding = gpu_mesh.partition_sharding()
-   energy_engine = get_dipole_dipole_ewald(
+   energy_engine, UkGG = build_dipole_dipole_ewald(
        lattice, dtype=field.get_values().dtype, sharding=sharding
    )
+   energy = jax.jit(energy_engine)(field.get_values(), UkGG, parameters)
+
+Partitioning distributes the ``6 * N`` kernel values across the mesh. Using
+replicated sharding instead stores the complete kernel on every GPU, so its
+per-GPU memory cost does not decrease as devices are added.
 
 For very large cells, remember that distributed FFTs can still allocate backend
 workspace and communication buffers beyond the arrays listed above.

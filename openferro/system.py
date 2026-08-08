@@ -17,7 +17,7 @@ from openferro.units import Constants
 from openferro.engine.elastic import *
 from openferro.engine.ferroelectric import *
 from openferro.engine.magnetic import *
-from openferro.engine.ewald import get_dipole_dipole_ewald
+from openferro.engine.ewald import build_dipole_dipole_ewald
 ## import parallelism modules
 from openferro.parallelism import DeviceMesh
 
@@ -355,12 +355,13 @@ class System:
         """
         self._add_interaction_sanity_check(ID)
         field = self.get_field_by_ID(field_ID)
-        interaction = self_interaction( field_ID)
-        energy_engine = get_dipole_dipole_ewald(
+        interaction = self_interaction(field_ID)
+        energy_engine, UkGG = build_dipole_dipole_ewald(
             field.lattice,
             dtype=field.get_values().dtype,
             sharding=field._sharding,
         )
+        interaction.set_engine_data(UkGG)
         interaction.set_energy_engine(energy_engine, enable_jit=enable_jit)
         interaction.create_force_engine(enable_jit=enable_jit)
         interaction.set_parameters(jnp.array([prefactor]))
