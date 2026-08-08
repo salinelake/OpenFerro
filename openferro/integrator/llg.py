@@ -13,6 +13,7 @@ from jax import jit
 import jax.numpy as jnp
 
 from openferro.integrator.base import Integrator
+from openferro.parallelism import _random_normal
 from openferro.units import Constants
 from openferro.utilities import SO3_rotation
 
@@ -267,10 +268,12 @@ class LLLangevinIntegrator(LLIntegrator):
             Random noise array
         """
         values = field.get_values()
-        gaussian = jax.random.normal(key, values.shape, dtype=values.dtype)
-        if field._sharding is not None and field._sharding != gaussian.sharding:
-            gaussian = jax.device_put(gaussian, field._sharding)
-        return gaussian    
+        return _random_normal(
+            key,
+            values.shape,
+            dtype=values.dtype,
+            sharding=field._sharding,
+        )
     
     def step(self, key, field, force_updater=None):
         """
@@ -565,10 +568,12 @@ class LLSIBLangevinIntegrator(LLSIBIntegrator):
         self.noise_max = jnp.sqrt(2* jnp.abs(jnp.log(self.dt)))
     def get_noise(self, key, field):
         values = field.get_values()
-        gaussian = jax.random.normal(key, values.shape, dtype=values.dtype)
-        if field._sharding is not None and field._sharding != gaussian.sharding:
-            gaussian = jax.device_put(gaussian, field._sharding)
-        return gaussian    
+        return _random_normal(
+            key,
+            values.shape,
+            dtype=values.dtype,
+            sharding=field._sharding,
+        )
     
     def step(self, key, field, force_updater=None):
         """

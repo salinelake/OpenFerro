@@ -7,7 +7,7 @@ import numpy as np
 import jax
 import jax.numpy as jnp
 from openferro.units import Constants
-from openferro.parallelism import DeviceMesh
+from openferro.parallelism import DeviceMesh, _random_normal
 from openferro.integrator.llg import *
 from openferro.integrator.md import *
 
@@ -110,6 +110,13 @@ class Field:
             if self._sharding is not None:
                 self._velocity = jax.device_put(self._velocity, self._sharding)
 
+    def _set_velocity_from_integrator(self, velocity):
+        """Store a velocity produced from field arrays by a built-in integrator."""
+        self.compare_shape(velocity, self._values)
+        if self._sharding is not None and velocity.sharding != self._sharding:
+            raise ValueError("Integrator output must preserve field sharding.")
+        self._velocity = velocity
+
     def get_velocity(self):
         if self._velocity is None:
             raise ValueError("Velocity is not set")
@@ -144,15 +151,16 @@ class Field:
                 else key
             )
             self._velocity = (
-                jax.random.normal(
-                    random_key, self._values.shape, dtype=self._values.dtype
+                _random_normal(
+                    random_key,
+                    self._values.shape,
+                    dtype=self._values.dtype,
+                    sharding=self._sharding,
                 )
                 * jnp.sqrt(Constants.kb * temperature / self._mass)
             )
         else:
             raise ValueError(f"Unknown velocity initialization mode {mode!r}.")
-        if self._sharding is not None:
-            self._velocity = jax.device_put(self._velocity, self._sharding)
     
     """
     These methods are used to handle the force of the field.

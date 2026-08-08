@@ -9,7 +9,9 @@ import pytest
 
 from openferro.engine.elastic import deformed_volume, linearized_volume
 from openferro.engine.ewald import build_dipole_dipole_ewald
+from openferro.integrator.md import LangevinIntegrator
 from openferro.lattice import SimpleCubic3D
+from openferro.parallelism import DeviceMesh
 from openferro.simulation import SimulationNPTLangevin, SimulationNVTLangevin
 from openferro.system import System
 
@@ -164,6 +166,28 @@ def test_gpu_stochastic_sib_exchange_step_preserves_spin_norm():
     np.testing.assert_allclose(
         np.linalg.norm(np.asarray(values), axis=-1), 1.5, rtol=2e-6, atol=2e-6
     )
+
+
+def test_gpu_langevin_noise_and_velocity_preserve_field_sharding():
+    device_count = jax.device_count()
+    system = System(SimpleCubic3D(2, 2 * device_count, 2))
+    field = system.add_field("x", ftype="Rn", dim=3, value=0.0, mass=1.0)
+    field.set_velocity(jnp.zeros_like(field.get_values()))
+    field.set_force(jnp.ones_like(field.get_values()))
+    system.move_fields_to_multi_devs(DeviceMesh())
+    integrator = LangevinIntegrator(dt=0.01, temp=300.0, tau=0.5)
+    key = jax.random.PRNGKey(31)
+
+    reference = jax.random.normal(
+        key, field.get_values().shape, dtype=field.get_values().dtype
+    )
+    noise = integrator.get_noise(key, field)
+    np.testing.assert_array_equal(np.asarray(noise), np.asarray(reference))
+    assert noise.sharding == field._sharding
+
+    integrator.step(key, field)
+    field.get_velocity().block_until_ready()
+    assert field.get_velocity().sharding == field._sharding
 
 
 @pytest.mark.stochastic

@@ -6,10 +6,31 @@ Notes
 This file is part of OpenFerro.
 """
 
+from functools import lru_cache
 import logging
 import numpy as np
 import jax
 from jax.sharding import Mesh, NamedSharding, PartitionSpec
+
+
+@lru_cache(maxsize=32)
+def _normal_engine(shape, dtype, sharding):
+    def draw(key):
+        return jax.random.normal(key, shape, dtype=dtype)
+
+    return jax.jit(draw, out_shardings=sharding)
+
+
+def _random_normal(key, shape, dtype, sharding=None):
+    """Generate a normal random array directly with the requested sharding."""
+    if sharding is None or jax.process_count() > 1:
+        values = jax.random.normal(key, shape, dtype=dtype)
+        if sharding is not None and values.sharding != sharding:
+            values = jax.device_put(values, sharding)
+        return values
+    # JAX 0.11 rejects random.normal(out_sharding=...) for automatic mesh axes.
+    # A compiled output constraint supports that mesh mode without a reshard.
+    return _normal_engine(tuple(shape), np.dtype(dtype), sharding)(key)
 
 
 class DeviceMesh:
@@ -62,6 +83,8 @@ class DeviceMesh:
                 return devices.shape
             if devices.ndim != 1:
                 raise ValueError("devices must be a one- or two-dimensional array.")
+            if jax.process_count() == 1:
+                return 1, num_devices
             for i in range(int(np.sqrt(num_devices)), 0, -1):
                 if num_devices % i == 0:
                     return i, num_devices // i

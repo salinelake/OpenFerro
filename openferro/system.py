@@ -1022,8 +1022,8 @@ class System:
                 t0 = timer()
             interaction = self._self_interaction_dict[interaction_ID]
             field = self.get_field_by_ID(interaction.field_ID)
-            force = interaction.calc_force(field)
-            field.accumulate_force(force)
+            force = interaction._accumulate_force(field, field.get_force())
+            field.set_force(force)
             if profile:
                 jax.block_until_ready(field.get_force())
                 logging.info('Time for updating force from {}: {:.8f}s'.format(interaction_ID, timer()-t0))
@@ -1040,9 +1040,11 @@ class System:
             interaction = self.get_interaction_by_ID(interaction_ID)
             field1 = self.get_field_by_ID(interaction.field_1_ID)
             field2 = self.get_field_by_ID(interaction.field_2_ID)
-            force1, force2 = interaction.calc_force(field1, field2)
-            field1.accumulate_force(force1)
-            field2.accumulate_force(force2)
+            force1, force2 = interaction._accumulate_force(
+                field1, field2, field1.get_force(), field2.get_force()
+            )
+            field1.set_force(force1)
+            field2.set_force(force2)
             if profile:
                 jax.block_until_ready(field2.get_force())
                 logging.info('Time for updating force from {}: {:.8f}s'.format(interaction_ID, timer()-t0))
@@ -1059,10 +1061,17 @@ class System:
             field1 = self.get_field_by_ID(interaction.field_1_ID)
             field2 = self.get_field_by_ID(interaction.field_2_ID)
             field3 = self.get_field_by_ID(interaction.field_3_ID)
-            force1, force2, force3 = interaction.calc_force(field1, field2, field3)
-            field1.accumulate_force(force1)
-            field2.accumulate_force(force2)
-            field3.accumulate_force(force3)
+            force1, force2, force3 = interaction._accumulate_force(
+                field1,
+                field2,
+                field3,
+                field1.get_force(),
+                field2.get_force(),
+                field3.get_force(),
+            )
+            field1.set_force(force1)
+            field2.set_force(force2)
+            field3.set_force(force3)
             if profile:
                 jax.block_until_ready(field3.get_force())
                 logging.info('Time for updating force from {}: {:.8f}s'.format(interaction_ID, timer()-t0))

@@ -1,6 +1,7 @@
 import numpy as np
 import jax
 import jax.numpy as jnp
+import pytest
 from jax.sharding import NamedSharding
 
 from openferro.parallelism import DeviceMesh
@@ -19,6 +20,29 @@ def test_device_mesh_infers_single_device_shape():
     mesh = DeviceMesh(devices=jax.devices()[:1])
 
     assert mesh.mesh.shape == {"x": 1, "y": 1}
+
+
+@pytest.mark.parametrize("device_count", [1, 2, 3, 4])
+def test_device_mesh_infers_single_process_slab_shape(device_count, monkeypatch):
+    monkeypatch.setattr(jax, "process_count", lambda: 1)
+    devices = np.empty(device_count, dtype=object)
+
+    shape = DeviceMesh._resolve_mesh_shape(
+        devices, device_count, num_rows=None, num_cols=None
+    )
+
+    assert shape == (1, device_count)
+
+
+def test_device_mesh_preserves_balanced_multi_process_policy(monkeypatch):
+    monkeypatch.setattr(jax, "process_count", lambda: 2)
+    devices = np.empty(4, dtype=object)
+
+    shape = DeviceMesh._resolve_mesh_shape(
+        devices, 4, num_rows=None, num_cols=None
+    )
+
+    assert shape == (2, 2)
 
 
 def test_device_mesh_preserves_shaped_devices():

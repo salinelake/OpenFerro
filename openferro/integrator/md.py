@@ -13,6 +13,7 @@ from jax import jit
 import jax.numpy as jnp
 
 from openferro.integrator.base import Integrator
+from openferro.parallelism import _random_normal
 from openferro.units import Constants
 
 
@@ -129,7 +130,7 @@ class LeapFrogIntegrator(Integrator):
         v0 = field.get_velocity()
         x0, v0 = self.step_xp(x0, v0, field.get_force(), field.get_mass(), self.dt)
         field.set_values(x0)
-        field.set_velocity(v0)
+        field._set_velocity_from_integrator(v0)
         return field
 
 class LeapFrogIntegrator_Strain(LeapFrogIntegrator):
@@ -180,17 +181,13 @@ class LangevinIntegrator(Integrator):
     """
     velocity_time_offset = -0.5
 
-    def _step_p(self, v, f, m, dt):
+    def _step_lfmiddle(self, x, v, f, m, gaussian, dt, kbT, z1, z2):
         v += f / m * dt
-        return v
-
-    def _step_x(self, x, v, dt):
         x += 0.5 * v * dt
-        return x
-
-    def _step_t(self, v, noise, z1, z2):
+        noise = gaussian * jnp.sqrt(kbT / m)
         v = z1 * v + z2 * noise
-        return v
+        x += 0.5 * v * dt
+        return x, v
 
     def __init__(self, dt, temp, tau):
         super().__init__(dt)
@@ -202,9 +199,7 @@ class LangevinIntegrator(Integrator):
         self.gamma = 1.0 / self.tau
         self.z1 = jnp.exp(-self.dt * self.gamma)
         self.z2 = jnp.sqrt(1 - jnp.exp(-2 * self.dt * self.gamma))
-        self.step_p = jit(self._step_p)
-        self.step_x = jit(self._step_x)
-        self.step_t = jit(self._step_t)
+        self.step_lfmiddle = jit(self._step_lfmiddle)
     
     def get_noise(self, key, field):
         """
@@ -223,10 +218,12 @@ class LangevinIntegrator(Integrator):
             Random noise array
         """
         velocity = field.get_velocity()
-        gaussian = jax.random.normal(key, velocity.shape, dtype=velocity.dtype)
-        if field._sharding is not None and field._sharding != gaussian.sharding:
-            gaussian = jax.device_put(gaussian, field._sharding)
-        return gaussian
+        return _random_normal(
+            key,
+            velocity.shape,
+            dtype=velocity.dtype,
+            sharding=field._sharding,
+        )
         
     def step(self, key, field):
         """
@@ -249,14 +246,12 @@ class LangevinIntegrator(Integrator):
         force = field.get_force()
         v0 = field.get_velocity()
         x0 = field.get_values()
-        v0 = self.step_p(v0, force, mass, dt)
-        x0 = self.step_x(x0, v0, dt)
-        gaussian = self.get_noise(key, field) 
-        gaussian *= (self.kbT/ mass)**0.5
-        v0 = self.step_t(v0, gaussian, self.z1, self.z2)
-        x0 = self.step_x(x0, v0, dt)
+        gaussian = self.get_noise(key, field)
+        x0, v0 = self.step_lfmiddle(
+            x0, v0, force, mass, gaussian, dt, self.kbT, self.z1, self.z2
+        )
         field.set_values(x0)
-        field.set_velocity(v0)
+        field._set_velocity_from_integrator(v0)
         return field
 
 class LangevinIntegrator_Strain(LangevinIntegrator):
@@ -284,22 +279,17 @@ class LangevinIntegrator_Strain(LangevinIntegrator):
             self.mask = jnp.ones((6,))
         else:
             self.mask = jnp.array([int(not freeze_x), int(not freeze_y), int(not freeze_z), 0, 0, 0])
-        def _step_p(v, f, m, dt):
+        def _step_lfmiddle(x, v, f, m, gaussian, dt, kbT, z1, z2):
             v += f / m * dt
             v *= self.mask
-            return v
-
-        def _step_x(x, v, dt):
             x += 0.5 * v * dt
-            return x
-
-        def _step_t(v, noise, z1, z2):
+            noise = gaussian * jnp.sqrt(kbT / m)
             v = z1 * v + z2 * noise
             v *= self.mask
-            return v 
-        self.step_p = jit(_step_p)
-        self.step_x = jit(_step_x)
-        self.step_t = jit(_step_t)
+            x += 0.5 * v * dt
+            return x, v
+
+        self.step_lfmiddle = jit(_step_lfmiddle)
     
 class OverdampedLangevinIntegrator(Integrator):
     """

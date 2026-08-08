@@ -203,6 +203,14 @@ def test_md_integrators_reject_invalid_configuration(constructor):
         constructor()
 
 
+@pytest.mark.parametrize("velocity", [np.nan, np.inf, -np.inf])
+def test_public_velocity_setter_still_rejects_nonfinite_values(velocity):
+    field = _field(0.0)
+
+    with pytest.raises(ValueError, match="finite values"):
+        field.set_velocity(jnp.full(field.get_values().shape, velocity))
+
+
 @pytest.mark.parametrize("mass", [0.0, -1.0, np.inf, np.nan])
 def test_field_rejects_invalid_inertial_mass(mass):
     field = FieldRn(BravaisLattice3D(1, 1, 1), "x", 1)

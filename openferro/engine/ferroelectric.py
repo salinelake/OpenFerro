@@ -167,19 +167,23 @@ def short_range_2ednn_isotropic(field, parameters):
     """
     j3, j4, j5 = parameters
     
-    f = field
     energy = 0.0
 
-    for axis_pair in [(0,1), (0,2), (1,2)]:
-        f1 = jnp.roll( f, (1, 1), axis=axis_pair) 
-        f2 = jnp.roll( f, (1,-1), axis=axis_pair) 
+    for axis_a, axis_b in ((0, 1), (0, 2), (1, 2)):
+        axis_c = 3 - axis_a - axis_b
+        neighbor_1 = jnp.roll(field, (1, 1), axis=(axis_a, axis_b))
+        neighbor_2 = jnp.roll(field, (1, -1), axis=(axis_a, axis_b))
+        neighbor_sum = neighbor_1 + neighbor_2
+        neighbor_difference = neighbor_1 - neighbor_2
 
-        # Uni-axis interactions
-        energy += j3 * jnp.sum(f * (f1 + f2))
-        energy += (j4 - j3) * jnp.sum(f[..., 3 - axis_pair[0] - axis_pair[1]] * (f1 + f2)[..., 3 - axis_pair[0] - axis_pair[1]])
-
-        # Orthogonal-axis interactions
-        energy += j5 * jnp.sum(f[..., [axis_pair[0], axis_pair[1]]] * (f1 - f2)[..., [axis_pair[1], axis_pair[0]]])
+        energy += j3 * jnp.sum(field * neighbor_sum)
+        energy += (j4 - j3) * jnp.sum(
+            field[..., axis_c] * neighbor_sum[..., axis_c]
+        )
+        energy += j5 * jnp.sum(
+            field[..., axis_a] * neighbor_difference[..., axis_b]
+            + field[..., axis_b] * neighbor_difference[..., axis_a]
+        )
 
     return energy
  

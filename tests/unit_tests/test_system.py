@@ -7,6 +7,14 @@ from openferro.lattice import SimpleCubic3D
 from openferro.system import System
 
 
+def _quadratic_energy(field, parameters):
+    return parameters[0] * jnp.sum(field**2)
+
+
+def _bilinear_energy(field1, field2, parameters):
+    return parameters[0] * jnp.sum(field1 * field2)
+
+
 def test_add_global_strain_is_transactional_for_duplicates():
     system = System(SimpleCubic3D(1, 1, 1))
     field = system.add_global_strain(value=jnp.arange(6.0), mass=2.0)
@@ -88,3 +96,36 @@ def test_reference_example_field_calls_remain_compatible():
     assert isinstance(global_strain, GlobalStrain)
     assert isinstance(spin, FieldSO3)
     np.testing.assert_allclose(jnp.linalg.norm(spin.get_values(), axis=-1), 2.23)
+
+
+@pytest.mark.parametrize("dtype", [jnp.float32, jnp.float64])
+def test_update_force_accumulates_terms_and_uses_updated_parameters(dtype):
+    system = System(SimpleCubic3D(2, 1, 1))
+    field1 = system.add_field(
+        "a", value=jnp.asarray(2.0, dtype=dtype), mass=None
+    )
+    field2 = system.add_field(
+        "b", value=jnp.asarray(3.0, dtype=dtype), mass=None
+    )
+    first = system.add_self_interaction(
+        "a_first", "a", _quadratic_energy, [0.5]
+    )
+    system.add_self_interaction("a_second", "a", _quadratic_energy, [1.5])
+    system.add_mutual_interaction("ab", "a", "b", _bilinear_energy, [2.0])
+
+    def expected_forces():
+        self_first = system.calc_force_by_ID("a_first")
+        self_second = system.calc_force_by_ID("a_second")
+        mutual1, mutual2 = system.calc_force_by_ID("ab")
+        return self_first + self_second + mutual1, mutual2
+
+    expected1, expected2 = expected_forces()
+    system.update_force()
+    np.testing.assert_allclose(field1.get_force(), expected1)
+    np.testing.assert_allclose(field2.get_force(), expected2)
+
+    first.set_parameters([2.5])
+    expected1, expected2 = expected_forces()
+    system.update_force()
+    np.testing.assert_allclose(field1.get_force(), expected1)
+    np.testing.assert_allclose(field2.get_force(), expected2)

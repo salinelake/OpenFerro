@@ -14,6 +14,10 @@ def _weighted_quadratic_energy(field, weights, parameters):
     return parameters[0] * jnp.sum(weights * field**2)
 
 
+def _bilinear_energy(field1, field2, parameters):
+    return parameters[0] * jnp.sum(field1 * field2)
+
+
 def test_self_interaction_passes_engine_data_to_energy_and_force():
     system = System(SimpleCubic3D(1, 1, 1))
     field = system.add_field("a", ftype="Rn", dim=1, value=2.0, mass=None)
@@ -25,13 +29,60 @@ def test_self_interaction_passes_engine_data_to_energy_and_force():
 
     np.testing.assert_allclose(interaction.calc_energy(field), 24.0)
     np.testing.assert_allclose(interaction.calc_force(field), -24.0)
+    np.testing.assert_allclose(
+        interaction._accumulate_force(field, jnp.ones_like(field.get_values())),
+        -23.0,
+    )
+    assert interaction._force_accumulator is None
+
+
+def test_compiled_force_accumulators_match_term_forces():
+    system = System(SimpleCubic3D(1, 1, 1))
+    field1 = system.add_field("a", value=2.0, mass=None)
+    field2 = system.add_field("b", value=3.0, mass=None)
+    field3 = system.add_field("c", value=4.0, mass=None)
+
+    self_term = system.add_self_interaction(
+        "aa", "a", lambda field, p: p[0] * jnp.sum(field**2), [0.5]
+    )
+    mutual_term = system.add_mutual_interaction(
+        "ab", "a", "b", _bilinear_energy, [2.0]
+    )
+    triple_term = system.add_triple_interaction(
+        "abc", "a", "b", "c", _trilinear_energy, [1.5]
+    )
+
+    current1 = jnp.full_like(field1.get_values(), 10.0)
+    current2 = jnp.full_like(field2.get_values(), 20.0)
+    current3 = jnp.full_like(field3.get_values(), 30.0)
+
+    np.testing.assert_allclose(
+        self_term._accumulate_force(field1, current1),
+        current1 + self_term.calc_force(field1),
+    )
+    force1, force2 = mutual_term._accumulate_force(
+        field1, field2, current1, current2
+    )
+    expected1, expected2 = mutual_term.calc_force(field1, field2)
+    np.testing.assert_allclose(force1, current1 + expected1)
+    np.testing.assert_allclose(force2, current2 + expected2)
+
+    force1, force2, force3 = triple_term._accumulate_force(
+        field1, field2, field3, current1, current2, current3
+    )
+    expected1, expected2, expected3 = triple_term.calc_force(
+        field1, field2, field3
+    )
+    np.testing.assert_allclose(force1, current1 + expected1)
+    np.testing.assert_allclose(force2, current2 + expected2)
+    np.testing.assert_allclose(force3, current3 + expected3)
 
 
 def test_triple_interaction_energy_lookup_and_force():
     system = System(SimpleCubic3D(1, 1, 1))
     field1 = system.add_field("a", value=1.0, mass=None)
-    system.add_field("b", value=2.0, mass=None)
-    system.add_field("c", value=3.0, mass=None)
+    field2 = system.add_field("b", value=2.0, mass=None)
+    field3 = system.add_field("c", value=3.0, mass=None)
 
     interaction = system.add_triple_interaction(
         "abc",
@@ -50,6 +101,11 @@ def test_triple_interaction_energy_lookup_and_force():
     np.testing.assert_allclose(force1, -12.0)
     np.testing.assert_allclose(force2, -6.0)
     np.testing.assert_allclose(force3, -4.0)
+
+    system.update_force()
+    np.testing.assert_allclose(field1.get_force(), force1)
+    np.testing.assert_allclose(field2.get_force(), force2)
+    np.testing.assert_allclose(field3.get_force(), force3)
 
     original = field1.get_values()
     index = (0, 0, 0, 0)

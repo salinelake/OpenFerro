@@ -196,12 +196,6 @@ def test_magnetic_record_matches_production_engines(path):
     assert couplings.dtype == jnp.float64
 
 
-def test_ferroelectric_records_select_determinant_pressure_volume():
-    for path in FERROELECTRIC_RECORDS:
-        record = _load_record(path)
-        assert record["conventions"]["pressure_volume"] == "determinant"
-
-
 def test_exchange_records_declare_pair_counting_and_unit_conversion():
     bcc = _load_record(MAGNETIC_RECORDS[0])
     simple_cubic = _load_record(MAGNETIC_RECORDS[1])

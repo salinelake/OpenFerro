@@ -20,8 +20,10 @@ class interaction_base:
     """
     def __init__(self, parameters=None):
         self.parameters = parameters
+        self._energy_engine = None
         self.energy_engine = None
         self.force_engine = None
+        self._force_accumulator = None
     def set_parameters(self, parameters):
         """
         Set the parameters of the interaction.
@@ -65,6 +67,9 @@ class interaction_base:
         enable_jit : bool, optional
             Whether to enable jit for the energy engine, by default True
         """
+        self._energy_engine = energy_engine
+        self.force_engine = None
+        self._force_accumulator = None
         if enable_jit:
             self.energy_engine = jit(energy_engine)
         else:
@@ -98,6 +103,7 @@ class self_interaction(interaction_base):
         which must remain JAX arguments instead of JIT closure constants.
         """
         self.engine_data = engine_data
+        self._force_accumulator = None
 
     def create_force_engine(self, enable_jit=True):
         """
@@ -113,12 +119,24 @@ class self_interaction(interaction_base):
         ValueError
             If energy engine is not set
         """
-        if self.energy_engine is None:
+        if self._energy_engine is None:
             raise ValueError("Energy engine is not set. Set energy engine before creating force engine.")
+        gradient_source = (
+            self.energy_engine
+            if self.engine_data is not None
+            else self._energy_engine
+        )
+        gradient_engine = grad(gradient_source, argnums=0)
         if enable_jit:
-            self.force_engine =  jit(grad(self.energy_engine, argnums=0 )) 
+            self.force_engine = jit(gradient_engine)
         else:
-            self.force_engine =  grad(self.energy_engine, argnums=0 )
+            self.force_engine = gradient_engine
+        self._force_accumulator = None
+        if self.engine_data is None:
+            def accumulate(field_values, parameters, current_force):
+                return current_force - gradient_engine(field_values, parameters)
+
+            self._force_accumulator = jit(accumulate) if enable_jit else accumulate
         return
 
     def calc_energy(self, field):
@@ -165,6 +183,14 @@ class self_interaction(interaction_base):
             gradient = self.force_engine(field_values, self.parameters)
         return -gradient
 
+    def _accumulate_force(self, field, current_force):
+        """Add this interaction's force to an existing force array."""
+        if self._force_accumulator is None:
+            return current_force + self.calc_force(field)
+        return self._force_accumulator(
+            field.get_values(), self.parameters, current_force
+        )
+
 
 class mutual_interaction(interaction_base):
     """
@@ -197,12 +223,20 @@ class mutual_interaction(interaction_base):
         ValueError
             If energy engine is not set
         """
-        if self.energy_engine is None:
+        if self._energy_engine is None:
             raise ValueError("Energy engine is not set. Set energy engine before creating force engine.")
+        gradient_engine = grad(self._energy_engine, argnums=(0, 1))
+
+        def accumulate(f1, f2, parameters, current_force1, current_force2):
+            gradient1, gradient2 = gradient_engine(f1, f2, parameters)
+            return current_force1 - gradient1, current_force2 - gradient2
+
         if enable_jit:
-            self.force_engine =  jit(grad(self.energy_engine, argnums=(0, 1) )) 
+            self.force_engine = jit(gradient_engine)
+            self._force_accumulator = jit(accumulate)
         else:
-            self.force_engine =  grad(self.energy_engine, argnums=(0, 1) )
+            self.force_engine = gradient_engine
+            self._force_accumulator = accumulate
     def calc_energy(self, field1, field2):
         """
         Calculate the energy of the interaction for a given pair of fields.
@@ -243,6 +277,16 @@ class mutual_interaction(interaction_base):
         gradient = self.force_engine(f1, f2, self.parameters)
         return (- gradient[0], - gradient[1])
 
+    def _accumulate_force(self, field1, field2, current_force1, current_force2):
+        """Add this interaction's forces to two existing force arrays."""
+        return self._force_accumulator(
+            field1.get_values(),
+            field2.get_values(),
+            self.parameters,
+            current_force1,
+            current_force2,
+        )
+
 class triple_interaction(interaction_base):
     """
     A class to specify the mutual interaction between three fields.
@@ -277,12 +321,29 @@ class triple_interaction(interaction_base):
         ValueError
             If energy engine is not set
         """
-        if self.energy_engine is None:
+        if self._energy_engine is None:
             raise ValueError("Energy engine is not set. Set energy engine before creating force engine.")
+        gradient_engine = grad(self._energy_engine, argnums=(0, 1, 2))
+
+        def accumulate(
+            f1, f2, f3, parameters,
+            current_force1, current_force2, current_force3,
+        ):
+            gradient1, gradient2, gradient3 = gradient_engine(
+                f1, f2, f3, parameters
+            )
+            return (
+                current_force1 - gradient1,
+                current_force2 - gradient2,
+                current_force3 - gradient3,
+            )
+
         if enable_jit:
-            self.force_engine =  jit(grad(self.energy_engine, argnums=(0, 1, 2) )) 
+            self.force_engine = jit(gradient_engine)
+            self._force_accumulator = jit(accumulate)
         else:
-            self.force_engine =  grad(self.energy_engine, argnums=(0, 1, 2) )
+            self.force_engine = gradient_engine
+            self._force_accumulator = accumulate
     def calc_energy(self, field1, field2, field3):
         """
         Calculate the energy of the interaction for a given triple of fields.
@@ -328,3 +389,18 @@ class triple_interaction(interaction_base):
         f3 = field3.get_values()
         gradient = self.force_engine(f1, f2, f3, self.parameters)
         return (- gradient[0], - gradient[1], - gradient[2])
+
+    def _accumulate_force(
+        self, field1, field2, field3,
+        current_force1, current_force2, current_force3,
+    ):
+        """Add this interaction's forces to three existing force arrays."""
+        return self._force_accumulator(
+            field1.get_values(),
+            field2.get_values(),
+            field3.get_values(),
+            self.parameters,
+            current_force1,
+            current_force2,
+            current_force3,
+        )
