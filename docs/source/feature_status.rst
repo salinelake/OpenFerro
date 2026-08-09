@@ -3,7 +3,7 @@ Feature Status
 
 OpenFerro is currently a research alpha. A callable API is not necessarily a
 scientifically validated API. This page is the authoritative status statement
-for the 0.1 series. Exact promoted equations and units are in
+for the 0.2 series. Exact promoted equations and units are in
 :doc:`scientific_conventions`.
 
 Status definitions
@@ -11,7 +11,7 @@ Status definitions
 
 ``Stable``
    The listed behavior has focused analytical or invariant tests and is
-   intended to remain compatible within the 0.1 series, within the stated
+   intended to remain compatible within the 0.2 series, within the stated
    geometry and field-count limits.
 
 ``Experimental``
@@ -32,7 +32,6 @@ Supported environment
 
    * - Component
      - Supported range
-     - Milestone B validation
    * - Python
      - 3.13 and 3.14
      - Python 3.14.6 in the Della ``openferro`` conda environment.
@@ -50,7 +49,6 @@ Supported environment
        is not a performance guarantee.
    * - Multi-device and multi-host
      - Experimental
-     - No Milestone B correctness or scaling promotion.
 
 Core API
 --------
@@ -191,8 +189,6 @@ Dynamics and simulations
    * - Non-SIB ``ConservativeLLIntegrator``, ``LLIntegrator``, and
        ``LLLangevinIntegrator``
      - Experimental
-     - These directly constructible legacy classes were not included in the
-       Milestone B source-locked integrator matrix.
    * - NVE, NVT, and NPT orchestration
      - Stable
      - Stable for promoted field/integrator combinations. NPT uses only the
@@ -203,11 +199,12 @@ Dynamics and simulations
 Reference examples
 ------------------
 
-The scripts below have strict source-backed configs, explicit entry points,
-script-relative default paths, reproducible seeds, and automated ``--tiny``
-CPU execution tests. These checks validate construction and short execution;
-they do not regress full phase-transition curves or establish convergence of a
-particular production run.
+Examples 01 through 04 have explicit entry points, script-relative default
+paths, reproducible seeds, and automated ``--tiny`` CPU execution tests.
+These checks validate construction and short execution; they do not regress
+full phase-transition curves or establish convergence of a production run.
+Example 05 is a metadata-rich performance benchmark rather than a scientific
+reference trajectory.
 
 .. list-table:: Maintained example status
    :header-rows: 1
@@ -229,6 +226,14 @@ particular production run.
      - The historical path now identifies its continuous SO(3) dot-product
        model as Heisenberg; strict unique-link conversion and stochastic SIB
        execute in tiny mode.
+   * - ``04.PTOSTO_superlattice``
+     - Runnable experimental example
+     - Single-device construction, Ewald, NPT Langevin, reporting, and a tiny
+       trajectory execute. The superlattice engines remain experimental.
+   * - ``05.BTO_GPU_Parallel``
+     - Experimental performance example
+     - Reproducible one-node A100 measurements cover 1, 2, 3, and 4 devices for
+       three BTO cell sizes. They do not promote multi-device correctness.
 
 A feature moves from experimental to stable only with a declared equation and
 parameter convention, independent energy or one-step coverage, force or

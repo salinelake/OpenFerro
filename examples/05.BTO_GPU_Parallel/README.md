@@ -14,7 +14,7 @@ JAX process controls the visible GPUs with OpenFerro's default `1 x N` mesh.
 On Perlmutter, request a full GPU node and run:
 
 ```bash
-salloc -N1 -t 04:00:00 -C gpu -q interactive -A m5025
+salloc -N1 -t 04:00:00 -C gpu -q interactive -A m5218
 cd examples/05.BTO_GPU_Parallel
 bash run_benchmarks.bash
 ```

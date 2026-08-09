@@ -3,10 +3,13 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-OpenFerro Documentation
-=======================
+OpenFerro 0.2 Documentation
+===========================
 
-OpenFerro is a Python package for on-lattice atomistic dynamics simulation. Built on `JAX <https://github.com/google/jax>`_, OpenFerro provides a high-performance framework for simulating lattice Hamiltonian models with GPU acceleration and auto-differentiation capabilities.
+OpenFerro is a JAX-based framework for on-lattice atomistic dynamics. Version
+0.2.0 constructs lattice Hamiltonians from composable interaction energies,
+derives forces with automatic differentiation, and supports promoted CPU and
+single-GPU workflows together with experimental multi-device execution.
 
 .. warning::
    OpenFerro is a research alpha. Review :doc:`feature_status` before using
@@ -62,6 +65,7 @@ Check the ``examples/`` directory for various simulation examples:
 * bcc Fe heating
 * Simple-cubic classical Heisenberg model (historical directory name retained)
 * PbTiO3/SrTiO3 superlattice
+* Single-node BaTiO3 GPU scaling benchmark
 
 Contributing
 ------------

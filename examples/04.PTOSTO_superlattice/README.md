@@ -24,7 +24,7 @@ For an interactive or reduced run, request one GPU:
 
 ```bash
 salloc -N1 -n32 -t 04:00:00 -C gpu -q shared_interactive \
-    --gres=gpu:1 -A m5025
+    --gres=gpu:1 -A m5218
 cd examples/04.PTOSTO_superlattice
 srun --ntasks=1 --gpus-per-task=1 python npt.py
 ```
@@ -45,6 +45,16 @@ Plot any saved field rather than editing a hard-coded filename:
 python plot.py output/drive_field_dump_1500000.npy \
     --output 3d_visualization.png
 ```
+
+Animate all drive-stage dumps as synchronized cross-section and middle-PTO-
+layer panels:
+
+```bash
+python animation.py
+```
+
+The animation is written to `output/drive_field.webm`. Use `--help` to adjust
+the frame rate, output resolution, color range, or layer counts.
 
 For a tiny-mode dump, also pass `--sto-layers 2`. The image below is the
 reference visualization retained from the original production calculation.
