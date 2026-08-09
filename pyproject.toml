@@ -31,7 +31,9 @@ test = [
 ]
 package = [
     "build>=1.2,<2",
+    "setuptools>=77",
     "twine>=6,<7",
+    "wheel",
 ]
 docs = [
     "sphinx>=8,<10",

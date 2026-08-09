@@ -32,9 +32,10 @@ Supported environment
 
    * - Component
      - Supported range
+     - Validation evidence
    * - Python
      - 3.13 and 3.14
-     - Python 3.14.6 in the Della ``openferro`` conda environment.
+     - Python 3.14.6 in the Perlmutter ``of_dev`` conda environment.
    * - JAX
      - >=0.10,<0.12
      - JAX 0.11.0 CPU reference and JIT suite.
@@ -43,12 +44,14 @@ Supported environment
      - NumPy 2.5.1 reference calculations.
    * - Single GPU
      - Promoted paths only
-     - JAX 0.11.0 on one ``CudaDevice`` allocated by ``gputest`` on
-       ``della-l05g4`` and ``della-l07g4`` passed float32 Ewald JIT/autodiff,
-       stochastic SIB, and paired BTO NPT volume-convention smoke tests. This
-       is not a performance guarantee.
+     - JAX 0.11.0 on one NVIDIA A100 ``CudaDevice`` allocated on Perlmutter
+       passed float32 Ewald JIT/autodiff, stochastic SIB, sharded Langevin
+       state, and the BTO determinant-volume NPT smoke test. This is not a
+       performance guarantee.
    * - Multi-device and multi-host
      - Experimental
+     - No correctness or scaling guarantee; see the experimental benchmark
+       example below.
 
 Core API
 --------
@@ -62,12 +65,15 @@ Core API
      - Scope or limitation
    * - Clean wheel and source distribution
      - Stable
-     - Engine and integrator subpackages are included and imported from
-       outside the checkout in the packaging test.
+     - The packaging extra mirrors the no-isolation build requirements. Engine
+       and integrator subpackages are included and imported from outside the
+       checkout in clean wheel and source-distribution environments.
    * - ``scalar``, ``R3``, and ``Rn`` fields
      - Stable
-     - Construction, broadcasting, finite positive masses, finite velocities,
-       local updates, and inertial state are tested on 3-D lattices.
+     - Construction, broadcasting, integer/Boolean-to-floating promotion,
+       shape and finite-value validation, sharding-preserving assignment,
+       positive masses, finite velocities, local updates, and inertial state
+       are tested on 3-D lattices.
    * - ``SO3`` field state
      - Stable
      - Assignment, local mutation, and magnitude changes preserve finite,
@@ -75,8 +81,9 @@ Core API
        field and the SIB aliases listed below.
    * - ``LocalStrain3D`` and ``GlobalStrain`` state
      - Stable
-     - State, Voigt mapping, elastic energies, pressure, reported volume,
-       masks, and the tested NPT path share one selected volume convention.
+     - Validated real-valued state, Voigt mapping, elastic energies, pressure,
+       reported volume, masks, and the tested NPT path share one selected
+       volume convention.
    * - Self, mutual, and triple interaction wrappers
      - Stable
      - Registration, lookup, energy, autodiff force sign, parameter updates,
@@ -167,8 +174,8 @@ Dynamics and simulations
      - Scope or limitation
    * - Gradient descent
      - Stable
-     - Exact one-step behavior, masks, invalid state, and minimization
-       orchestration are tested.
+     - Exact one-step behavior, masks, invalid state, and current-state force
+       convergence in minimization orchestration are tested.
    * - Leapfrog MD
      - Stable
      - Stored velocities are at half time steps. Exact updates, harmonic
@@ -189,6 +196,8 @@ Dynamics and simulations
    * - Non-SIB ``ConservativeLLIntegrator``, ``LLIntegrator``, and
        ``LLLangevinIntegrator``
      - Experimental
+     - These directly constructible legacy classes are not included in the
+       promoted validation matrix.
    * - NVE, NVT, and NPT orchestration
      - Stable
      - Stable for promoted field/integrator combinations. NPT uses only the
@@ -199,12 +208,14 @@ Dynamics and simulations
 Reference examples
 ------------------
 
-Examples 01 through 04 have explicit entry points, script-relative default
-paths, reproducible seeds, and automated ``--tiny`` CPU execution tests.
-These checks validate construction and short execution; they do not regress
-full phase-transition curves or establish convergence of a production run.
-Example 05 is a metadata-rich performance benchmark rather than a scientific
-reference trajectory.
+Examples 01 through 03 have explicit entry points, reproducible seeds,
+working-directory-relative defaults, and automated ``--tiny`` CPU execution
+tests launched from their own directories. Example 04 resolves its default
+paths from the repository and script locations and has an automated,
+explicitly reduced 4x4x4 CPU smoke run. These checks validate construction and
+short execution; they do not regress full phase-transition curves or establish
+convergence of a production run. Example 05 is a metadata-rich performance
+benchmark rather than a scientific reference trajectory.
 
 .. list-table:: Maintained example status
    :header-rows: 1
@@ -215,8 +226,8 @@ reference trajectory.
      - Validated scope
    * - ``01.BTO_Cooling``
      - Stable entry point
-     - Strict BTO config, Ewald, local/global strain, minimization, NPT
-       Langevin, pressure, and output reporting execute in tiny mode.
+     - BTO config, Ewald, local/global strain, minimization, NPT Langevin,
+       determinant-volume pressure, and output reporting execute in tiny mode.
    * - ``02.bcc_Fe_Heating``
      - Stable entry point
      - Four-shell ordered-source to unique-engine conversion and stochastic
@@ -228,8 +239,9 @@ reference trajectory.
        execute in tiny mode.
    * - ``04.PTOSTO_superlattice``
      - Runnable experimental example
-     - Single-device construction, Ewald, NPT Langevin, reporting, and a tiny
-       trajectory execute. The superlattice engines remain experimental.
+     - Single-device construction, Ewald, NPT Langevin, reporting, and an
+       explicitly reduced trajectory execute. The superlattice engines remain
+       experimental.
    * - ``05.BTO_GPU_Parallel``
      - Experimental performance example
      - Reproducible one-node A100 measurements cover 1, 2, 3, and 4 devices for

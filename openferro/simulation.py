@@ -171,6 +171,12 @@ class MDMinimize(Simulation):
         Maximum number of iterations, by default 100
     tol : float, optional
         Force tolerance for convergence, by default 1e-5
+
+    Notes
+    -----
+    Forces are evaluated at the initial state and after every accepted update.
+    ``iterations`` counts accepted updates, so an initially converged system
+    finishes with zero iterations.
     """
     def __init__(self, system, max_iter=100, tol=1e-5 ):
         super().__init__(system)
@@ -183,7 +189,7 @@ class MDMinimize(Simulation):
             
     def _step(self, variable_cell):
         """
-        Update the field by one time step.
+        Update the fields by one step using their current forces.
 
         Parameters
         ----------
@@ -193,18 +199,25 @@ class MDMinimize(Simulation):
         SO3_fields = self.system.get_all_SO3_fields()
         non_SO3_fields = self.system.get_all_non_SO3_fields()
         if len(non_SO3_fields) > 0:
-            ## update the force for all fields. 
-            ## Force will not be updated again while integrating each non-SO3 field with simple explicit integrator. 
-            self.system.update_force()
             for field in non_SO3_fields:
                 if (variable_cell is False) and isinstance(field, GlobalStrain):
                     continue
                 field.integrator.step(field)
         if len(SO3_fields) > 0:
-            ## Force updater will be passed to the integrator of each SO3 fields because implicit methods are used.
-            ## So the force will not be updated here. 
+            # Implicit SIB stages evaluate forces through this callback.
             for field in SO3_fields:
                 field.integrator.step(field, force_updater=self.system.update_force)
+
+    def _update_force_and_check_convergence(self, active_fields):
+        """Evaluate forces at the current state and apply the force tolerance."""
+        self.system.update_force()
+        self.max_force_by_field = {
+            field.ID: float(jax.device_get(jnp.max(jnp.abs(field.get_force()))))
+            for field in active_fields
+        }
+        return all(
+            force < self.tol for force in self.max_force_by_field.values()
+        )
             
     def run(self, variable_cell=True, pressure=None):
         """
@@ -253,16 +266,18 @@ class MDMinimize(Simulation):
         self.converged = False
         self.iterations = 0
         self.max_force_by_field = {}
+        self.converged = self._update_force_and_check_convergence(active_fields)
+        if self.converged:
+            return
+
         for i in range(self.max_iter):
             self._step(variable_cell)
-            self.step_reporters()
             self.iterations = i + 1
-            self.max_force_by_field = {
-                field.ID: float(jax.device_get(jnp.max(jnp.abs(field.get_force()))))
-                for field in active_fields
-            }
-            if all(force < self.tol for force in self.max_force_by_field.values()):
-                self.converged = True
+            self.converged = self._update_force_and_check_convergence(
+                active_fields
+            )
+            self.step_reporters()
+            if self.converged:
                 break
         if not self.converged:
             logging.warning(

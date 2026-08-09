@@ -45,6 +45,44 @@ class Field:
         self._values = values
         return
 
+    def _prepare_real_values(self, values, expected_shape, name):
+        """Convert and validate values for a real-valued field."""
+        try:
+            values = jnp.asarray(values)
+        except (TypeError, ValueError) as exc:
+            raise TypeError(f"{name} must be numeric array-like values.") from exc
+
+        if values.shape != expected_shape:
+            raise ValueError(f"{name} must have shape {expected_shape}.")
+        if jnp.issubdtype(values.dtype, jnp.complexfloating):
+            raise ValueError(f"{name} must be real-valued.")
+        if not jnp.issubdtype(values.dtype, jnp.floating):
+            if not (
+                jnp.issubdtype(values.dtype, jnp.integer)
+                or jnp.issubdtype(values.dtype, jnp.bool_)
+            ):
+                raise TypeError(f"{name} must be numeric array-like values.")
+            target_dtype = (
+                self._values.dtype
+                if self._values is not None
+                and jnp.issubdtype(self._values.dtype, jnp.floating)
+                else jnp.asarray(0.0).dtype
+            )
+            values = values.astype(target_dtype)
+        if bool(jax.device_get(jnp.any(~jnp.isfinite(values)))):
+            raise ValueError(f"{name} must contain only finite values.")
+        return values
+
+    def _set_values_from_integrator(self, values):
+        """Store a built-in integrator result without a host synchronization."""
+        values = jnp.asarray(values)
+        self.compare_shape(values, self._values)
+        if not jnp.issubdtype(values.dtype, jnp.floating):
+            raise ValueError("Integrator output must be real floating-point values.")
+        if self._sharding is not None and values.sharding != self._sharding:
+            raise ValueError("Integrator output must preserve field sharding.")
+        self._values = values
+
     def get_values(self):
         """
         Get the values of the field.
@@ -277,6 +315,32 @@ class FieldRn(Field):
                                  'adiabatic': LeapFrogIntegrator, 
                                  'isothermal': LangevinIntegrator}
 
+    def set_values(self, values):
+        """Set finite, real field values with the declared lattice shape.
+
+        Integer and Boolean inputs are converted to the field's current
+        floating-point dtype. Floating-point inputs retain their dtype.
+
+        Parameters
+        ----------
+        values : array-like
+            Values with shape ``(*lattice.size, field_dimension)``.
+
+        Raises
+        ------
+        TypeError
+            If values are not numeric.
+        ValueError
+            If values have the wrong shape, are complex, or are non-finite.
+        """
+        expected_shape = tuple(int(extent) for extent in self.shape)
+        values = self._prepare_real_values(
+            values, expected_shape, "Field values"
+        )
+        if self._sharding is not None:
+            values = jax.device_put(values, self._sharding)
+        self._values = values
+
     @property
     def mean(self):
         """
@@ -322,11 +386,17 @@ class FieldRn(Field):
             if index < -extent or index >= extent:
                 raise IndexError(f"Field location {loc} is outside shape {self._values.shape[:-1]}.")
 
-        value = jnp.asarray(value)
+        try:
+            value = jnp.asarray(value)
+        except (TypeError, ValueError) as exc:
+            raise TypeError(
+                "Local field value must be numeric array-like values."
+            ) from exc
         if value.ndim == 0 and self.fdim == 1:
             value = value.reshape((1,))
-        if value.shape != (self.fdim,):
-            raise ValueError(f"Local field value must have shape ({self.fdim},).")
+        value = self._prepare_real_values(
+            value, (self.fdim,), "Local field value"
+        )
 
         values = self._values.at[loc].set(value)
         if self._sharding is not None:
@@ -652,6 +722,32 @@ class GlobalStrain(Field):
         self.integrator_class = {'optimization': GradientDescentIntegrator_Strain,
                                  'adiabatic': LeapFrogIntegrator_Strain,
                                  'isothermal': LangevinIntegrator_Strain}
+
+    def set_values(self, values):
+        """Set the finite, real six-component engineering strain.
+
+        Integer and Boolean inputs are converted to the field's current
+        floating-point dtype. Floating-point inputs retain their dtype.
+
+        Parameters
+        ----------
+        values : array-like
+            Engineering Voigt strain with shape ``(6,)``.
+
+        Raises
+        ------
+        TypeError
+            If values are not numeric.
+        ValueError
+            If values do not have shape ``(6,)``, are complex, or are
+            non-finite.
+        """
+        values = self._prepare_real_values(
+            values, (6,), "Global strain values"
+        )
+        if self._sharding is not None:
+            values = jax.device_put(values, self._sharding)
+        self._values = values
 
     def to_multi_devs(self, mesh: DeviceMesh):
         sharding = mesh.replicate_sharding()

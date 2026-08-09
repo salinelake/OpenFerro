@@ -10,18 +10,37 @@ ROOT = Path(__file__).resolve().parents[2]
 EXAMPLES = [
     (
         ROOT / "examples/01.BTO_Cooling/npt.py",
+        ("--tiny",),
         ("optimization.log", "thermo_300K.log", "field_300K_avg.log"),
     ),
     (
         ROOT / "examples/02.bcc_Fe_Heating/nvt.py",
+        ("--tiny",),
         ("thermo_10K.log", "spin_10K_avg.log"),
     ),
     (
         ROOT / "examples/03.sc_Ising_Heating/nvt.py",
+        ("--tiny",),
         ("thermo_700K.log", "spin_700K_avg.log"),
     ),
     (
         ROOT / "examples/04.PTOSTO_superlattice/npt.py",
+        (
+            "--lateral-size",
+            "4",
+            "--pto-layers",
+            "2",
+            "--sto-layers",
+            "2",
+            "--relax-time-ps",
+            "0.002",
+            "--drive-time-ps",
+            "0.002",
+            "--log-interval",
+            "1",
+            "--dump-interval",
+            "1",
+        ),
         (
             "relax.log",
             "relax_field_dump_0.npy",
@@ -34,11 +53,13 @@ EXAMPLES = [
 
 @pytest.mark.slow
 @pytest.mark.parametrize(
-    "script, expected_files",
+    "script, arguments, expected_files",
     EXAMPLES,
     ids=("BaTiO3", "bcc_Fe", "sc_Heisenberg", "PTO_STO"),
 )
-def test_maintained_example_tiny_mode(script, expected_files, tmp_path):
+def test_maintained_example_smoke_mode(
+    script, arguments, expected_files, tmp_path
+):
     output_dir = tmp_path / "output"
     environment = os.environ.copy()
     environment["JAX_PLATFORMS"] = "cpu"
@@ -50,7 +71,7 @@ def test_maintained_example_tiny_mode(script, expected_files, tmp_path):
         [
             sys.executable,
             script.name,
-            "--tiny",
+            *arguments,
             "--output-dir",
             str(output_dir),
             "--seed",

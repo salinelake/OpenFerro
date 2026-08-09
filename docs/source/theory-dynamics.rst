@@ -95,6 +95,11 @@ For flexible simulation cell, the strain tensor is optimized through
 .. math::
    m_\eta \frac{d \eta}{dt} = -\frac{\partial (E(u,s,\eta) + P V)}{\partial \eta}
 
+``MDMinimize`` evaluates forces at the initial state and after every accepted
+update. Convergence and force-based reporting therefore describe the stored
+field values, and a state already below the force tolerance returns with zero
+optimization iterations.
+
 
 **References**
 

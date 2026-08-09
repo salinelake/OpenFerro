@@ -51,10 +51,12 @@ They select determinant pressure volume, `V0 * det(I + strain)`. The BTO example
 performs the explicit mapping from the named onsite, short-range, elastic,
 elastic-dipole, and Born-charge values to OpenFerro calls.
 
-For a linearized-volume comparison, change
-`conventions.pressure_volume` to `linearized_small_strain` or pass the BTO
-example's `--pressure-volume linearized_small_strain` option. No material
-parameters need to change.
+For a linearized-volume comparison in a custom setup, pass
+`pressure_volume="linearized_small_strain"` to `System.add_global_strain`.
+The BTO example intentionally uses the determinant default and does not expose
+a pressure-volume command-line option. Changing record metadata alone does not
+reconfigure a system because these records are not loaded through a package
+schema.
 
 ## Magnetic records
 

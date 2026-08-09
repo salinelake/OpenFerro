@@ -3,7 +3,14 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from openferro.field import FieldR3, FieldRn, FieldSO3, FieldScalar, LocalStrain3D
+from openferro.field import (
+    FieldR3,
+    FieldRn,
+    FieldSO3,
+    FieldScalar,
+    GlobalStrain,
+    LocalStrain3D,
+)
 from openferro.lattice import SimpleCubic3D
 from openferro.parallelism import DeviceMesh
 from openferro.system import System
@@ -115,3 +122,52 @@ def test_local_value_update_validates_input_and_preserves_sharding():
         field.set_local_value((1, 0, 0), [1.0])
     with pytest.raises(IndexError, match="outside shape"):
         field.set_local_value((2, 0, 0), [1.0, 2.0])
+
+
+def test_real_field_value_setter_rejects_invalid_state_without_mutation():
+    field = FieldRn(SimpleCubic3D(2, 1, 1), "u", dim=2)
+    original = field.get_values().copy()
+
+    with pytest.raises(ValueError, match="shape"):
+        field.set_values(jnp.zeros((2, 1, 1, 1)))
+    with pytest.raises(ValueError, match="finite"):
+        field.set_values(original.at[0, 0, 0, 0].set(jnp.nan))
+    with pytest.raises(ValueError, match="real-valued"):
+        field.set_values(original.astype(jnp.complex64) + 1.0j)
+
+    np.testing.assert_array_equal(field.get_values(), original)
+
+
+def test_global_strain_value_setter_rejects_invalid_state_without_mutation():
+    strain = GlobalStrain(SimpleCubic3D(1, 1, 1), "gstrain")
+    original = strain.get_values().copy()
+
+    with pytest.raises(ValueError, match="shape"):
+        strain.set_values(jnp.zeros(5))
+    with pytest.raises(ValueError, match="finite"):
+        strain.set_values(original.at[0].set(jnp.inf))
+    with pytest.raises(ValueError, match="real-valued"):
+        strain.set_values(original.astype(jnp.complex64) + 1.0j)
+
+    np.testing.assert_array_equal(strain.get_values(), original)
+
+
+def test_real_field_value_setters_promote_integers_and_preserve_sharding():
+    system = System(SimpleCubic3D(2, 1, 1))
+    field = system.add_field("u", ftype="Rn", dim=2)
+    strain = system.add_global_strain()
+    mesh = DeviceMesh(devices=jax.devices()[:1], num_rows=1, num_cols=1)
+    system.move_fields_to_multi_devs(mesh)
+    field_sharding = field.get_values().sharding
+    strain_sharding = strain.get_values().sharding
+
+    field.set_values(jnp.ones(field.get_values().shape, dtype=jnp.float32))
+    field.set_values(np.full(field.get_values().shape, 2, dtype=np.int32))
+    strain.set_values(np.arange(6, dtype=np.int32))
+
+    assert field.get_values().dtype == jnp.float32
+    assert jnp.issubdtype(strain.get_values().dtype, jnp.floating)
+    assert field.get_values().sharding == field_sharding
+    assert strain.get_values().sharding == strain_sharding
+    np.testing.assert_allclose(field.get_values(), 2.0)
+    np.testing.assert_allclose(strain.get_values(), np.arange(6))

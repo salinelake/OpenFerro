@@ -4,6 +4,7 @@ import shutil
 import subprocess
 import sys
 import tarfile
+import tomllib
 import zipfile
 
 import pytest
@@ -71,7 +72,6 @@ def _install_and_smoke_test(artifact, environment_dir, outside_dir, env):
             "install",
             "--force-reinstall",
             "--no-deps",
-            "--no-build-isolation",
             artifact,
         ],
         cwd=outside_dir,
@@ -95,6 +95,23 @@ assert field.get_values().shape == (1, 1, 1, 1)
 print(package_root)
 """
     _run([python, "-c", smoke_test], cwd=outside_dir, env=env)
+
+
+@pytest.mark.packaging
+def test_packaging_extra_covers_no_isolation_build_requirements():
+    metadata = tomllib.loads(
+        (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    )
+    build_requirements = set(metadata["build-system"]["requires"])
+    packaging_requirements = set(
+        metadata["project"]["optional-dependencies"]["package"]
+    )
+    missing_requirements = build_requirements - packaging_requirements
+
+    assert not missing_requirements, (
+        "The package extra must provide no-isolation build requirements: "
+        f"{sorted(missing_requirements)}"
+    )
 
 
 @pytest.mark.packaging

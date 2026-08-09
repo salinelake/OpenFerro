@@ -33,10 +33,20 @@ This example intentionally uses one GPU and does not enable multi-device
 sharding. Output is written under `output/`; full dipole fields are saved every
 50,000 steps.
 
-For a short execution check, use the 4x4x4, two-step mode:
+For a short execution check, explicitly request a 4x4x4 cell with one
+relaxation step and one driven step:
 
 ```bash
-python npt.py --tiny --output-dir /tmp/openferro-ptosto-smoke
+python npt.py \
+    --lateral-size 4 \
+    --pto-layers 2 \
+    --sto-layers 2 \
+    --relax-time-ps 0.002 \
+    --drive-time-ps 0.002 \
+    --log-interval 1 \
+    --dump-interval 1 \
+    --seed 17 \
+    --output-dir /tmp/openferro-ptosto-smoke
 ```
 
 Plot any saved field rather than editing a hard-coded filename:
@@ -56,9 +66,10 @@ python animation.py
 The animation is written to `output/drive_field.webm`. Use `--help` to adjust
 the frame rate, output resolution, color range, or layer counts.
 
-For a tiny-mode dump, also pass `--sto-layers 2`. The image below is the
-reference visualization retained from the original production calculation.
+When plotting a dump from the reduced command, also pass `--sto-layers 2` to
+`plot.py`. The image below is the reference visualization retained from the
+original production calculation.
 
 <p align="center">
-  <img width="80%" src="./3d_visualization_ref.png" />
+  <img width="80%" src="./3d_visualization.png" />
 </p>

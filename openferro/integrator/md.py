@@ -61,7 +61,7 @@ class GradientDescentIntegrator(Integrator):
         x0 = field.get_values()
         f0 = field.get_force()
         x0 = self.step_x(x0, f0, field.get_mass(), self.dt)
-        field.set_values(x0)
+        field._set_values_from_integrator(x0)
         return field
 
 class GradientDescentIntegrator_Strain(GradientDescentIntegrator):
@@ -129,7 +129,7 @@ class LeapFrogIntegrator(Integrator):
         x0 = field.get_values()
         v0 = field.get_velocity()
         x0, v0 = self.step_xp(x0, v0, field.get_force(), field.get_mass(), self.dt)
-        field.set_values(x0)
+        field._set_values_from_integrator(x0)
         field._set_velocity_from_integrator(v0)
         return field
 
@@ -250,7 +250,7 @@ class LangevinIntegrator(Integrator):
         x0, v0 = self.step_lfmiddle(
             x0, v0, force, mass, gaussian, dt, self.kbT, self.z1, self.z2
         )
-        field.set_values(x0)
+        field._set_values_from_integrator(x0)
         field._set_velocity_from_integrator(v0)
         return field
 

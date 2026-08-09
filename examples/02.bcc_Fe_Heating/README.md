@@ -6,6 +6,9 @@ Heisenberg exchange parameters of Tao et al., Phys. Rev. Lett. 95, 087207
 applies the documented conversion to OpenFerro's unique-undirected-bond
 eV/mu_B^2 engine convention immediately before registering the interactions.
 
+Run from this directory because the default configuration and output paths are
+relative to the working directory:
+
 ```bash
 python nvt.py
 python nvt.py --tiny --output-dir /tmp/openferro-bcc-fe-smoke

@@ -1,9 +1,12 @@
 # OpenFerro examples
 
-The maintained examples use explicit entry points, reproducible random seeds,
-and paths resolved relative to their scripts. Examples 01 through 04 provide a
-``--tiny`` execution mode for development checks; those short runs do not
-establish production convergence.
+The maintained examples use explicit entry points and reproducible random
+seeds. Examples 01 through 03 retain working-directory-relative configuration
+and output defaults, so launch them from their own directories unless you pass
+explicit paths; each provides a ``--tiny`` development check. Example 04
+resolves its defaults from the repository and script locations and documents
+an explicitly reduced smoke command. These short runs do not establish
+production convergence.
 
 | Example | Description | Status |
 | --- | --- | --- |

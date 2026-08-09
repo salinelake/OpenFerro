@@ -35,6 +35,9 @@ def test_add_global_strain_validates_before_mutating_system():
     with pytest.raises(ValueError, match=r"shape \(6,\)"):
         system.add_global_strain(value=jnp.zeros(5))
 
+    with pytest.raises(ValueError, match="finite"):
+        system.add_global_strain(value=[0.0, 0.0, 0.0, 0.0, 0.0, jnp.nan])
+
     with pytest.raises(ValueError, match="does not exist"):
         system.get_field_by_ID("gstrain")
     with pytest.raises(ValueError, match="does not exist"):
@@ -96,6 +99,34 @@ def test_reference_example_field_calls_remain_compatible():
     assert isinstance(global_strain, GlobalStrain)
     assert isinstance(spin, FieldSO3)
     np.testing.assert_allclose(jnp.linalg.norm(spin.get_values(), axis=-1), 2.23)
+
+
+def test_integer_and_boolean_initializers_create_differentiable_state():
+    system = System(SimpleCubic3D(1, 1, 1))
+    scalar = system.add_field("scalar", value=1)
+    vector = system.add_field("vector", ftype="R3", value=[1, 2, 3])
+    boolean = system.add_field("boolean", value=True)
+    strain = system.add_global_strain(value=[0, 1, 2, 0, 0, 0])
+
+    for interaction_id, field_id in (
+        ("scalar_energy", "scalar"),
+        ("vector_energy", "vector"),
+        ("boolean_energy", "boolean"),
+        ("strain_energy", "gstrain"),
+    ):
+        system.add_self_interaction(
+            interaction_id,
+            field_id,
+            _quadratic_energy,
+            [1.0],
+            enable_jit=False,
+        )
+
+    system.update_force()
+
+    for field in (scalar, vector, boolean, strain):
+        assert jnp.issubdtype(field.get_values().dtype, jnp.floating)
+        assert bool(jnp.all(jnp.isfinite(field.get_force())))
 
 
 @pytest.mark.parametrize("dtype", [jnp.float32, jnp.float64])

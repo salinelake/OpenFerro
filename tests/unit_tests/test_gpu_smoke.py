@@ -7,7 +7,7 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from openferro.engine.elastic import deformed_volume, linearized_volume
+from openferro.engine.elastic import deformed_volume
 from openferro.engine.ewald import build_dipole_dipole_ewald
 from openferro.integrator.md import LangevinIntegrator
 from openferro.lattice import SimpleCubic3D
@@ -36,21 +36,19 @@ def _load_bto_builder():
     return module.build_system
 
 
-def _run_bto_volume_trajectory(mode, *, size, warmup_steps, sample_steps):
+def _run_bto_determinant_trajectory(*, size, warmup_steps, sample_steps):
     config_path = ROOT / "examples/01.BTO_Cooling/BaTiO3.json"
     config = json.loads(config_path.read_text(encoding="utf-8"))
     build_system = _load_bto_builder()
-    system, dipole, local_strain, global_strain = build_system(
-        config, size, pressure_volume=mode
-    )
+    system, dipole, local_strain, global_strain = build_system(config, size)
     simulation = SimulationNPTLangevin(system, pressure=-4.8e4, seed=101)
     dipole.set_integrator("isothermal", dt=0.002, temp=300.0, tau=0.1)
     global_strain.set_integrator("isothermal", dt=0.002, temp=300.0, tau=1.0)
     local_strain.set_integrator("isothermal", dt=0.002, temp=300.0, tau=1.0)
     simulation.init_velocity(mode="gaussian", temp=300.0)
 
+    reported_volumes = []
     determinant_volumes = []
-    linearized_volumes = []
     strains = []
     local_mode_rms = []
     reference_volume = system.lattice.ref_volume
@@ -59,66 +57,18 @@ def _run_bto_volume_trajectory(mode, *, size, warmup_steps, sample_steps):
         if step < warmup_steps:
             continue
         strain = global_strain.get_values()
+        reported_volumes.append(float(system.calc_volume()))
         determinant_volumes.append(
             float(deformed_volume(strain, reference_volume))
-        )
-        linearized_volumes.append(
-            float(linearized_volume(strain, reference_volume))
         )
         strains.append(np.asarray(strain))
         local_mode_rms.append(float(jnp.sqrt(jnp.mean(dipole.get_values() ** 2))))
 
     return {
+        "reported_volumes": np.asarray(reported_volumes),
         "determinant_volumes": np.asarray(determinant_volumes),
-        "linearized_volumes": np.asarray(linearized_volumes),
         "strains": np.asarray(strains),
         "local_mode_rms": np.asarray(local_mode_rms),
-    }
-
-
-def compare_bto_volume_conventions(*, size=2, warmup_steps=20, sample_steps=80):
-    """Run paired BTO NPT trajectories and return comparison metrics."""
-    determinant = _run_bto_volume_trajectory(
-        "determinant",
-        size=size,
-        warmup_steps=warmup_steps,
-        sample_steps=sample_steps,
-    )
-    linearized = _run_bto_volume_trajectory(
-        "linearized_small_strain",
-        size=size,
-        warmup_steps=warmup_steps,
-        sample_steps=sample_steps,
-    )
-
-    det_mean = np.mean(determinant["determinant_volumes"])
-    linear_trajectory_det_mean = np.mean(linearized["determinant_volumes"])
-    formula_relative_difference = np.mean(
-        np.abs(
-            determinant["determinant_volumes"]
-            - determinant["linearized_volumes"]
-        )
-        / determinant["determinant_volumes"]
-    )
-    volume_relative_difference = abs(det_mean - linear_trajectory_det_mean) / det_mean
-    mean_strain_max_abs_difference = np.max(
-        np.abs(
-            np.mean(determinant["strains"], axis=0)
-            - np.mean(linearized["strains"], axis=0)
-        )
-    )
-    det_rms = np.mean(determinant["local_mode_rms"])
-    linear_rms = np.mean(linearized["local_mode_rms"])
-    local_mode_rms_relative_difference = abs(det_rms - linear_rms) / det_rms
-    return {
-        "determinant_mean_volume": float(det_mean),
-        "linearized_mode_mean_determinant_volume": float(linear_trajectory_det_mean),
-        "formula_relative_difference": float(formula_relative_difference),
-        "volume_relative_difference": float(volume_relative_difference),
-        "mean_strain_max_abs_difference": float(mean_strain_max_abs_difference),
-        "local_mode_rms_relative_difference": float(
-            local_mode_rms_relative_difference
-        ),
     }
 
 
@@ -191,10 +141,18 @@ def test_gpu_langevin_noise_and_velocity_preserve_field_sharding():
 
 
 @pytest.mark.stochastic
-def test_gpu_bto_npt_determinant_is_consistent_with_linearized_reference():
-    metrics = compare_bto_volume_conventions()
+def test_gpu_bto_npt_determinant_trajectory_is_finite():
+    trajectory = _run_bto_determinant_trajectory(
+        size=2, warmup_steps=20, sample_steps=80
+    )
 
-    assert metrics["formula_relative_difference"] < 1.0e-3
-    assert metrics["volume_relative_difference"] < 1.0e-3
-    assert metrics["mean_strain_max_abs_difference"] < 1.0e-3
-    assert metrics["local_mode_rms_relative_difference"] < 1.0e-2
+    for values in trajectory.values():
+        assert np.all(np.isfinite(values))
+    assert np.all(trajectory["reported_volumes"] > 0.0)
+    assert np.all(trajectory["local_mode_rms"] >= 0.0)
+    np.testing.assert_allclose(
+        trajectory["reported_volumes"],
+        trajectory["determinant_volumes"],
+        rtol=2.0e-6,
+        atol=2.0e-5,
+    )

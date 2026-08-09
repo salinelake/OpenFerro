@@ -70,4 +70,9 @@ extra and run the packaging marker:
 
 The artifact test builds from a temporary clean source tree and imports each
 installed artifact from outside the repository, preventing ignored ``build/``
-contents from masking missing packages.
+contents from masking missing packages. The initial artifact build deliberately
+disables isolation, so the ``package`` extra includes every requirement from
+``[build-system].requires`` as well as ``build`` and ``twine``. Artifact smoke
+installs use normal PEP 517 build isolation, ensuring that the sdist can
+bootstrap the build backend declared in its own metadata. Install the extra
+before running the test.

@@ -147,7 +147,8 @@ class System:
         dim : int, optional
             Dimension of the field. Only used for Rn fields
         value : array-like, optional
-            Initial value of the field. Will be broadcasted to the shape of the field
+            Initial value of the field. It is broadcast to the field shape;
+            integer and Boolean inputs are converted to floating point.
         mass : float or array-like, optional
             Mass of the field. When omitted, Rn-like fields use 1.0 and SO(3)
             fields remain massless.
@@ -216,7 +217,8 @@ class System:
         Parameters
         ----------
         value : array-like, optional
-            Initial value of the global strain
+            Initial value of the global strain. Integer and Boolean inputs are
+            converted to floating point.
         mass : float, optional
             Effective mass of the global strain for the barostat
         pressure_volume : {"determinant", "linearized_small_strain"}, optional
