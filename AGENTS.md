@@ -88,7 +88,7 @@ You should use salloc to activate an interactive session. However, salloc is for
 
 For quick validation that requires only one GPU, you can use the following command to activate an interactive session on Perlmutter:
 ```bash
-salloc -N1 -n32 -t 04:00:00 -C gpu -q shared_interactive --gres=gpu:1 -A m5025
+salloc -N1 -n32 -t 04:00:00 -C gpu -q shared_interactive --gres=gpu:1 -A m5218
 ```
 This will give you a login node with 32 CPU cores and 1 NVIDIA A100 GPU. This is typically sufficient for most of the tests.
 
@@ -100,7 +100,7 @@ This allocate one A100 GPU on a single node.
 
 For development that requires all 4 NVIDIA A100 GPUs on a single node, activate a multi-GPU sesseion on Perlmutter:
 ```bash
-salloc -N1 -t 04:00:00 -C gpu -q interactive -A m5025
+salloc -N1 -t 04:00:00 -C gpu -q interactive -A m5218
 ```
 
 On Della, you can use the following command to activate a multi-GPU session:
@@ -110,7 +110,7 @@ salloc -N 1 -n 32 --gres=gpu:4 -t 1:0:0
 
 If you need two nodes to test multi-node parallelism using all 8 NVIDIA A100 GPUs, activate a multi-node session:
 ```bash
-salloc --nodes=2 --ntasks-per-node=4 --gpus-per-node=4 -t 01:00:00 -C gpu -q interactive -A m5025
+salloc --nodes=2 --ntasks-per-node=4 --gpus-per-node=4 -t 01:00:00 -C gpu -q interactive -A m5218
 ```
 
 On Della, you can use the following command to activate a multi-node session:

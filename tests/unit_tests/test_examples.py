@@ -20,6 +20,15 @@ EXAMPLES = [
         ROOT / "examples/03.sc_Ising_Heating/nvt.py",
         ("thermo_700K.log", "spin_700K_avg.log"),
     ),
+    (
+        ROOT / "examples/04.PTOSTO_superlattice/npt.py",
+        (
+            "relax.log",
+            "relax_field_dump_0.npy",
+            "drive.log",
+            "drive_field_dump_0.npy",
+        ),
+    ),
 ]
 
 
@@ -27,7 +36,7 @@ EXAMPLES = [
 @pytest.mark.parametrize(
     "script, expected_files",
     EXAMPLES,
-    ids=("BaTiO3", "bcc_Fe", "sc_Heisenberg"),
+    ids=("BaTiO3", "bcc_Fe", "sc_Heisenberg", "PTO_STO"),
 )
 def test_maintained_example_tiny_mode(script, expected_files, tmp_path):
     output_dir = tmp_path / "output"

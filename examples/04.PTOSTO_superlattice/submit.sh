@@ -1,15 +1,14 @@
 #!/bin/bash
-#SBATCH --nodes=1
-#SBATCH --ntasks=48
-
-#SBATCH --gres=gpu:4
-
-#SBATCH --time=23:00:00
+#SBATCH --account=m5218
+#SBATCH -C gpu
+#SBATCH -q premium
+#SBATCH -t 10:00:00
+#SBATCH -N 1
+#SBATCH --gpus=1
 #SBATCH --job-name=ptosto
 
- 
-module purge
-module load anaconda3/2023.3
-conda activate /home/pinchenx/data.gpfs/envs/jax
-python npt.py
 
+module load python
+conda activate of_dev
+
+srun --ntasks=1 --gpus-per-task=1 python npt.py
