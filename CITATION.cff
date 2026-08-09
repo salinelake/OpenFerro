@@ -1,0 +1,24 @@
+cff-version: 1.2.0
+message: >-
+  If you use OpenFerro, please cite the software repository with its version
+  and access date.
+title: OpenFerro
+type: software
+authors:
+  - family-names: Xie
+    given-names: Pinchen
+    email: pinchenxie@lbl.gov
+version: 0.2.0
+date-released: 2026-08-08
+repository-code: https://github.com/salinelake/OpenFerro
+url: https://openferro.readthedocs.io/
+license: MIT
+abstract: >-
+  A JAX-based framework for constructing and simulating on-lattice atomistic
+  Hamiltonian models with automatic differentiation and CPU/GPU execution.
+keywords:
+  - lattice Hamiltonian
+  - atomistic dynamics
+  - JAX
+  - ferroelectrics
+  - spin dynamics
