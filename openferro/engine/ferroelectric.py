@@ -167,22 +167,26 @@ def short_range_2ednn_isotropic(field, parameters):
     """
     j3, j4, j5 = parameters
     
-    f = field
     energy = 0.0
 
-    for axis_pair in [(0,1), (0,2), (1,2)]:
-        f1 = jnp.roll( f, (1, 1), axis=axis_pair) 
-        f2 = jnp.roll( f, (1,-1), axis=axis_pair) 
+    for axis_a, axis_b in ((0, 1), (0, 2), (1, 2)):
+        axis_c = 3 - axis_a - axis_b
+        neighbor_1 = jnp.roll(field, (1, 1), axis=(axis_a, axis_b))
+        neighbor_2 = jnp.roll(field, (1, -1), axis=(axis_a, axis_b))
+        neighbor_sum = neighbor_1 + neighbor_2
+        neighbor_difference = neighbor_1 - neighbor_2
 
-        # Uni-axis interactions
-        energy += j3 * jnp.sum(f * (f1 + f2))
-        energy += (j4 - j3) * jnp.sum(f[..., 3 - axis_pair[0] - axis_pair[1]] * (f1 + f2)[..., 3 - axis_pair[0] - axis_pair[1]])
-
-        # Orthogonal-axis interactions
-        energy += j5 * jnp.sum(f[..., [axis_pair[0], axis_pair[1]]] * (f1 - f2)[..., [axis_pair[1], axis_pair[0]]])
+        energy += j3 * jnp.sum(field * neighbor_sum)
+        energy += (j4 - j3) * jnp.sum(
+            field[..., axis_c] * neighbor_sum[..., axis_c]
+        )
+        energy += j5 * jnp.sum(
+            field[..., axis_a] * neighbor_difference[..., axis_b]
+            + field[..., axis_b] * neighbor_difference[..., axis_a]
+        )
 
     return energy
-
+ 
 def get_short_range_3rdnn_isotropic():
     """
     Returns the engine of short-range interaction of third nearest neighbors for a R^3 field defined on a lattice with periodic boundary conditions.
@@ -239,11 +243,14 @@ def get_short_range_3rdnn_isotropic():
         r_4 = c_4 * j7 + c_0 * j6
 
         ## sum up the interaction
+        # Use broadcast-mul + sum instead of jnp.dot/@/einsum. On multi-GPU
+        # sharded fields, autodiff through dot_general can bitcast (l1,l2,l3,3)
+        # to (l1*l2*l3,3) while keeping a 4D sharding, which XLA rejects.
         f = field
-        fr_sum = jnp.dot( jnp.roll( f, ( 1, 1, 1), axis=(0,1,2)), r_1)
-        fr_sum += jnp.dot( jnp.roll( f, ( 1,-1, 1), axis=(0,1,2)), r_2)
-        fr_sum += jnp.dot( jnp.roll( f, (-1, 1, 1), axis=(0,1,2)), r_3)
-        fr_sum += jnp.dot( jnp.roll( f, (-1,-1, 1), axis=(0,1,2)), r_4)
+        fr_sum = (jnp.roll(f, (1, 1, 1), axis=(0, 1, 2))[..., :, None] * r_1).sum(-2)
+        fr_sum += (jnp.roll(f, (1, -1, 1), axis=(0, 1, 2))[..., :, None] * r_2).sum(-2)
+        fr_sum += (jnp.roll(f, (-1, 1, 1), axis=(0, 1, 2))[..., :, None] * r_3).sum(-2)
+        fr_sum += (jnp.roll(f, (-1, -1, 1), axis=(0, 1, 2))[..., :, None] * r_4).sum(-2)
         energy = jnp.sum(f * fr_sum)
         return energy
     return short_range_3rdnn_isotropic

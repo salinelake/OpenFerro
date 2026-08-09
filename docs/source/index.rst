@@ -3,24 +3,32 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-OpenFerro Documentation
-=======================
+OpenFerro 0.2 Documentation
+===========================
 
-OpenFerro is a Python package for on-lattice atomistic dynamics simulation. Built on `JAX <https://github.com/google/jax>`_, OpenFerro provides a high-performance framework for simulating lattice Hamiltonian models with GPU acceleration and auto-differentiation capabilities.
+OpenFerro is a JAX-based framework for on-lattice atomistic dynamics. Version
+0.2.0 constructs lattice Hamiltonians from composable interaction energies,
+derives forces with automatic differentiation, and supports promoted CPU and
+single-GPU workflows together with experimental multi-device execution.
+
+.. warning::
+   OpenFerro is a research alpha. Review :doc:`feature_status` before using
+   available Hamiltonians or integrators for scientific production.
 
 Key Features
 ------------
 
-* **GPU Support**: Highly efficient for large-scale simulations with multi-GPU parallelization
-* **Auto-differentiable**: Native support for enhanced sampling and Hamiltonian optimization
-* **Modular Design**: Easy implementation of new interaction terms without deep codebase knowledge
-* **Flexible Architecture**: Supports simultaneous simulation of R^n and SO(3) local order parameters
+* **JAX Execution**: CPU/GPU backends with experimental multi-device sharding
+* **Auto-differentiable**: Forces derived from scalar custom energy functions
+* **Modular Design**: Custom interactions use small, pure energy functions
+* **Flexible Fields**: R^n and fixed-magnitude SO(3) local order parameters
 
 .. toctree::
    :maxdepth: 2
    :caption: Getting Started
 
    installation
+   feature_status
    quickstart
 
 .. toctree::
@@ -29,6 +37,7 @@ Key Features
 
    theory-lattice-model
    theory-dynamics
+   scientific_conventions
 
 .. toctree::
    :maxdepth: 2
@@ -37,6 +46,7 @@ Key Features
    logic
    core_components
    guide_custum_engine
+   ewald_performance
 
 .. toctree::
    :maxdepth: 2
@@ -53,8 +63,9 @@ Check the ``examples/`` directory for various simulation examples:
 
 * BaTiO3 cooling simulation
 * bcc Fe heating
-* Simple cubic Ising model
+* Simple-cubic classical Heisenberg model (historical directory name retained)
 * PbTiO3/SrTiO3 superlattice
+* Single-node BaTiO3 GPU scaling benchmark
 
 Contributing
 ------------

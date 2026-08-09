@@ -1,7 +1,11 @@
 # custom
 *slurm*out
 *.npy
-
+*.sh
+*.slurm
+archived/
+trash/
+scratch/
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

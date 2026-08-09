@@ -6,6 +6,8 @@ This module contains classes for reporting thermodynamic quantities and field va
 # This file is part of OpenFerro.
 import time
 import jax.numpy as jnp
+
+
 class Thermo_Reporter:
     """
     Reporter for thermodynamic quantities.
@@ -108,13 +110,7 @@ class Thermo_Reporter:
                 ex_stress = system.calc_excess_stress()
                 values.extend(ex_stress)
             if self.report_volume:
-                try:
-                    gs = system.get_field_by_ID('gstrain').get_values().flatten().tolist()
-                except:
-                    gs = [0.0, 0.0, 0.0]
-                vol_ref = system.lattice.ref_volume
-                vol = (1+gs[0] + gs[1] + gs[2]) * vol_ref
-                values.append(vol)
+                values.append(system.calc_volume())
             all_fields = system.get_all_fields()
             if self.report_potential_energy:
                 values.append(system.calc_total_potential_energy())

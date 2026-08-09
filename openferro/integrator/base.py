@@ -4,6 +4,10 @@ Base class for integrators.
 This file is part of OpenFerro.
 """
 
+import math
+import numbers
+
+
 class Integrator:
     """
     Base class for integrators.
@@ -14,7 +18,14 @@ class Integrator:
         Time step size
     """
     def __init__(self, dt):
-        self.dt = dt
+        if (
+            isinstance(dt, bool)
+            or not isinstance(dt, numbers.Real)
+            or not math.isfinite(float(dt))
+            or dt <= 0.0
+        ):
+            raise ValueError("Integrator time step dt must be finite and positive.")
+        self.dt = float(dt)
 
     def step(self, field, force_updater=None):
         """

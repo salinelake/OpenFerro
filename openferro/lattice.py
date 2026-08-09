@@ -88,10 +88,11 @@ class BravaisLattice3D:
         ndarray
             3x3 array of reciprocal lattice vectors
         """
-        coef = 2 * jnp.pi / self.ref_volume
-        b1 = coef * np.cross(self.a2,self.a3)  
-        b2 = coef * np.cross(self.a3,self.a1) 
-        b3 = coef * np.cross(self.a1,self.a2) 
+        signed_unit_volume = jnp.dot(self.a1, jnp.cross(self.a2, self.a3))
+        coef = 2 * jnp.pi / signed_unit_volume
+        b1 = coef * jnp.cross(self.a2, self.a3)
+        b2 = coef * jnp.cross(self.a3, self.a1)
+        b3 = coef * jnp.cross(self.a1, self.a2)
         return jnp.stack([b1, b2, b3], axis=0)
 
 class SimpleCubic3D(BravaisLattice3D):

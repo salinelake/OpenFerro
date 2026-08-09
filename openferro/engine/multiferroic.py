@@ -101,7 +101,7 @@ def short_range_1stnn_uniaxial_quartic(field, parameters):
     The energy is given by:
     
     .. math::
-        \sum_{i, \\alpha} K u^3_{i, \\alpha} (u_{i+\\alpha, \\alpha} + u_{i-\\alpha, \\alpha})
+        \\sum_{i, \\alpha} K u^3_{i, \\alpha} (u_{i+\\alpha, \\alpha} + u_{i-\\alpha, \\alpha})
 
 
     Parameters
@@ -131,16 +131,16 @@ def short_range_1stnn_trilinear_two_sublattices(field_A, field_B, parameters):
     The energy is given by:
     
     .. math::
-        \sum_{i \\sim j, \\alpha \\neq \\beta} D_{ij,\\alpha\\beta} a_{j, \\alpha} b_{i, \\alpha} b_{i, \\beta}
+        \\sum_{i \\sim j, \\alpha \\neq \\beta} D_{ij,\\alpha\\beta} a_{j, \\alpha} b_{i, \\alpha} b_{i, \\beta}
 
-    Here i is the index of sublattice A and j is the index of sublattice B. :math:`i\sim j` means that i and j are nearest neighbors. 
+    Here i is the index of sublattice A and j is the index of sublattice B. :math:`i\\sim j` means that i and j are nearest neighbors. 
     :math:`D_{ij,\\alpha\\beta}` is the trilinear coupling constant.
     For interwaving cubic lattices, there are 8 such nearest neighbors for a given i. 
 
     Define :math:`a'_{i}` to be the mean-field (averaged over the 8 nearest neighbors of a B-site) of field_A on the B site-i. The energy is given by
     
     .. math::
-        \sum_{i, \\alpha \\neq \\beta} 8 D^{\mathrm{nn}}_{\\alpha\\beta} a'_{i, \\alpha} b_{i, \\alpha} b_{i, \\beta}
+        \\sum_{i, \\alpha \\neq \\beta} 8 D^{\\mathrm{nn}}_{\\alpha\\beta} a'_{i, \\alpha} b_{i, \\alpha} b_{i, \\beta}
     
     Parameters
     ----------
@@ -182,7 +182,7 @@ def short_range_1stnn_biquadratic_iiii_two_sublattices(field_A, field_B, paramet
     The energy is given by:
     
     .. math::
-        \sum_{i, \\alpha \\beta \\gamma \\delta} E_{\\alpha\\beta\\gamma\\delta}  b_{i, \\alpha} b_{i, \\beta} a'_{i, \\gamma} a'_{i, \\delta}  
+        \\sum_{i, \\alpha \\beta \\gamma \\delta} E_{\\alpha\\beta\\gamma\\delta}  b_{i, \\alpha} b_{i, \\beta} a'_{i, \\gamma} a'_{i, \\delta}  
 
     Parameters
     ----------
@@ -234,7 +234,7 @@ def short_range_biquadratic_ijii_two_sublattices(field_A, field_B, parameters):
     The energy is given by:
     
     .. math::
-        \sum_{ij, \\alpha \\beta \\gamma \\delta} E_{\\alpha\\beta\\gamma\\delta}  b_{i, \\alpha} b_{j, \\beta} a'_{i, \\gamma} a'_{i, \\delta}  
+        \\sum_{ij, \\alpha \\beta \\gamma \\delta} E_{\\alpha\\beta\\gamma\\delta}  b_{i, \\alpha} b_{j, \\beta} a'_{i, \\gamma} a'_{i, \\delta}  
 
     Parameters
     ----------
@@ -287,7 +287,7 @@ def short_range_biquadratic_ijii(field_A, field_B, parameters):
     The energy is given by:
     
     .. math::
-        \sum_{ij, \\alpha \\beta \\gamma \\delta} E_{\\alpha\\beta\\gamma\\delta}  b_{i, \\alpha} b_{j, \\beta} a_{i, \\gamma} a_{i, \\delta}  
+        \\sum_{ij, \\alpha \\beta \\gamma \\delta} E_{\\alpha\\beta\\gamma\\delta}  b_{i, \\alpha} b_{j, \\beta} a_{i, \\gamma} a_{i, \\delta}  
 
     j is summed over the 1st, 2nd, 3rd nearest neighbors of i.
 
@@ -341,7 +341,7 @@ def homo_strain_spin_interaction(global_strain, spin_field, parameters):
     The energy is given by:
     
     .. math::
-        \sum_{i,j,l,\\alpha,\\beta} G_{ij, l\\alpha\\beta} \\eta_{l} m_{i, \\alpha} m_{j, \\beta}
+        \\sum_{i,j,l,\\alpha,\\beta} G_{ij, l\\alpha\\beta} \\eta_{l} m_{i, \\alpha} m_{j, \\beta}
 
     l is index of strain under Voigt notation.
 
@@ -440,7 +440,7 @@ def homo_strain_spin_1stnn_interaction(global_strain, spin_field, parameters):
     The energy is given by:
     
     .. math::
-        \sum_{i,j,l,\\alpha,\\beta} G_{ij, l\\alpha\\beta} \\eta_{l} m_{i, \\alpha} m_{j, \\beta}
+        \\sum_{i,j,l,\\alpha,\\beta} G_{ij, l\\alpha\\beta} \\eta_{l} m_{i, \\alpha} m_{j, \\beta}
 
     l is index of strain under Voigt notation.
 
@@ -486,7 +486,7 @@ def homo_strain_spin_2ndnn_interaction(global_strain, spin_field, parameters):
     The energy is given by:
     
     .. math::
-        \sum_{i,j,l,\\alpha,\\beta} G_{ij, l\\alpha\\beta} \\eta_{l} m_{i, \\alpha} m_{j, \\beta}
+        \\sum_{i,j,l,\\alpha,\\beta} G_{ij, l\\alpha\\beta} \\eta_{l} m_{i, \\alpha} m_{j, \\beta}
 
     l is index of strain under Voigt notation.
 
@@ -532,7 +532,7 @@ def homo_strain_spin_3rdnn_interaction(global_strain, spin_field, parameters):
     The energy is given by:
     
     .. math::
-        \sum_{i,j,l,\\alpha,\\beta} G_{ij, l\\alpha\\beta} \\eta_{l} m_{i, \\alpha} m_{j, \\beta}
+        \\sum_{i,j,l,\\alpha,\\beta} G_{ij, l\\alpha\\beta} \\eta_{l} m_{i, \\alpha} m_{j, \\beta}
 
     l is index of strain under Voigt notation.
 
@@ -594,7 +594,7 @@ def get_inhomo_strain_spin_interaction(enable_jit=True):
         The energy is given by:
         
         .. math::
-            \sum_{i,j,l,\\alpha,\\beta} G_{ij, l\\alpha\\beta} \\eta_{i,l} m_{i, \\alpha} m_{j, \\beta}
+            \\sum_{i,j,l,\\alpha,\\beta} G_{ij, l\\alpha\\beta} \\eta_{i,l} m_{i, \\alpha} m_{j, \\beta}
 
         l is index of local strain under Voigt notation.
 
@@ -666,7 +666,7 @@ def DM_AFD_1stnn(AFD_field, spin_field, parameters):
     The energy is given by:
     
     .. math::
-        \frac{1}{2}\sum_{i\sim j} L (\\omega_i - \\omega_j)\cdot (m_i \cross m_j)
+        \\frac{1}{2}\\sum_{i\\sim j} L (\\omega_i - \\omega_j)\\cdot (m_i \\cross m_j)
 
     Here i and j are nearest neighbors.
 

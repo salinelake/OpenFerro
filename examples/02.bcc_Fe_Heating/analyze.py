@@ -10,7 +10,8 @@ mpl.rcParams['legend.frameon'] = False
 
 Ms= 2.23
 M_abs_list = []
-temp_list = [10,  100, 200, 300, 400, 500, 600, 700, 800, 900, 950, 1000, 1050, 1100, 1150, 1200, 1250, 1300, 1350, 1400, 1450, 1500]
+temp_list = [        10, 200, 400, 600, 700, 800, 900, 1000, 1200]
+
 for temp in temp_list:
     file = np.loadtxt("output/spin_{:d}K_avg.log".format(temp), comments="#", delimiter=",", dtype=float)
     M_abs = np.linalg.norm(file[:, 1:4], axis=1) / Ms

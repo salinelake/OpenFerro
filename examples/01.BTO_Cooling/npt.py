@@ -1,85 +1,202 @@
+"""NPT cooling example for the BaTiO3 effective Hamiltonian."""
+
+import argparse
 import json
 import logging
-import os
+from pathlib import Path
+
 import jax.numpy as jnp
+import numpy as np
+
 import openferro as of
-from openferro.interaction import *
-from openferro.simulation import *
-from openferro.engine.elastic import *
-from openferro.engine.ferroelectric import *
+from openferro.simulation import MDMinimize, SimulationNPTLangevin
 from openferro.units import Constants
 
-os.makedirs('output', exist_ok=True)
-logging.basicConfig(level=logging.INFO, filename='simulation.log')
-##########################################################################################
-## Define the lattice 
-##########################################################################################
-L = 20
-hydropres =  -4.8e4
-config = json.load(open('BaTiO3.json'))
-latt_vecs = jnp.eye(3) * config['lattice']['a1']
-latt = of.SimpleCubic3D(L, L, L, latt_vecs[0], latt_vecs[1], latt_vecs[2])
-bto = of.System(latt)
+def build_system(config, size):
+    """Build the BaTiO3 system from a documented model record.
 
-##########################################################################################
-## Define the fields
-##########################################################################################
-dipole_field = bto.add_field(ID="dipole", ftype="Rn", dim=3, value=0.0, mass = 200 * Constants.amu)
-## Although with ID='dipole'. This is actually the soft mode in unit of length (Angstrom).
-## To get the local electric dipole moment, one needs to multiply it by the Born effective charge.
-lstrain_field = bto.add_field(ID="lstrain", ftype="LocalStrain3D", value=0.0, mass = 200 * Constants.amu)
-gstrain  = bto.add_global_strain(value=jnp.array([0.01,0.01,0.01,0,0,0]), mass = 200 * Constants.amu * L**3)
+    Parameters
+    ----------
+    config : mapping
+        BaTiO3 model parameters, units, provenance, and conventions.
+    size : int
+        Cubic supercell extent.
+    """
+    lattice_parameters = config["lattice"]
+    lattice = of.SimpleCubic3D(
+        size,
+        size,
+        size,
+        jnp.asarray((lattice_parameters["a1"], 0.0, 0.0)),
+        jnp.asarray((0.0, lattice_parameters["a2"], 0.0)),
+        jnp.asarray((0.0, 0.0, lattice_parameters["a3"])),
+    )
+    system = of.System(lattice)
+    mass = 200 * Constants.amu
 
-##########################################################################################
-## Define the Hamiltonian
-##########################################################################################
-bto.add_dipole_onsite_interaction('self_onsite', field_ID="dipole", K2=config["onsite"]["k2"], alpha=config["onsite"]["alpha"], gamma=config["onsite"]["gamma"])
-bto.add_dipole_interaction_1st_shell('short_range_1', field_ID="dipole", j1=config["short_range"]["j1"], j2=config["short_range"]["j2"])
-bto.add_dipole_interaction_2nd_shell('short_range_2', field_ID="dipole", j3=config["short_range"]["j3"], j4=config["short_range"]["j4"], j5=config["short_range"]["j5"])
-bto.add_dipole_interaction_3rd_shell('short_range_3', field_ID="dipole", j6=config["short_range"]["j6"], j7=config["short_range"]["j7"])
-## because "dipole_field" is actually the soft mode in unit of length (Angstrom). Here the prefactor includes the Born effective charge squared.
-bto.add_dipole_dipole_interaction('dipole_ewald', field_ID="dipole", prefactor = config["born"]["Z_star"]**2 / config["born"]["epsilon_inf"] )
-bto.add_homo_elastic_interaction('homo_elastic', field_ID="gstrain", B11=config["elastic"]["B11"], B12=config["elastic"]["B12"], B44=config["elastic"]["B44"])
-bto.add_homo_strain_dipole_interaction('homo_strain_dipole', field_1_ID="gstrain", field_2_ID="dipole", B1xx=config["elastic_dipole"]["B1xx"], B1yy=config["elastic_dipole"]["B1yy"], B4yz=config["elastic_dipole"]["B4yz"])
-bto.add_inhomo_elastic_interaction('inhomo_elastic', field_ID="lstrain", B11=config["elastic"]["B11"], B12=config["elastic"]["B12"], B44=config["elastic"]["B44"])
-bto.add_inhomo_strain_dipole_interaction('inhomo_strain_dipole', field_1_ID="lstrain", field_2_ID="dipole", B1xx=config["elastic_dipole"]["B1xx"], B1yy=config["elastic_dipole"]["B1yy"], B4yz=config["elastic_dipole"]["B4yz"])
+    # The field stores the soft-mode displacement in Angstrom, not its dipole.
+    dipole = system.add_field(ID="dipole", ftype="Rn", dim=3, value=0.0, mass=mass)
+    local_strain = system.add_field(ID="lstrain", ftype="LocalStrain3D", value=0.0, mass=mass)
+    global_strain = system.add_global_strain(
+        value=jnp.asarray((0.01, 0.01, 0.01, 0.0, 0.0, 0.0)),
+        mass=mass * size**3,
+    )
 
-##########################################################################################
-## Structure relaxation
-##########################################################################################
-logging.info('Structure relaxation')
-dipole_field.set_integrator('optimization', dt=0.0001)
-gstrain.set_integrator('optimization', dt=0.0001)
-lstrain_field.set_integrator('optimization', dt=0.0001)
-minimizer = MDMinimize(bto, max_iter=1000, tol=1e-5)
-minimizer.add_thermo_reporter(file='output/optimization.log', log_interval=10, global_strain=True, volume=True, potential_energy=True, kinetic_energy=False, temperature=False)
-minimizer.run(variable_cell=True, pressure=hydropres)
+    parameters = config["parameters"]
+    onsite = parameters["onsite"]
+    short = parameters["short_range"]
+    elastic = parameters["elastic"]
+    elastic_dipole = parameters["elastic_dipole"]
+    system.add_dipole_onsite_interaction(
+        "self_onsite",
+        field_ID="dipole",
+        K2=onsite["k2"],
+        alpha=onsite["alpha"],
+        gamma=onsite["gamma"],
+    )
+    system.add_dipole_interaction_1st_shell(
+        "short_range_1",
+        field_ID="dipole",
+        j1=short["j1"],
+        j2=short["j2"],
+    )
+    system.add_dipole_interaction_2nd_shell(
+        "short_range_2",
+        field_ID="dipole",
+        j3=short["j3"],
+        j4=short["j4"],
+        j5=short["j5"],
+    )
+    system.add_dipole_interaction_3rd_shell(
+        "short_range_3",
+        field_ID="dipole",
+        j6=short["j6"],
+        j7=short["j7"],
+    )
+    born = parameters["born"]
+    system.add_dipole_dipole_interaction(
+        "dipole_ewald",
+        field_ID="dipole",
+        prefactor=born["Z_star"] ** 2 / born["epsilon_inf"],
+    )
+    system.add_homo_elastic_interaction(
+        "homo_elastic",
+        field_ID="gstrain",
+        B11=elastic["B11"],
+        B12=elastic["B12"],
+        B44=elastic["B44"],
+    )
+    system.add_homo_strain_dipole_interaction(
+        "homo_strain_dipole",
+        field_1_ID="gstrain",
+        field_2_ID="dipole",
+        B1xx=elastic_dipole["B1xx"],
+        B1yy=elastic_dipole["B1yy"],
+        B4yz=elastic_dipole["B4yz"],
+    )
+    system.add_inhomo_elastic_interaction(
+        "inhomo_elastic",
+        field_ID="lstrain",
+        B11=elastic["B11"],
+        B12=elastic["B12"],
+        B44=elastic["B44"],
+    )
+    system.add_inhomo_strain_dipole_interaction(
+        "inhomo_strain_dipole",
+        field_1_ID="lstrain",
+        field_2_ID="dipole",
+        B1xx=elastic_dipole["B1xx"],
+        B1yy=elastic_dipole["B1yy"],
+        B4yz=elastic_dipole["B4yz"],
+    )
+    return system, dipole, local_strain, global_strain
 
-##########################################################################################
-## NPT cooling simulation
-##########################################################################################
-log_freq = 100
-total_time = 100
-dt = 0.002
-relax_steps = int(10/dt)
-sampling_steps = int(total_time / dt)
 
-temp_list = np.array([400, 350, 320, 310, 300, 290, 280, 270, 260, 250, 240, 230, 220, 210, 200, 190, 180, 170, 160, 150, 140]).astype(int)
-simulation = SimulationNPTLangevin(bto, pressure=hydropres)
-simulation.init_velocity(mode='gaussian', temp=temp_list[0])
+def parse_args(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--config", type=Path, default="BaTiO3.json", help="ferroelectric JSON model record.")
+    parser.add_argument("--size", type=int, default=24, help="Cubic supercell size.")
+    parser.add_argument("--output-dir", type=Path, default="output", help="Directory for logs and field reports.")
+    parser.add_argument("--seed", type=int, default=42, help="Simulation RNG seed.")
+    parser.add_argument("--tiny", action="store_true", help="Run a two-site-per-axis CPU smoke calculation.")
+    return parser.parse_args(argv)
 
-for temperature in temp_list:
-    dipole_field.set_integrator('isothermal', dt=dt, temp=temperature, tau=0.1)
-    gstrain.set_integrator('isothermal', dt=dt, temp=temperature, tau=1)
-    lstrain_field.set_integrator('isothermal', dt=dt, temp=temperature, tau=1)
-    ## equilibration
-    logging.info('T={}K, NPT Equlibration'.format(temperature))
-    simulation.remove_all_reporters()
-    simulation.run(relax_steps)
-    ## sampling
-    logging.info('T={}K, NPT Sampling'.format(temperature))
-    simulation.add_thermo_reporter(file='output/thermo_{}K.log'.format(temperature), log_interval=log_freq, 
-        global_strain=True, excess_stress=True, volume=True, potential_energy=True, kinetic_energy=True, temperature=True)
-    simulation.add_field_reporter(file_prefix='output/field_{}K'.format(temperature), field_ID="dipole", log_interval=log_freq, 
-        field_average=True, dump_field=False)
-    simulation.run(sampling_steps)
+
+def main(argv=None):
+    args = parse_args(argv)
+    size = 2 if args.tiny else args.size
+
+    args.output_dir.mkdir(parents=True, exist_ok=True)
+    logging.basicConfig(
+        level=logging.INFO,
+        filename=args.output_dir / "simulation.log",
+        force=True,
+    )
+    config = json.load(args.config.open(encoding="utf-8"))
+    system, dipole, local_strain, global_strain = build_system(config, size)
+    pressure_bar = -4.8e4
+
+    logging.info("Structure relaxation")
+    dipole.set_integrator("optimization", dt=0.0001)
+    global_strain.set_integrator("optimization", dt=0.0001)
+    local_strain.set_integrator("optimization", dt=0.0001)
+    minimizer = MDMinimize(system, 1000, tol=1e-5)
+    minimizer.add_thermo_reporter(
+        file=str(args.output_dir / "optimization.log"),
+        log_interval= 10,
+        global_strain=True,
+        volume=True,
+        potential_energy=True,
+        kinetic_energy=False,
+        temperature=False,
+    )
+    minimizer.run(variable_cell=True, pressure=pressure_bar)
+
+    dt = 0.002
+    # temperatures = np.asarray([300] if args.tiny else [
+    #     400, 350, 320, 310, 300, 290, 280, 270, 260, 250, 240,
+    #     230, 220, 210, 200, 190, 180, 170, 160, 150, 140,
+    # ])
+    temperatures = np.asarray([300] if args.tiny else [
+        320, 310, 300, 290, 280, 270, 260, 250, 240, 230, 220, 210, 200, 190, 180, 170, 160, 150
+        ]).astype(int)
+
+    relax_steps = 1 if args.tiny else int(10 / dt)
+    sampling_steps = 1 if args.tiny else int(50 / dt)
+    log_interval = 1 if args.tiny else 100
+
+    simulation = SimulationNPTLangevin(system, pressure=pressure_bar, seed=args.seed)
+    simulation.init_velocity(mode="gaussian", temp=float(temperatures[0]))
+    for temperature in temperatures:
+        temperature = int(temperature)
+        dipole.set_integrator("isothermal", dt=dt, temp=temperature, tau=0.1)
+        global_strain.set_integrator("isothermal", dt=dt, temp=temperature, tau=1)
+        local_strain.set_integrator("isothermal", dt=dt, temp=temperature, tau=1)
+
+        logging.info("T=%s K, NPT equilibration", temperature)
+        simulation.remove_all_reporters()
+        simulation.run(relax_steps)
+
+        logging.info("T=%s K, NPT sampling", temperature)
+        simulation.add_thermo_reporter(
+            file=str(args.output_dir / f"thermo_{temperature}K.log"),
+            log_interval=log_interval,
+            global_strain=True,
+            excess_stress=True,
+            volume=True,
+            potential_energy=True,
+            kinetic_energy=True,
+            temperature=True,
+        )
+        simulation.add_field_reporter(
+            file_prefix=str(args.output_dir / f"field_{temperature}K"),
+            field_ID="dipole",
+            log_interval=log_interval,
+            field_average=True,
+            dump_field=False,
+        )
+        simulation.run(sampling_steps)
+
+
+if __name__ == "__main__":
+    main()

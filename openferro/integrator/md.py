@@ -5,11 +5,27 @@ This file is part of OpenFerro.
 
 """
 
+import math
+import numbers
+
 import jax
 from jax import jit
 import jax.numpy as jnp
-from openferro.units import Constants
+
 from openferro.integrator.base import Integrator
+from openferro.parallelism import _random_normal
+from openferro.units import Constants
+
+
+def _validate_finite_scalar(name, value, *, minimum=0.0, strict=False):
+    if (
+        isinstance(value, bool)
+        or not isinstance(value, numbers.Real)
+        or not math.isfinite(float(value))
+        or (value <= minimum if strict else value < minimum)
+    ):
+        relation = "greater than" if strict else "at least"
+        raise ValueError(f"{name} must be finite and {relation} {minimum}.")
 
 
 class GradientDescentIntegrator(Integrator):
@@ -75,13 +91,18 @@ class GradientDescentIntegrator_Strain(GradientDescentIntegrator):
     
 class LeapFrogIntegrator(Integrator):
     """
-    Leapfrog integrator.
+    Leapfrog integrator with velocities stored at half time steps.
+
+    At state ``(x_n, v_(n-1/2))``, one step applies a full kick followed by a
+    full drift and stores ``(x_(n+1), v_(n+1/2))``.
 
     Parameters
     ----------
     dt : float
         Time step size
     """
+    velocity_time_offset = -0.5
+
     def _step_xp(self, x, v, f, m, dt):
         v += f / m * dt
         x += v * dt
@@ -109,7 +130,7 @@ class LeapFrogIntegrator(Integrator):
         v0 = field.get_velocity()
         x0, v0 = self.step_xp(x0, v0, field.get_force(), field.get_mass(), self.dt)
         field.set_values(x0)
-        field.set_velocity(v0)
+        field._set_velocity_from_integrator(v0)
         return field
 
 class LeapFrogIntegrator_Strain(LeapFrogIntegrator):
@@ -142,12 +163,12 @@ class LeapFrogIntegrator_Strain(LeapFrogIntegrator):
 
 class LangevinIntegrator(Integrator):
     """
-    Langevin integrator as in J. Phys. Chem. A 2019, 123, 28, 6056-6079.
-    ABOBA scheme: exp(i L dt) = exp(i Lx dt/2)exp(i Lt dt)exp(i Lx dt/2)exp(i Lp dt)
-    
-    Lx/2: half-step position update (_step_x)
-    Lt: velocity update from damping and noise (_step_t)
-    Lp: full-step velocity update (_step_p)
+    LFMiddle Langevin integrator with half-step velocities.
+
+    Following J. Phys. Chem. A 123, 6056-6079 (2019), the stored state is
+    ``(x_n, v_(n-1/2))`` and a step applies ``B-A-O-A``: a full force kick,
+    half drift, exact Ornstein-Uhlenbeck thermostat, and half drift. The final
+    kick of velocity-Verlet middle is merged with the next step's first kick.
 
     Parameters
     ----------
@@ -158,29 +179,27 @@ class LangevinIntegrator(Integrator):
     tau : float
         Relaxation time
     """
-    def _step_p(self, v, f, m, dt):
+    velocity_time_offset = -0.5
+
+    def _step_lfmiddle(self, x, v, f, m, gaussian, dt, kbT, z1, z2):
         v += f / m * dt
-        return v
-
-    def _step_x(self, x, v, dt):
         x += 0.5 * v * dt
-        return x
-
-    def _step_t(self, v, noise, z1, z2):
+        noise = gaussian * jnp.sqrt(kbT / m)
         v = z1 * v + z2 * noise
-        return v
+        x += 0.5 * v * dt
+        return x, v
 
     def __init__(self, dt, temp, tau):
         super().__init__(dt)
-        self.temp = temp
-        self.kbT = Constants.kb * temp
-        self.tau = tau
-        self.gamma = 1.0 / tau
-        self.z1 = jnp.exp(-dt * self.gamma)
-        self.z2 = jnp.sqrt(1 - jnp.exp(-2 * dt * self.gamma))
-        self.step_p = jit(self._step_p)
-        self.step_x = jit(self._step_x)
-        self.step_t = jit(self._step_t)
+        _validate_finite_scalar("Temperature", temp)
+        _validate_finite_scalar("Relaxation time tau", tau, strict=True)
+        self.temp = float(temp)
+        self.kbT = Constants.kb * self.temp
+        self.tau = float(tau)
+        self.gamma = 1.0 / self.tau
+        self.z1 = jnp.exp(-self.dt * self.gamma)
+        self.z2 = jnp.sqrt(1 - jnp.exp(-2 * self.dt * self.gamma))
+        self.step_lfmiddle = jit(self._step_lfmiddle)
     
     def get_noise(self, key, field):
         """
@@ -198,10 +217,13 @@ class LangevinIntegrator(Integrator):
         jax.Array
             Random noise array
         """
-        gaussian = jax.random.normal(key, field.get_velocity().shape) 
-        if field._sharding != gaussian.sharding:
-            gaussian = jax.device_put(gaussian, field._sharding)
-        return gaussian
+        velocity = field.get_velocity()
+        return _random_normal(
+            key,
+            velocity.shape,
+            dtype=velocity.dtype,
+            sharding=field._sharding,
+        )
         
     def step(self, key, field):
         """
@@ -224,14 +246,12 @@ class LangevinIntegrator(Integrator):
         force = field.get_force()
         v0 = field.get_velocity()
         x0 = field.get_values()
-        v0 = self.step_p(v0, force, mass, dt)
-        x0 = self.step_x(x0, v0, dt)
-        gaussian = self.get_noise(key, field) 
-        gaussian *= (self.kbT/ mass)**0.5
-        v0 = self.step_t(v0, gaussian, self.z1, self.z2)
-        x0 = self.step_x(x0, v0, dt)
+        gaussian = self.get_noise(key, field)
+        x0, v0 = self.step_lfmiddle(
+            x0, v0, force, mass, gaussian, dt, self.kbT, self.z1, self.z2
+        )
         field.set_values(x0)
-        field.set_velocity(v0)
+        field._set_velocity_from_integrator(v0)
         return field
 
 class LangevinIntegrator_Strain(LangevinIntegrator):
@@ -259,22 +279,17 @@ class LangevinIntegrator_Strain(LangevinIntegrator):
             self.mask = jnp.ones((6,))
         else:
             self.mask = jnp.array([int(not freeze_x), int(not freeze_y), int(not freeze_z), 0, 0, 0])
-        def _step_p(v, f, m, dt):
+        def _step_lfmiddle(x, v, f, m, gaussian, dt, kbT, z1, z2):
             v += f / m * dt
             v *= self.mask
-            return v
-
-        def _step_x(x, v, dt):
             x += 0.5 * v * dt
-            return x
-
-        def _step_t(v, noise, z1, z2):
+            noise = gaussian * jnp.sqrt(kbT / m)
             v = z1 * v + z2 * noise
             v *= self.mask
-            return v 
-        self.step_p = jit(_step_p)
-        self.step_x = jit(_step_x)
-        self.step_t = jit(_step_t)
+            x += 0.5 * v * dt
+            return x, v
+
+        self.step_lfmiddle = jit(_step_lfmiddle)
     
 class OverdampedLangevinIntegrator(Integrator):
     """

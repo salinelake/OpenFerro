@@ -1,0 +1,39 @@
+{
+    "schema_version": 1,
+    "model": {
+        "id": "sc_Heisenberg_VAMPIRE_tutorial",
+        "material": "simple-cubic classical spin model",
+        "method": "classical Heisenberg model",
+        "kind": "classical_heisenberg",
+        "citation": {
+            "text": "VAMPIRE Curie-temperature tutorial; Evans et al., J. Phys.: Condens. Matter 26, 103202 (2014)",
+            "doi": "10.1088/0953-8984/26/10/103202"
+        }
+    },
+    "lattice": {
+        "type": "simple_cubic",
+        "lattice_constant_angstrom": 1.0,
+        "shells": 1
+    },
+    "units": {
+        "moment": "mu_B",
+        "exchange_source": "J",
+        "exchange_engine": "eV/mu_B^2"
+    },
+    "conventions": {
+        "source_pair_counting": "unique",
+        "engine_pair_counting": "unique",
+        "conversion": "J_engine = J_source * unit_to_eV / moment_mu_B**2"
+    },
+    "parameters": {
+        "moment_mu_B": 1.5,
+        "exchange_source_values": [6.72e-21]
+    },
+    "reference_observable": {
+        "name": "uniform_ferromagnetic_exchange_energy_per_site",
+        "configuration": [0, 0, 1],
+        "value": -0.12582882144000002,
+        "units": "eV/site",
+        "atol": 1e-12
+    }
+}
