@@ -140,6 +140,47 @@ def test_gpu_langevin_noise_and_velocity_preserve_field_sharding():
     assert field.get_velocity().sharding == field._sharding
 
 
+def test_gpu_masked_field_projects_state_force_and_langevin_commits():
+    device_count = jax.device_count()
+    lattice = SimpleCubic3D(2, 2 * device_count, 2)
+    mask = np.zeros(tuple(lattice.size), dtype=bool)
+    mask[:, ::2, :] = True
+    system = System(lattice)
+    field = system.add_field(
+        "u",
+        ftype="MaskedRn",
+        dim=3,
+        value=1.0,
+        mass=2.0,
+        active_mask=mask,
+    )
+
+    def linear_energy(values, parameters):
+        return parameters[0] * jnp.sum(values)
+
+    system.add_self_interaction("linear", "u", linear_energy, [0.2])
+    system.move_fields_to_multi_devs(DeviceMesh())
+    field.init_velocity("gaussian", temperature=300.0, seed=41)
+    system.update_force()
+    LangevinIntegrator(dt=0.01, temp=300.0, tau=0.5).step(
+        jax.random.PRNGKey(42), field
+    )
+    field.get_values().block_until_ready()
+
+    for array in (
+        field.active_mask,
+        field.get_values(),
+        field.get_mass(),
+        field.get_velocity(),
+        field.get_force(),
+    ):
+        assert array.sharding == field._sharding
+        assert all(device.platform == "gpu" for device in array.devices())
+    np.testing.assert_array_equal(np.asarray(field.get_values())[~mask], 0.0)
+    np.testing.assert_array_equal(np.asarray(field.get_velocity())[~mask], 0.0)
+    np.testing.assert_array_equal(np.asarray(field.get_force())[~mask], 0.0)
+
+
 @pytest.mark.stochastic
 def test_gpu_bto_npt_determinant_trajectory_is_finite():
     trajectory = _run_bto_determinant_trajectory(

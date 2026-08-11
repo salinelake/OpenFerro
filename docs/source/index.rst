@@ -66,6 +66,7 @@ Check the ``examples/`` directory for various simulation examples:
 * Simple-cubic classical Heisenberg model (historical directory name retained)
 * PbTiO3/SrTiO3 superlattice
 * Single-node BaTiO3 GPU scaling benchmark
+* Idealized masked BaTiO3 nanoparticle Phase-B finite-cell workflow
 
 Contributing
 ------------

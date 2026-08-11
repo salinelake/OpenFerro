@@ -74,6 +74,14 @@ Core API
        shape and finite-value validation, sharding-preserving assignment,
        positive masses, finite velocities, local updates, and inertial state
        are tested on 3-D lattices.
+   * - ``MaskedRn`` field constraints
+     - Stable core invariant
+     - A required immutable Boolean site mask projects values, velocities, and
+       assembled forces to exact zero outside the active region. An optional
+       finite linear basis can remove global modes from each component.
+       Active temperature and partition-sharding commits are tested. Inherited
+       mean and variance, standard reporters, stored array size, and positive
+       inactive masses retain ordinary ``Rn`` behavior.
    * - ``SO3`` field state
      - Stable
      - Assignment, local mutation, and magnitude changes preserve finite,
@@ -83,7 +91,9 @@ Core API
      - Stable
      - Validated real-valued state, Voigt mapping, elastic energies, pressure,
        reported volume, masks, and the tested NPT path share one selected
-       volume convention.
+       volume convention. Global strain may use a positive thermodynamic
+       reference volume distinct from the lattice/Ewald reference volume;
+       excess stress is a reference-volume-normalized nominal measure.
    * - Self, mutual, and triple interaction wrappers
      - Stable
      - Registration, lookup, energy, autodiff force sign, parameter updates,
@@ -136,6 +146,12 @@ Hamiltonians
      - Limited to positive, axis-aligned orthogonal primitive vectors and a
        three-component field. General cells and an explicit analytic force are
        not implemented.
+   * - Spherical Ewald surface correction
+     - Experimental application helper
+     - The nanoparticle example provides only the fixed named conducting and
+       spherical-vacuum conventions and a standalone same-parity nonperiodic
+       energy-and-force validation plot. It is not a dielectric-interface or
+       atomic-surface model.
    * - Ferroelectric onsite and short-range terms
      - Stable
      - BTO source matrices, independent energies, finite-difference forces,
@@ -208,14 +224,16 @@ Dynamics and simulations
 Reference examples
 ------------------
 
-Examples 01 through 03 have explicit entry points, reproducible seeds,
-working-directory-relative defaults, and automated ``--tiny`` CPU execution
-tests launched from their own directories. Example 04 resolves its default
-paths from the repository and script locations and has an automated,
-explicitly reduced 4x4x4 CPU smoke run. These checks validate construction and
-short execution; they do not regress full phase-transition curves or establish
-convergence of a production run. Example 05 is a metadata-rich performance
-benchmark rather than a scientific reference trajectory.
+Examples 01 through 03 and 06 have explicit entry points, reproducible seeds,
+and automated reduced CPU execution tests. Examples 01 through 03 expose
+``--tiny``; Example 06 supplies reduced values through its ordinary arguments.
+Examples 01 through 03 retain working-directory-relative defaults; Example 06
+resolves repository defaults. Example 04 resolves its default paths from the
+repository and script locations and has an automated, explicitly reduced
+4x4x4 CPU smoke run. These checks validate construction and short execution;
+they do not regress full phase-transition curves or establish convergence of a
+production run. Example 05 is a metadata-rich performance benchmark rather
+than a scientific reference trajectory.
 
 .. list-table:: Maintained example status
    :header-rows: 1
@@ -246,6 +264,14 @@ benchmark rather than a scientific reference trajectory.
      - Experimental performance example
      - Reproducible one-node A100 measurements cover 1, 2, 3, and 4 devices for
        three BTO cell sizes. They do not promote multi-device correctness.
+   * - ``06.BTO_Nanoparticle``
+     - Runnable Phase-B workflow; production validation pending
+     - Masked soft modes, affine-constrained acoustic nodes, fully integrated
+       finite-cell free-surface mechanics, Born-charge mappings, and reduced
+       minimization/NPT execution are tested. The closure preserves cubic
+       elastic constants but not finite-wave-vector ZVR acoustic dispersion.
+       A physical dielectric interface, surface chemistry, and production box
+       convergence remain outside the promoted scope.
 
 A feature moves from experimental to stable only with a declared equation and
 parameter convention, independent energy or one-step coverage, force or

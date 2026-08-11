@@ -53,6 +53,7 @@ class System:
         self._mutual_interaction_dict = {}
         self._triple_interaction_dict = {}
         self._pressure_volume_mode = None
+        self._strain_reference_volume = lattice.ref_volume
         
     def __repr__(self):
         return f"System with lattice {self.lattice} and fields {self._fields_dict.keys()}"
@@ -103,11 +104,13 @@ class System:
         return [field for field in self.get_all_fields() if not isinstance(field, FieldSO3)]
 
     def calc_volume(self):
-        """Calculate the current supercell volume.
+        """Calculate the thermodynamic volume associated with global strain.
 
-        Returns the reference volume for a fixed-cell system. Variable-cell
-        systems use the pressure-volume convention selected when global strain
-        was added.
+        A fixed-cell system returns the lattice reference volume.  A system
+        with global strain uses the independently configured strain reference
+        volume and the pressure-volume convention selected when that field was
+        added.  The result is therefore the padded supercell volume only under
+        the default reference-volume convention.
 
         Returns
         -------
@@ -119,7 +122,7 @@ class System:
         mode = self._pressure_volume_mode or "determinant"
         volume_function = _PRESSURE_VOLUME_FUNCTIONS[mode]
         strain = self.get_field_by_ID("gstrain").get_values()
-        return volume_function(strain, self.lattice.ref_volume)
+        return volume_function(strain, self._strain_reference_volume)
 
     def move_fields_to_multi_devs(self, mesh: DeviceMesh):
         """
@@ -133,7 +136,16 @@ class System:
         for ID in self._fields_dict.keys():
             self._fields_dict[ID].to_multi_devs(mesh)
 
-    def add_field(self, ID, ftype='scalar', dim=None, value=None, mass=_DEFAULT_FIELD_MASS):
+    def add_field(
+        self,
+        ID,
+        ftype='scalar',
+        dim=None,
+        value=None,
+        mass=_DEFAULT_FIELD_MASS,
+        active_mask=None,
+        constraint_basis=None,
+    ):
         """
         Add a predefined field to the system.
 
@@ -142,8 +154,8 @@ class System:
         ID : str
             ID of the field
         ftype : str, optional
-            Type of field: ``scalar``, ``R3``, ``Rn``, ``SO3``, or
-            ``LocalStrain3D``. The default is ``scalar``.
+            Type of field: ``scalar``, ``R3``, ``Rn``, ``MaskedRn``, ``SO3``,
+            or ``LocalStrain3D``. The default is ``scalar``.
         dim : int, optional
             Dimension of the field. Only used for Rn fields
         value : array-like, optional
@@ -152,6 +164,12 @@ class System:
         mass : float or array-like, optional
             Mass of the field. When omitted, Rn-like fields use 1.0 and SO(3)
             fields remain massless.
+        active_mask : array-like of bool, optional
+            Required for ``MaskedRn`` or ``MaskedFieldRn`` and rejected for
+            every other field type.
+        constraint_basis : array-like, optional
+            Linear basis projected from each component of a masked field.
+            Valid only for ``MaskedRn`` or ``MaskedFieldRn``.
 
         Returns
         -------
@@ -170,6 +188,16 @@ class System:
         if ID == 'gstrain':
             raise ValueError("The ID 'gstrain' is reserved for global strain field. Please pick another ID.")
 
+        masked_type = ftype in ('MaskedRn', 'MaskedFieldRn')
+        if masked_type and active_mask is None:
+            raise ValueError("MaskedRn fields require active_mask.")
+        if not masked_type and active_mask is not None:
+            raise ValueError("active_mask is only valid for MaskedRn fields.")
+        if not masked_type and constraint_basis is not None:
+            raise ValueError(
+                "constraint_basis is only valid for MaskedRn fields."
+            )
+
         if ftype in ('scalar', 'FieldScalar'):
             field = FieldScalar(self.lattice, ID)
             default_value = 0.0
@@ -181,6 +209,17 @@ class System:
                 raise ValueError("Rn field dimension must be a positive integer.")
             field = FieldRn(self.lattice, ID, int(dim))
             default_value = jnp.zeros(dim)
+        elif masked_type:
+            if isinstance(dim, bool) or not isinstance(dim, (int, np.integer)) or dim <= 0:
+                raise ValueError("MaskedRn field dimension must be a positive integer.")
+            field = MaskedFieldRn(
+                self.lattice,
+                ID,
+                int(dim),
+                active_mask=active_mask,
+                constraint_basis=constraint_basis,
+            )
+            default_value = jnp.zeros(dim)
         elif ftype == 'SO3':
             field = FieldSO3(self.lattice, ID)
             default_value = jnp.array([0.0, 0.0, 1.0])
@@ -189,8 +228,8 @@ class System:
             default_value = jnp.zeros(3)
         else:
             raise ValueError(
-                f"Unknown field type {ftype!r}. Expected scalar, R3, Rn, SO3, "
-                "or LocalStrain3D."
+                f"Unknown field type {ftype!r}. Expected scalar, R3, Rn, "
+                "MaskedRn, SO3, or LocalStrain3D."
             )
 
         initial_value = default_value if value is None else value
@@ -210,7 +249,13 @@ class System:
         self._fields_dict[ID] = field
         return field
 
-    def add_global_strain(self, value=None, mass=1, pressure_volume="determinant"):
+    def add_global_strain(
+        self,
+        value=None,
+        mass=1,
+        pressure_volume="determinant",
+        reference_volume=None,
+    ):
         """
         Add a global strain to the system. Allow variable cell simulation.
 
@@ -225,6 +270,10 @@ class System:
             Volume convention for pressure energy and reporting. The default
             uses ``det(I + epsilon)``; the linearized option is retained for
             controlled comparison and compatibility.
+        reference_volume : float, optional
+            Positive reference volume used for thermodynamic volume, pressure
+            energy, and nominal excess-stress normalization.  The default is
+            ``lattice.ref_volume``.
 
         Returns
         -------
@@ -247,6 +296,23 @@ class System:
                 "'linearized_small_strain'."
             )
 
+        if reference_volume is None:
+            resolved_reference_volume = self.lattice.ref_volume
+        else:
+            if isinstance(reference_volume, (bool, np.bool_)):
+                raise ValueError("reference_volume must be a finite, strictly positive scalar.")
+            reference_array = np.asarray(reference_volume)
+            if reference_array.ndim != 0:
+                raise ValueError("reference_volume must be a finite, strictly positive scalar.")
+            try:
+                resolved_reference_volume = float(reference_array)
+            except (TypeError, ValueError) as exc:
+                raise ValueError(
+                    "reference_volume must be a finite, strictly positive scalar."
+                ) from exc
+            if not np.isfinite(resolved_reference_volume) or resolved_reference_volume <= 0.0:
+                raise ValueError("reference_volume must be a finite, strictly positive scalar.")
+
         init = jnp.zeros(6) if value is None else jnp.asarray(value)
         if init.shape != (6,):
             raise ValueError("Global strain must be a 6D vector with shape (6,).")
@@ -256,13 +322,21 @@ class System:
         if mass is not None:
             field.set_mass(mass)
 
+        prior_fields = self._fields_dict.copy()
+        prior_pressure_interactions = self._self_interaction_dict.copy()
+        prior_pressure_volume_mode = self._pressure_volume_mode
+        prior_strain_reference_volume = self._strain_reference_volume
         self._fields_dict[ID] = field
+        self._strain_reference_volume = resolved_reference_volume
         try:
             self.add_pressure(0.0, volume_mode=pressure_volume)
         except Exception:
-            self._fields_dict.pop(ID, None)
-            self._self_interaction_dict.pop('pV', None)
-            self._pressure_volume_mode = None
+            self._fields_dict.clear()
+            self._fields_dict.update(prior_fields)
+            self._self_interaction_dict.clear()
+            self._self_interaction_dict.update(prior_pressure_interactions)
+            self._pressure_volume_mode = prior_pressure_volume_mode
+            self._strain_reference_volume = prior_strain_reference_volume
             raise
         return field
     
@@ -417,8 +491,31 @@ class System:
         return interaction
 
     ## elastic-type interactions
-    def add_homo_elastic_interaction(self, ID, field_ID, B11, B12, B44, enable_jit=True):
-        N = float(self.lattice.nsites)
+    def add_homo_elastic_interaction(
+        self,
+        ID,
+        field_ID,
+        B11,
+        B12,
+        B44,
+        enable_jit=True,
+        n_cells=None,
+    ):
+        """Add homogeneous elastic energy with an explicit cell-count scale.
+
+        Parameters are passed to :func:`homo_elastic_energy`.  When
+        ``n_cells`` is omitted, the existing ``lattice.nsites`` behavior is
+        preserved.
+        """
+        if n_cells is None:
+            n_cells = self.lattice.nsites
+        elif (
+            isinstance(n_cells, (bool, np.bool_))
+            or not isinstance(n_cells, (int, np.integer))
+            or n_cells <= 0
+        ):
+            raise ValueError("n_cells must be a positive integer.")
+        N = float(n_cells)
         self._add_interaction_sanity_check(ID)
         interaction = self_interaction(field_ID)
         interaction.set_energy_engine(homo_elastic_energy, enable_jit=enable_jit)
@@ -480,7 +577,7 @@ class System:
         energy_engine = _PRESSURE_VOLUME_ENGINES[volume_mode]
         interaction.set_energy_engine(energy_engine=energy_engine, enable_jit=True)
         interaction.create_force_engine(enable_jit=True)
-        parameters = jnp.array([_pres, self.lattice.ref_volume]) 
+        parameters = jnp.array([_pres, self._strain_reference_volume])
         interaction.set_parameters(parameters)
         self._self_interaction_dict[ID] = interaction
         self._pressure_volume_mode = volume_mode
@@ -1005,11 +1102,9 @@ class System:
         return field.get_temperature()
 
     def calc_excess_stress(self):
-        '''
-        Get instantaneous stress - applied stress (e.g. from hydrostatic pressure)
-        '''
+        """Return reference-volume-normalized generalized excess stress."""
         field = self.get_field_by_ID('gstrain')
-        return field.get_excess_stress()
+        return field.get_excess_stress(self._strain_reference_volume)
 
     """
     Methods for updating the gradient force 

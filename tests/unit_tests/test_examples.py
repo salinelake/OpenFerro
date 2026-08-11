@@ -1,3 +1,4 @@
+import json
 import os
 from pathlib import Path
 import subprocess
@@ -48,6 +49,34 @@ EXAMPLES = [
             "drive_field_dump_0.npy",
         ),
     ),
+    (
+        ROOT / "examples/06.BTO_Nanoparticle/01.npt.py",
+        (
+            "--size",
+            "5",
+            "--radius",
+            "1.0",
+            "--minimization-steps",
+            "2",
+            "--equilibration-steps",
+            "2",
+            "--sampling-steps",
+            "2",
+            "--relax-log-interval",
+            "1",
+            "--sample-log-interval",
+            "1",
+            "--dump-field",
+        ),
+        (
+            "config.json",
+            "optimization.log",
+            "relax_thermo.log",
+            "traj/relax_dipole_avg.log",
+            "sample_thermo.log",
+            "sample_dipole_avg.log",
+        ),
+    ),
 ]
 
 
@@ -55,7 +84,7 @@ EXAMPLES = [
 @pytest.mark.parametrize(
     "script, arguments, expected_files",
     EXAMPLES,
-    ids=("BaTiO3", "bcc_Fe", "sc_Heisenberg", "PTO_STO"),
+    ids=("BaTiO3", "bcc_Fe", "sc_Heisenberg", "PTO_STO", "BTO_nanoparticle"),
 )
 def test_maintained_example_smoke_mode(
     script, arguments, expected_files, tmp_path
@@ -90,3 +119,10 @@ def test_maintained_example_smoke_mode(
         output = output_dir / filename
         assert output.is_file(), f"missing {output}"
         assert output.stat().st_size > 0, f"empty {output}"
+    if script.parent.name == "06.BTO_Nanoparticle":
+        with (output_dir / "config.json").open(encoding="utf-8") as stream:
+            config = json.load(stream)
+        assert config["size"] == 5
+        assert config["radius"] == 1.0
+        assert config["seed"] == 17
+        assert config["output_dir"] == str(output_dir)

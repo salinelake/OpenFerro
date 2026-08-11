@@ -76,7 +76,9 @@ The homogeneous elastic energy from Eq. (12) is
    + \frac{B_{44}}{2}\sum_{a=4}^6\eta_a^2\right].
 
 The parameter order is ``(B11, B12, B44, N)``. ``N`` is the number of
-primitive cells. For the local acoustic-displacement form of Eq. (13), the
+primitive cells. ``System.add_homo_elastic_interaction(..., n_cells=N)`` can
+select this scale explicitly; omitting it preserves ``lattice.nsites``. For
+the local acoustic-displacement form of Eq. (13), the
 production coefficients are ``g11 = B11 / 4``, ``g12 = B12 / 8``, and
 ``g44 = B44 / 8``. A uniform local displacement has zero elastic energy.
 
@@ -115,6 +117,63 @@ determinant. Select it with
 ``add_global_strain(..., pressure_volume="linearized_small_strain")`` when
 reproducing a pre-determinant workflow.
 
+``System.add_global_strain(reference_volume=V0)`` may associate homogeneous
+strain with a positive thermodynamic reference volume distinct from the
+lattice reference volume. The selected value is used consistently by the
+pressure interaction, ``System.calc_volume()``, and excess-stress
+normalization without modifying ``lattice.ref_volume``. Excess stress is
+therefore a reference-volume-normalized generalized or nominal stress, not a
+finite-strain Cauchy stress. This distinction lets a padded nanoparticle use
+``N_particle * a0**3`` for homogeneous mechanics while retaining
+``(L * a0)**3`` for the fixed Ewald geometry.
+
+Masked Euclidean fields
+^^^^^^^^^^^^^^^^^^^^^^^
+
+``MaskedFieldRn`` stores a full ``(*lattice.size, dim)`` array and a required,
+immutable lattice-shaped Boolean mask ``m``. Public state assignments and the
+built-in Euclidean integrator commit paths enforce
+
+.. math::
+
+   \mathbf{u}_i \leftarrow
+   \begin{cases}
+   \mathbf{u}_i, & m_i=1,\\
+   \mathbf{0}, & m_i=0.
+   \end{cases}
+
+The same projection applies to velocity and assembled force. An optional
+full-lattice ``constraint_basis`` with rank ``r`` additionally applies the
+active-site orthogonal projection
+
+.. math::
+
+   P(\mathbf{u}) =
+   \mathbf{u} - X(X^T X)^{-1}X^T\mathbf{u}
+
+independently to each component. Only the basis and its small inverse Gram
+matrix are stored. Basis columns must be finite and linearly independent on
+the active sites. A basis-constrained field requires uniform mass on its
+active sites so this Euclidean projection is also the mass-metric projection.
+
+Mass remains finite and positive at inactive sites. Kinetic energy therefore
+needs no special mask, while temperature uses
+``active_dof = (N_active - r) * dim``:
+
+.. math::
+
+   T=\frac{2K}
+   {k_B (N_{\mathrm{active}}-r)\,\mathrm{dim}}.
+
+The inherited ``mean`` and ``var`` and the standard field reporter still
+reduce over every stored padded site. Exact zero padding allows recovery of an
+active mean as ``mean_reported * N_box / N_active``; active variance requires a
+full field sample. The mask constrains degrees of freedom and is not a general
+material-topology deletion rule for arbitrary energy engines.
+``System.calc_force_by_ID`` remains a raw interaction diagnostic and may show
+nonzero exterior components; ``System.update_force`` stores the projected
+assembled force used by integration and minimization.
+
 Dipole Ewald term
 ^^^^^^^^^^^^^^^^^
 
@@ -129,6 +188,23 @@ vectors. Rotated, left-handed, skew, and general triclinic cells fail
 explicitly. Energy is tested against a direct real-space dipole sum for two
 cell sizes and several fields; force uses JAX autodiff and is checked against
 float64 finite differences. A separate analytic Ewald force is not provided.
+
+The reciprocal zero vector is omitted, corresponding to the conducting or
+tin-foil macroscopic boundary convention. Under the same homogeneous
+``1 / epsilon_inf`` screening convention, the optional application-local
+spherical boundary term is
+
+.. math::
+
+   \Delta H_{\mathrm{sphere}} =
+   \frac{Z_*^2}{\epsilon_\infty}
+   \frac{|\sum_i \mathbf{u}_i|^2}{6\epsilon_0 V_{\mathrm{box}}}.
+
+This is the shape-dependent Ewald zero-mode boundary energy, not a physical
+surface free energy proportional to particle area. It does not solve a
+spatially varying BaTiO3-vacuum dielectric interface. The nanoparticle example
+keeps it off by default and provides a standalone same-parity nonperiodic
+energy-and-force comparison in ``surface_validation.py``.
 
 Magnetic exchange
 -----------------
@@ -288,6 +364,8 @@ The independent scientific checks are in:
 * ``tests/unit_tests/test_ewald.py``;
 * ``tests/unit_tests/test_integrator_md.py`` and ``test_integrator_llg.py``;
 * ``tests/unit_tests/test_model_records.py`` and ``test_examples.py``.
+* ``tests/unit_tests/test_masked_field.py``, ``test_particle_mechanics.py``,
+  ``test_nanoparticle_phase_a.py``, and ``test_nanoparticle_phase_b.py``.
 
 Reference tests enable float64 only inside pytest. Production precision still
 follows the user's JAX configuration. Float32 parity is checked with explicit

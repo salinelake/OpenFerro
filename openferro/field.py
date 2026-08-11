@@ -437,6 +437,262 @@ class FieldRn(Field):
             self.integrator = integrator
         return
 
+
+class MaskedFieldRn(FieldRn):
+    """Euclidean lattice field constrained to fixed active sites.
+
+    Values, velocities, and assembled forces are stored as full lattice arrays,
+    but entries outside ``active_mask`` are projected to exact zero at every
+    public and built-in-integrator commit point.  An optional small basis may
+    additionally remove global linear modes from each field component.
+    Masses remain finite and strictly positive on all lattice sites.
+
+    The inherited :attr:`FieldRn.mean` and :attr:`FieldRn.var` retain their
+    ordinary padded-lattice meaning.  Use :attr:`n_active_sites` and
+    :attr:`active_dof` when an active-site thermodynamic count is required.
+
+    Parameters
+    ----------
+    lattice : BravaisLattice3D
+        Lattice on which the field is stored.
+    ID : str
+        Field identifier.
+    dim : int
+        Positive number of components per lattice site.
+    active_mask : array-like of bool
+        Boolean array with shape ``tuple(lattice.size)``.  At least one site
+        must be active.
+    constraint_basis : array-like, optional
+        Full-lattice array with shape ``(*lattice.size, n_basis)``.  Its
+        active-site columns must be finite and linearly independent.  Each
+        field component is projected orthogonally to these columns.
+    unit : optional
+        Optional field unit metadata.
+    """
+
+    def __init__(
+        self,
+        lattice,
+        ID,
+        dim,
+        active_mask,
+        constraint_basis=None,
+        unit=None,
+    ):
+        if isinstance(dim, bool) or not isinstance(dim, (int, np.integer)) or dim <= 0:
+            raise ValueError("Masked field dimension must be a positive integer.")
+
+        try:
+            host_mask = np.asarray(jax.device_get(active_mask))
+        except (TypeError, ValueError) as exc:
+            raise TypeError("active_mask must be a Boolean array.") from exc
+        expected_shape = tuple(int(extent) for extent in lattice.size)
+        if host_mask.shape != expected_shape:
+            raise ValueError(f"active_mask must have shape {expected_shape}.")
+        if host_mask.dtype != np.bool_:
+            raise TypeError("active_mask must have Boolean dtype.")
+        n_active_sites = int(host_mask.sum())
+        if n_active_sites == 0:
+            raise ValueError("active_mask must contain at least one active site.")
+
+        super().__init__(lattice, ID, int(dim), unit=unit)
+        self._active_mask = jnp.asarray(host_mask)
+        self._n_active_sites = n_active_sites
+        self._constraint_basis = None
+        self._constraint_gram_inverse = None
+        self._constraint_rank = 0
+
+        if constraint_basis is not None:
+            try:
+                host_basis = np.asarray(jax.device_get(constraint_basis))
+            except (TypeError, ValueError) as exc:
+                raise TypeError(
+                    "constraint_basis must be a finite real array."
+                ) from exc
+            if host_basis.ndim != len(expected_shape) + 1:
+                raise ValueError(
+                    "constraint_basis must have shape "
+                    f"{expected_shape + ('n_basis',)}."
+                )
+            if host_basis.shape[:-1] != expected_shape or host_basis.shape[-1] == 0:
+                raise ValueError(
+                    "constraint_basis must match the lattice shape and contain "
+                    "at least one basis function."
+                )
+            if (
+                not np.issubdtype(host_basis.dtype, np.number)
+                or np.issubdtype(host_basis.dtype, np.complexfloating)
+            ):
+                raise TypeError("constraint_basis must be a finite real array.")
+            host_basis = host_basis.astype(float, copy=False)
+            if not np.all(np.isfinite(host_basis)):
+                raise ValueError("constraint_basis must contain only finite values.")
+
+            active_basis = host_basis[host_mask]
+            constraint_rank = int(np.linalg.matrix_rank(active_basis))
+            n_basis = int(active_basis.shape[1])
+            if constraint_rank != n_basis:
+                raise ValueError(
+                    "constraint_basis columns must be linearly independent on "
+                    "active sites."
+                )
+            if n_basis >= n_active_sites:
+                raise ValueError(
+                    "constraint_basis must leave at least one unconstrained "
+                    "site mode."
+                )
+
+            masked_basis = np.where(host_mask[..., None], host_basis, 0.0)
+            gram_inverse = np.linalg.inv(active_basis.T @ active_basis)
+            dtype = self._values.dtype
+            self._constraint_basis = jnp.asarray(masked_basis, dtype=dtype)
+            self._constraint_gram_inverse = jnp.asarray(
+                gram_inverse, dtype=dtype
+            )
+            self._constraint_rank = constraint_rank
+
+    @property
+    def active_mask(self):
+        """Boolean lattice-shaped mask defining the active sites."""
+        return self._active_mask
+
+    @property
+    def n_active_sites(self):
+        """Number of active lattice sites as a host integer."""
+        return self._n_active_sites
+
+    @property
+    def constraint_basis(self):
+        """Optional full-lattice basis removed from every field component."""
+        return self._constraint_basis
+
+    @property
+    def constraint_rank(self):
+        """Number of independent basis functions removed per component."""
+        return self._constraint_rank
+
+    @property
+    def active_dof(self):
+        """Number of unconstrained active Euclidean degrees of freedom."""
+        return (self._n_active_sites - self._constraint_rank) * self.fdim
+
+    def _project_active(self, array):
+        """Apply the fixed occupancy and optional linear constraints."""
+        array = jnp.asarray(array)
+        expected_shape = tuple(int(extent) for extent in self.shape)
+        if array.shape != expected_shape:
+            raise ValueError(f"Constrained array must have shape {expected_shape}.")
+        if jnp.issubdtype(array.dtype, jnp.complexfloating):
+            raise ValueError("Constrained arrays must be real-valued.")
+        if not jnp.issubdtype(array.dtype, jnp.floating):
+            array = array.astype(self._values.dtype)
+        projected = jnp.where(
+            self._active_mask[..., None], array, jnp.zeros((), dtype=array.dtype)
+        )
+        if self._constraint_basis is not None:
+            basis = self._constraint_basis.astype(array.dtype)
+            gram_inverse = self._constraint_gram_inverse.astype(array.dtype)
+            overlaps = jnp.einsum(
+                "...k,...d->kd", basis, projected, precision="highest"
+            )
+            coefficients = gram_inverse @ overlaps
+            fitted = jnp.einsum(
+                "...k,kd->...d", basis, coefficients, precision="highest"
+            )
+            projected = jnp.where(
+                self._active_mask[..., None],
+                projected - fitted,
+                jnp.zeros((), dtype=array.dtype),
+            )
+        if self._sharding is not None:
+            projected = jax.device_put(projected, self._sharding)
+        return projected
+
+    def set_values(self, values):
+        """Set field values and clamp inactive sites to exact zero."""
+        expected_shape = tuple(int(extent) for extent in self.shape)
+        values = self._prepare_real_values(values, expected_shape, "Field values")
+        super().set_values(self._project_active(values))
+
+    def set_local_value(self, loc, value):
+        """Set one local value and reapply the fixed active-site constraint."""
+        super().set_local_value(loc, value)
+        self.set_values(self._values)
+
+    def set_mass(self, mass):
+        """Set mass, requiring uniform active mass for linear constraints."""
+        if self._constraint_basis is not None:
+            host_mass = np.asarray(jax.device_get(mass))
+            expected_shape = tuple(int(extent) for extent in self.shape[:-1])
+            if host_mass.shape == expected_shape:
+                host_mask = np.asarray(jax.device_get(self._active_mask))
+                active_mass = host_mass[host_mask]
+                if (
+                    np.all(np.isfinite(active_mass))
+                    and np.all(active_mass > 0.0)
+                    and not np.allclose(
+                        active_mass,
+                        active_mass[0],
+                        rtol=1.0e-12,
+                        atol=0.0,
+                    )
+                ):
+                    raise ValueError(
+                        "Fields with constraint_basis require uniform mass on "
+                        "active sites."
+                    )
+        super().set_mass(mass)
+
+    def set_velocity(self, velocity):
+        """Set finite velocities and clamp inactive sites to exact zero."""
+        if self._values is None:
+            raise ValueError("Field has no values. Set values before setting velocity.")
+        velocity = jnp.asarray(velocity)
+        self.compare_shape(velocity, self._values)
+        if bool(jax.device_get(jnp.any(~jnp.isfinite(velocity)))):
+            raise ValueError("Velocity must contain only finite values.")
+        super().set_velocity(self._project_active(velocity))
+
+    def init_velocity(self, mode='zero', temperature=None, seed=42, key=None):
+        """Initialize velocities and discard all inactive-site components."""
+        super().init_velocity(mode=mode, temperature=temperature, seed=seed, key=key)
+        self.set_velocity(self._velocity)
+
+    def set_force(self, force):
+        """Store an assembled force projected onto the active sites."""
+        super().set_force(self._project_active(force))
+
+    def accumulate_force(self, force):
+        """Accumulate only the active components of a force contribution."""
+        super().accumulate_force(self._project_active(force))
+
+    def _set_values_from_integrator(self, values):
+        """Commit projected integrator values without host-value validation."""
+        super()._set_values_from_integrator(self._project_active(values))
+
+    def _set_velocity_from_integrator(self, velocity):
+        """Commit projected integrator velocities without a host round trip."""
+        super()._set_velocity_from_integrator(self._project_active(velocity))
+
+    def get_temperature(self):
+        """Return kinetic temperature using only active degrees of freedom."""
+        if self._velocity is None or self._mass is None:
+            return 0.0
+        return 2.0 * self.get_kinetic_energy() / (Constants.kb * self.active_dof)
+
+    def to_multi_devs(self, mesh: DeviceMesh):
+        """Shard state, occupancy, and optional constraint data."""
+        super().to_multi_devs(mesh)
+        self._active_mask = jax.device_put(self._active_mask, self._sharding)
+        if self._constraint_basis is not None:
+            self._constraint_basis = jax.device_put(
+                self._constraint_basis, self._sharding
+            )
+            self._constraint_gram_inverse = jax.device_put(
+                self._constraint_gram_inverse, mesh.replicate_sharding()
+            )
+
+
 class FieldScalar(FieldRn):
     """
     Scalar field. Values are stored as scalars.
@@ -763,8 +1019,16 @@ class GlobalStrain(Field):
         if self._force is not None:
             self._force = jax.device_put(self._force, sharding)
 
-    def get_excess_stress(self):
-        return self.get_force() / self.lattice.ref_volume / Constants.bar 
+    def get_excess_stress(self, reference_volume=None):
+        """Return generalized excess stress normalized by a reference volume.
+
+        This is a nominal/reference-volume measure, not a finite-strain Cauchy
+        stress.  Omitting ``reference_volume`` preserves the historical lattice
+        reference-volume normalization.
+        """
+        if reference_volume is None:
+            reference_volume = self.lattice.ref_volume
+        return self.get_force() / reference_volume / Constants.bar
 
     def set_integrator(self, integrator_class, dt, temp=None, tau=None, freeze_x=False, freeze_y=False, freeze_z=False):
         """

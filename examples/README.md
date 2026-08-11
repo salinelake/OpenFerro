@@ -3,10 +3,9 @@
 The maintained examples use explicit entry points and reproducible random
 seeds. Examples 01 through 03 retain working-directory-relative configuration
 and output defaults, so launch them from their own directories unless you pass
-explicit paths; each provides a ``--tiny`` development check. Example 04
-resolves its defaults from the repository and script locations and documents
-an explicitly reduced smoke command. These short runs do not establish
-production convergence.
+explicit paths; each provides a ``--tiny`` development check. Examples 04 and
+06 resolve defaults from repository and script locations and document reduced
+smoke commands. These short runs do not establish production convergence.
 
 | Example | Description | Status |
 | --- | --- | --- |
@@ -15,6 +14,7 @@ production convergence.
 | [03.sc_Ising_Heating](03.sc_Ising_Heating) | Simple-cubic continuous Heisenberg heating; the directory name is historical. | Stable entry point |
 | [04.PTOSTO_superlattice](04.PTOSTO_superlattice) | Single-GPU field-driven PTO/STO domain dynamics and visualization. | Runnable; superlattice engines experimental |
 | [05.BTO_GPU_Parallel](05.BTO_GPU_Parallel) | Single-node BTO scaling and memory benchmark on 1, 2, 3, and 4 GPUs. | Experimental multi-device benchmark |
+| [06.BTO_Nanoparticle](06.BTO_Nanoparticle) | Masked, padded idealized BTO nanoparticle with finite-cell free-surface mechanics and electrostatic boundary validation. | Runnable Phase-B workflow; production physics validation pending |
 
 Each directory documents its physical model, run commands, and outputs. Review
 the repository [feature-status matrix](../docs/source/feature_status.rst) before
