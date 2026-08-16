@@ -154,10 +154,11 @@ class System:
         ID : str
             ID of the field
         ftype : str, optional
-            Type of field: ``scalar``, ``R3``, ``Rn``, ``MaskedRn``, ``SO3``,
-            or ``LocalStrain3D``. The default is ``scalar``.
+            Type of field: ``scalar``, ``R3``, ``Rn``, ``MaskedRn``,
+            ``MaskedLocalStrain``, ``SO3``, or ``LocalStrain3D``. The default
+            is ``scalar``.
         dim : int, optional
-            Dimension of the field. Only used for Rn fields
+            Dimension of the field. Used only for ``Rn`` and ``MaskedRn``.
         value : array-like, optional
             Initial value of the field. It is broadcast to the field shape;
             integer and Boolean inputs are converted to floating point.
@@ -165,11 +166,11 @@ class System:
             Mass of the field. When omitted, Rn-like fields use 1.0 and SO(3)
             fields remain massless.
         active_mask : array-like of bool, optional
-            Required for ``MaskedRn`` or ``MaskedFieldRn`` and rejected for
-            every other field type.
+            Required for ``MaskedRn``, ``MaskedFieldRn``, and
+            ``MaskedLocalStrain``; rejected for every other field type.
         constraint_basis : array-like, optional
-            Linear basis projected from each component of a masked field.
-            Valid only for ``MaskedRn`` or ``MaskedFieldRn``.
+            Required for ``MaskedLocalStrain`` and rejected for every other
+            field type.
 
         Returns
         -------
@@ -188,14 +189,20 @@ class System:
         if ID == 'gstrain':
             raise ValueError("The ID 'gstrain' is reserved for global strain field. Please pick another ID.")
 
-        masked_type = ftype in ('MaskedRn', 'MaskedFieldRn')
-        if masked_type and active_mask is None:
+        masked_rn_type = ftype in ('MaskedRn', 'MaskedFieldRn')
+        masked_local_strain_type = ftype == 'MaskedLocalStrain'
+        masked_type = masked_rn_type or masked_local_strain_type
+        if masked_rn_type and active_mask is None:
             raise ValueError("MaskedRn fields require active_mask.")
+        if masked_local_strain_type and active_mask is None:
+            raise ValueError("MaskedLocalStrain requires active_mask.")
         if not masked_type and active_mask is not None:
-            raise ValueError("active_mask is only valid for MaskedRn fields.")
-        if not masked_type and constraint_basis is not None:
+            raise ValueError("active_mask is only valid for masked fields.")
+        if masked_local_strain_type and constraint_basis is None:
+            raise ValueError("MaskedLocalStrain requires constraint_basis.")
+        if not masked_local_strain_type and constraint_basis is not None:
             raise ValueError(
-                "constraint_basis is only valid for MaskedRn fields."
+                "constraint_basis is only valid for MaskedLocalStrain."
             )
 
         if ftype in ('scalar', 'FieldScalar'):
@@ -209,7 +216,7 @@ class System:
                 raise ValueError("Rn field dimension must be a positive integer.")
             field = FieldRn(self.lattice, ID, int(dim))
             default_value = jnp.zeros(dim)
-        elif masked_type:
+        elif masked_rn_type:
             if isinstance(dim, bool) or not isinstance(dim, (int, np.integer)) or dim <= 0:
                 raise ValueError("MaskedRn field dimension must be a positive integer.")
             field = MaskedFieldRn(
@@ -217,9 +224,18 @@ class System:
                 ID,
                 int(dim),
                 active_mask=active_mask,
-                constraint_basis=constraint_basis,
             )
             default_value = jnp.zeros(dim)
+        elif masked_local_strain_type:
+            if dim is not None:
+                raise ValueError("MaskedLocalStrain has fixed dimension 3.")
+            field = MaskedLocalStrain(
+                self.lattice,
+                ID,
+                active_mask=active_mask,
+                constraint_basis=constraint_basis,
+            )
+            default_value = jnp.zeros(3)
         elif ftype == 'SO3':
             field = FieldSO3(self.lattice, ID)
             default_value = jnp.array([0.0, 0.0, 1.0])
@@ -229,7 +245,7 @@ class System:
         else:
             raise ValueError(
                 f"Unknown field type {ftype!r}. Expected scalar, R3, Rn, "
-                "MaskedRn, SO3, or LocalStrain3D."
+                "MaskedRn, MaskedLocalStrain, SO3, or LocalStrain3D."
             )
 
         initial_value = default_value if value is None else value

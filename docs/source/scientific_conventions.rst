@@ -142,9 +142,12 @@ built-in Euclidean integrator commit paths enforce
    \mathbf{0}, & m_i=0.
    \end{cases}
 
-The same projection applies to velocity and assembled force. An optional
-full-lattice ``constraint_basis`` with rank ``r`` additionally applies the
-active-site orthogonal projection
+The same projection applies to velocity and assembled force.
+``MaskedFieldRn.active_dof`` is ``N_active * dim``.
+
+``MaskedLocalStrain`` is a distinct three-component subclass for constrained
+acoustic displacement. It requires a full-lattice ``constraint_basis`` with
+rank ``r`` and additionally applies the active-site orthogonal projection
 
 .. math::
 
@@ -153,17 +156,17 @@ active-site orthogonal projection
 
 independently to each component. Only the basis and its small inverse Gram
 matrix are stored. Basis columns must be finite and linearly independent on
-the active sites. A basis-constrained field requires uniform mass on its
-active sites so this Euclidean projection is also the mass-metric projection.
+the active sites. ``MaskedLocalStrain`` requires uniform mass on its active
+sites so this Euclidean projection is also the mass-metric projection.
 
 Mass remains finite and positive at inactive sites. Kinetic energy therefore
-needs no special mask, while temperature uses
-``active_dof = (N_active - r) * dim``:
+needs no special mask. ``MaskedLocalStrain`` temperature uses
+``active_dof = 3 * (N_active - r)``:
 
 .. math::
 
    T=\frac{2K}
-   {k_B (N_{\mathrm{active}}-r)\,\mathrm{dim}}.
+   {3 k_B (N_{\mathrm{active}}-r)}.
 
 The inherited ``mean`` and ``var`` and the standard field reporter still
 reduce over every stored padded site. Exact zero padding allows recovery of an

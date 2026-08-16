@@ -77,11 +77,16 @@ Core API
    * - ``MaskedRn`` field constraints
      - Stable core invariant
      - A required immutable Boolean site mask projects values, velocities, and
-       assembled forces to exact zero outside the active region. An optional
-       finite linear basis can remove global modes from each component.
-       Active temperature and partition-sharding commits are tested. Inherited
-       mean and variance, standard reporters, stored array size, and positive
+       assembled forces to exact zero outside the active region. Active
+       temperature and partition-sharding commits are tested. Inherited mean
+       and variance, standard reporters, stored array size, and positive
        inactive masses retain ordinary ``Rn`` behavior.
+   * - ``MaskedLocalStrain`` constraints
+     - Stable for the nanoparticle workflow
+     - A dedicated three-component acoustic field combines an immutable node
+       mask with a required finite linear basis that removes translation and
+       affine modes. Projected state, active temperature, uniform active mass,
+       and partition-sharding commits are tested.
    * - ``SO3`` field state
      - Stable
      - Assignment, local mutation, and magnitude changes preserve finite,

@@ -17,11 +17,12 @@ System
 Fields
 ------
 
-``MaskedFieldRn`` is the opt-in Euclidean constrained field. Its inherited
-``mean`` and ``var`` retain full padded-lattice semantics; active counts are
-available through ``n_active_sites`` and ``active_dof``. An optional
-``constraint_basis`` removes a small set of linearly independent global modes
-from every field component at the same state and integrator commit points.
+``MaskedFieldRn`` is the occupancy-only Euclidean constrained field. Its
+inherited ``mean`` and ``var`` retain full padded-lattice semantics; active
+counts are available through ``n_active_sites`` and ``active_dof``.
+``MaskedLocalStrain`` is the separate three-component acoustic field. It
+requires a ``constraint_basis`` and removes its translation/affine modes at
+the same state and integrator commit points.
 
 .. automodule:: openferro.field
    :members:

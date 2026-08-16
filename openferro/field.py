@@ -439,13 +439,12 @@ class FieldRn(Field):
 
 
 class MaskedFieldRn(FieldRn):
-    """Euclidean lattice field constrained to fixed active sites.
+    """Euclidean lattice field constrained to a fixed set of active sites.
 
     Values, velocities, and assembled forces are stored as full lattice arrays,
     but entries outside ``active_mask`` are projected to exact zero at every
-    public and built-in-integrator commit point.  An optional small basis may
-    additionally remove global linear modes from each field component.
-    Masses remain finite and strictly positive on all lattice sites.
+    public and built-in-integrator commit point.  Masses remain finite and
+    strictly positive on all lattice sites.
 
     The inherited :attr:`FieldRn.mean` and :attr:`FieldRn.var` retain their
     ordinary padded-lattice meaning.  Use :attr:`n_active_sites` and
@@ -462,23 +461,11 @@ class MaskedFieldRn(FieldRn):
     active_mask : array-like of bool
         Boolean array with shape ``tuple(lattice.size)``.  At least one site
         must be active.
-    constraint_basis : array-like, optional
-        Full-lattice array with shape ``(*lattice.size, n_basis)``.  Its
-        active-site columns must be finite and linearly independent.  Each
-        field component is projected orthogonally to these columns.
     unit : optional
         Optional field unit metadata.
     """
 
-    def __init__(
-        self,
-        lattice,
-        ID,
-        dim,
-        active_mask,
-        constraint_basis=None,
-        unit=None,
-    ):
+    def __init__(self, lattice, ID, dim, active_mask, unit=None):
         if isinstance(dim, bool) or not isinstance(dim, (int, np.integer)) or dim <= 0:
             raise ValueError("Masked field dimension must be a positive integer.")
 
@@ -498,58 +485,6 @@ class MaskedFieldRn(FieldRn):
         super().__init__(lattice, ID, int(dim), unit=unit)
         self._active_mask = jnp.asarray(host_mask)
         self._n_active_sites = n_active_sites
-        self._constraint_basis = None
-        self._constraint_gram_inverse = None
-        self._constraint_rank = 0
-
-        if constraint_basis is not None:
-            try:
-                host_basis = np.asarray(jax.device_get(constraint_basis))
-            except (TypeError, ValueError) as exc:
-                raise TypeError(
-                    "constraint_basis must be a finite real array."
-                ) from exc
-            if host_basis.ndim != len(expected_shape) + 1:
-                raise ValueError(
-                    "constraint_basis must have shape "
-                    f"{expected_shape + ('n_basis',)}."
-                )
-            if host_basis.shape[:-1] != expected_shape or host_basis.shape[-1] == 0:
-                raise ValueError(
-                    "constraint_basis must match the lattice shape and contain "
-                    "at least one basis function."
-                )
-            if (
-                not np.issubdtype(host_basis.dtype, np.number)
-                or np.issubdtype(host_basis.dtype, np.complexfloating)
-            ):
-                raise TypeError("constraint_basis must be a finite real array.")
-            host_basis = host_basis.astype(float, copy=False)
-            if not np.all(np.isfinite(host_basis)):
-                raise ValueError("constraint_basis must contain only finite values.")
-
-            active_basis = host_basis[host_mask]
-            constraint_rank = int(np.linalg.matrix_rank(active_basis))
-            n_basis = int(active_basis.shape[1])
-            if constraint_rank != n_basis:
-                raise ValueError(
-                    "constraint_basis columns must be linearly independent on "
-                    "active sites."
-                )
-            if n_basis >= n_active_sites:
-                raise ValueError(
-                    "constraint_basis must leave at least one unconstrained "
-                    "site mode."
-                )
-
-            masked_basis = np.where(host_mask[..., None], host_basis, 0.0)
-            gram_inverse = np.linalg.inv(active_basis.T @ active_basis)
-            dtype = self._values.dtype
-            self._constraint_basis = jnp.asarray(masked_basis, dtype=dtype)
-            self._constraint_gram_inverse = jnp.asarray(
-                gram_inverse, dtype=dtype
-            )
-            self._constraint_rank = constraint_rank
 
     @property
     def active_mask(self):
@@ -562,48 +497,19 @@ class MaskedFieldRn(FieldRn):
         return self._n_active_sites
 
     @property
-    def constraint_basis(self):
-        """Optional full-lattice basis removed from every field component."""
-        return self._constraint_basis
-
-    @property
-    def constraint_rank(self):
-        """Number of independent basis functions removed per component."""
-        return self._constraint_rank
-
-    @property
     def active_dof(self):
-        """Number of unconstrained active Euclidean degrees of freedom."""
-        return (self._n_active_sites - self._constraint_rank) * self.fdim
+        """Number of active Euclidean degrees of freedom."""
+        return self._n_active_sites * self.fdim
 
     def _project_active(self, array):
-        """Apply the fixed occupancy and optional linear constraints."""
+        """Project a full field-shaped array onto the fixed active sites."""
         array = jnp.asarray(array)
         expected_shape = tuple(int(extent) for extent in self.shape)
         if array.shape != expected_shape:
             raise ValueError(f"Constrained array must have shape {expected_shape}.")
-        if jnp.issubdtype(array.dtype, jnp.complexfloating):
-            raise ValueError("Constrained arrays must be real-valued.")
-        if not jnp.issubdtype(array.dtype, jnp.floating):
-            array = array.astype(self._values.dtype)
         projected = jnp.where(
             self._active_mask[..., None], array, jnp.zeros((), dtype=array.dtype)
         )
-        if self._constraint_basis is not None:
-            basis = self._constraint_basis.astype(array.dtype)
-            gram_inverse = self._constraint_gram_inverse.astype(array.dtype)
-            overlaps = jnp.einsum(
-                "...k,...d->kd", basis, projected, precision="highest"
-            )
-            coefficients = gram_inverse @ overlaps
-            fitted = jnp.einsum(
-                "...k,kd->...d", basis, coefficients, precision="highest"
-            )
-            projected = jnp.where(
-                self._active_mask[..., None],
-                projected - fitted,
-                jnp.zeros((), dtype=array.dtype),
-            )
         if self._sharding is not None:
             projected = jax.device_put(projected, self._sharding)
         return projected
@@ -618,30 +524,6 @@ class MaskedFieldRn(FieldRn):
         """Set one local value and reapply the fixed active-site constraint."""
         super().set_local_value(loc, value)
         self.set_values(self._values)
-
-    def set_mass(self, mass):
-        """Set mass, requiring uniform active mass for linear constraints."""
-        if self._constraint_basis is not None:
-            host_mass = np.asarray(jax.device_get(mass))
-            expected_shape = tuple(int(extent) for extent in self.shape[:-1])
-            if host_mass.shape == expected_shape:
-                host_mask = np.asarray(jax.device_get(self._active_mask))
-                active_mass = host_mass[host_mask]
-                if (
-                    np.all(np.isfinite(active_mass))
-                    and np.all(active_mass > 0.0)
-                    and not np.allclose(
-                        active_mass,
-                        active_mass[0],
-                        rtol=1.0e-12,
-                        atol=0.0,
-                    )
-                ):
-                    raise ValueError(
-                        "Fields with constraint_basis require uniform mass on "
-                        "active sites."
-                    )
-        super().set_mass(mass)
 
     def set_velocity(self, velocity):
         """Set finite velocities and clamp inactive sites to exact zero."""
@@ -681,16 +563,173 @@ class MaskedFieldRn(FieldRn):
         return 2.0 * self.get_kinetic_energy() / (Constants.kb * self.active_dof)
 
     def to_multi_devs(self, mesh: DeviceMesh):
-        """Shard state, occupancy, and optional constraint data."""
+        """Shard state and the active mask with the same partition layout."""
         super().to_multi_devs(mesh)
         self._active_mask = jax.device_put(self._active_mask, self._sharding)
-        if self._constraint_basis is not None:
-            self._constraint_basis = jax.device_put(
-                self._constraint_basis, self._sharding
+
+
+class MaskedLocalStrain(MaskedFieldRn):
+    """Masked acoustic displacement with translation/affine constraints.
+
+    This three-component field stores the dimensionless local acoustic
+    displacement used to construct local strain.  In addition to the active
+    site mask inherited from :class:`MaskedFieldRn`, each component is
+    projected orthogonally to a required finite linear basis.  The nanoparticle
+    application uses ``[1, r_x, r_y, r_z]`` to remove translations and affine
+    displacement from the local field.
+
+    Parameters
+    ----------
+    lattice : BravaisLattice3D
+        Lattice on which the field is stored.
+    ID : str
+        Field identifier.
+    active_mask : array-like of bool
+        Boolean lattice-shaped acoustic-node mask.
+    constraint_basis : array-like
+        Full-lattice array with shape ``(*lattice.size, n_basis)``.  Its
+        active-site columns must be finite and linearly independent.
+    unit : optional
+        Optional field unit metadata.
+    """
+
+    def __init__(
+        self,
+        lattice,
+        ID,
+        active_mask,
+        constraint_basis,
+        unit=None,
+    ):
+        super().__init__(
+            lattice,
+            ID,
+            dim=3,
+            active_mask=active_mask,
+            unit=unit,
+        )
+        expected_shape = tuple(int(extent) for extent in lattice.size)
+        try:
+            host_basis = np.asarray(jax.device_get(constraint_basis))
+        except (TypeError, ValueError) as exc:
+            raise TypeError(
+                "constraint_basis must be a finite real array."
+            ) from exc
+        if host_basis.ndim != len(expected_shape) + 1:
+            raise ValueError(
+                "constraint_basis must have shape "
+                f"{expected_shape + ('n_basis',)}."
             )
-            self._constraint_gram_inverse = jax.device_put(
-                self._constraint_gram_inverse, mesh.replicate_sharding()
+        if host_basis.shape[:-1] != expected_shape or host_basis.shape[-1] == 0:
+            raise ValueError(
+                "constraint_basis must match the lattice shape and contain "
+                "at least one basis function."
             )
+        if (
+            not np.issubdtype(host_basis.dtype, np.number)
+            or np.issubdtype(host_basis.dtype, np.complexfloating)
+        ):
+            raise TypeError("constraint_basis must be a finite real array.")
+        host_basis = host_basis.astype(float, copy=False)
+        if not np.all(np.isfinite(host_basis)):
+            raise ValueError("constraint_basis must contain only finite values.")
+
+        host_mask = np.asarray(jax.device_get(self._active_mask))
+        active_basis = host_basis[host_mask]
+        constraint_rank = int(np.linalg.matrix_rank(active_basis))
+        n_basis = int(active_basis.shape[1])
+        if constraint_rank != n_basis:
+            raise ValueError(
+                "constraint_basis columns must be linearly independent on "
+                "active sites."
+            )
+        if n_basis >= self._n_active_sites:
+            raise ValueError(
+                "constraint_basis must leave at least one unconstrained site "
+                "mode."
+            )
+
+        masked_basis = np.where(host_mask[..., None], host_basis, 0.0)
+        gram_inverse = np.linalg.inv(active_basis.T @ active_basis)
+        dtype = self._values.dtype
+        self._constraint_basis = jnp.asarray(masked_basis, dtype=dtype)
+        self._constraint_gram_inverse = jnp.asarray(
+            gram_inverse, dtype=dtype
+        )
+        self._constraint_rank = constraint_rank
+
+    @property
+    def constraint_basis(self):
+        """Full-lattice basis removed from every displacement component."""
+        return self._constraint_basis
+
+    @property
+    def constraint_rank(self):
+        """Number of independent basis functions removed per component."""
+        return self._constraint_rank
+
+    @property
+    def active_dof(self):
+        """Number of unconstrained active acoustic degrees of freedom."""
+        return (self._n_active_sites - self._constraint_rank) * self.fdim
+
+    def _project_active(self, array):
+        """Apply occupancy and translation/affine constraints."""
+        array = jnp.asarray(array)
+        if jnp.issubdtype(array.dtype, jnp.complexfloating):
+            raise ValueError("Local-strain arrays must be real-valued.")
+        if not jnp.issubdtype(array.dtype, jnp.floating):
+            array = array.astype(self._values.dtype)
+        projected = super()._project_active(array)
+        basis = self._constraint_basis.astype(projected.dtype)
+        gram_inverse = self._constraint_gram_inverse.astype(projected.dtype)
+        overlaps = jnp.einsum(
+            "...k,...d->kd", basis, projected, precision="highest"
+        )
+        coefficients = gram_inverse @ overlaps
+        fitted = jnp.einsum(
+            "...k,kd->...d", basis, coefficients, precision="highest"
+        )
+        projected = jnp.where(
+            self._active_mask[..., None],
+            projected - fitted,
+            jnp.zeros((), dtype=projected.dtype),
+        )
+        if self._sharding is not None:
+            projected = jax.device_put(projected, self._sharding)
+        return projected
+
+    def set_mass(self, mass):
+        """Set a positive mass uniform over active acoustic nodes."""
+        host_mass = np.asarray(jax.device_get(mass))
+        expected_shape = tuple(int(extent) for extent in self.shape[:-1])
+        if host_mass.shape == expected_shape:
+            host_mask = np.asarray(jax.device_get(self._active_mask))
+            active_mass = host_mass[host_mask]
+            if (
+                np.all(np.isfinite(active_mass))
+                and np.all(active_mass > 0.0)
+                and not np.allclose(
+                    active_mass,
+                    active_mass[0],
+                    rtol=1.0e-12,
+                    atol=0.0,
+                )
+            ):
+                raise ValueError(
+                    "MaskedLocalStrain requires uniform mass on active sites."
+                )
+        super().set_mass(mass)
+
+    def to_multi_devs(self, mesh: DeviceMesh):
+        """Shard acoustic state and constraint data."""
+        super().to_multi_devs(mesh)
+        self._constraint_basis = jax.device_put(
+            self._constraint_basis, self._sharding
+        )
+        self._constraint_gram_inverse = jax.device_put(
+            self._constraint_gram_inverse, mesh.replicate_sharding()
+        )
 
 
 class FieldScalar(FieldRn):
