@@ -77,6 +77,95 @@ force with zero mean and unit variance and is not correlated with :math:`\xi_n`.
 The discrete leapfrog/LFMiddle velocity timing, SIB midpoint stages, and
 restart state are specified in :doc:`scientific_conventions`.
 
+Classical metadynamics
+----------------------
+
+``MetadynamicsNVT`` adds a classical fixed-height metadynamics bias to the NVT
+Langevin driver.  A collective variable is a pure scalar function with the
+same signature as an energy engine, ``engine(field1, ..., parameters)``.  CV
+functions belong to the simulation and are not registered as system
+interactions, so an observable such as a field sum contributes no physical
+Hamiltonian energy or force by itself.
+
+For example, a total dipole component can be configured without adding it to
+the Hamiltonian:
+
+.. code-block:: python
+
+   def total_dipole_z(dipole, parameters):
+       return parameters[0] * jnp.sum(dipole[..., 2])
+
+
+   simulation = MetadynamicsNVT(
+       system,
+       collective_variables=[{
+           "id": "total_dipole_z",
+           "field_ids": "dipole",
+           "engine": total_dipole_z,
+           "parameters": [1.0],
+       }],
+       pace=100,
+       sigma=0.02,
+       height=0.001,
+       grid_min=-1.5,
+       grid_max=1.5,
+       upper_walls={"at": 1.0, "kappa": 0.1},
+   )
+
+For :math:`1\leq d\leq3` collective variables and deposited centers
+:math:`c^{(k)}`, the bias is
+
+.. math::
+   V_{\mathrm{meta}}(s) = \sum_k h \exp\left[-\frac{1}{2}
+   \sum_{i=1}^d \frac{(s_i-c_i^{(k)})^2}{\sigma_i^2}\right].
+
+The fixed height :math:`h` is in eV.  Each width :math:`\sigma_i` uses the
+native units of its CV.  Optional upper and lower walls use
+
+.. math::
+   V_{\mathrm{upper}}(s) = \sum_i \kappa_i
+   \left[\frac{s_i-a_i+o_i}{\epsilon_i}\right]_+^{e_i},
+
+.. math::
+   V_{\mathrm{lower}}(s) = \sum_i \kappa_i
+   \left[\frac{a_i+o_i-s_i}{\epsilon_i}\right]_+^{e_i},
+
+where :math:`[z]_+=\max(z,0)`.  ``KAPPA`` is in eV; ``AT``, ``EPS``, and
+``OFFSET`` use the corresponding CV units.  JAX differentiates each CV only
+to assemble the additional field force
+
+.. math::
+   F_{\mathrm{bias}}^{(x)} = -\sum_i
+   \frac{\partial V_{\mathrm{bias}}}{\partial s_i}
+   \frac{\partial s_i}{\partial x}.
+
+A hill is deposited at the updated state after every ``pace`` accepted outer
+MD steps and affects the next force evaluation.  Calls made internally by an
+implicit SO(3) solver do not deposit hills.  At deposition, the Gaussian is
+accumulated on a fixed grid spanning ``grid_min`` through ``grid_max``.  The
+bias and its derivative are evaluated with tensor-product cubic interpolation,
+so their cost does not grow with the number of hills.  ``grid_bin`` gives the
+number of intervals in each direction; when omitted, OpenFerro chooses a
+spacing no larger than :math:`\sigma_i/5`.  The grid must cover the sampled CV
+range.  Values outside it use the boundary bias, so walls should be placed
+inside the grid to return the trajectory to the represented region. Active
+walls configured outside the grid are rejected.
+
+The fixed grid has :math:`\prod_i(n_i+1)` values, making it suitable for the
+supported one to three CVs but increasingly memory-intensive with dimension.
+Adaptive widths, multiple walkers, restart import, and well-tempered
+metadynamics are not implemented.
+
+The optional HILLS file records step, exact CV centers, widths, and height.
+It remains independent of the interpolated runtime grid and can reconstruct
+the deposited Gaussian sum directly.  Repeated
+``run`` calls on one object continue its history, but a fresh simulation
+refuses to overwrite an existing HILLS file.  ``Thermo_Reporter`` continues to
+report the physical system potential; use ``calc_total_bias`` or
+``calc_biased_potential_energy`` for bias-aware energies.  The
+``examples/07.MetaDynamics`` workflow compares a two-CV run with an exactly
+known toy free-energy surface.
+
 Structure Optimization
 ----------------------
 

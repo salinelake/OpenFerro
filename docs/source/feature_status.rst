@@ -225,20 +225,27 @@ Dynamics and simulations
        documented determinant volume by default and can select the linearized
        compatibility mode; restart is manual state plus key restoration rather
        than a checkpoint file.
+   * - Fixed-height NVT metadynamics
+     - Experimental
+     - Supports one to three differentiable scalar CV functions, fixed-shape
+       bias grids with cubic interpolation, polynomial walls, and HILLS
+       output. Restart import, multiple walkers, and well-tempered
+       metadynamics are deferred.
 
 Reference examples
 ------------------
 
-Examples 01 through 03 and 06 have explicit entry points, reproducible seeds,
-and automated reduced CPU execution tests. Examples 01 through 03 expose
-``--tiny``; Example 06 supplies reduced values through its ordinary arguments.
+Examples 01 through 03, 06, and 07 have explicit entry points, reproducible
+seeds, and automated reduced CPU execution tests. Examples 01 through 03 expose
+``--tiny``; Example 06 supplies reduced values through its ordinary arguments,
+and Example 07 exposes ``--quick``.
 Examples 01 through 03 retain working-directory-relative defaults; Example 06
-resolves repository defaults. Example 04 resolves its default paths from the
-repository and script locations and has an automated, explicitly reduced
-4x4x4 CPU smoke run. These checks validate construction and short execution;
-they do not regress full phase-transition curves or establish convergence of a
-production run. Example 05 is a metadata-rich performance benchmark rather
-than a scientific reference trajectory.
+and Example 07 resolve repository defaults. Example 04 resolves its default
+paths from the repository and script locations and has an automated,
+explicitly reduced 4x4x4 CPU smoke run. These checks validate construction and
+short execution; they do not regress full phase-transition curves or establish
+convergence of a production run. Example 05 is a metadata-rich performance
+benchmark rather than a scientific reference trajectory.
 
 .. list-table:: Maintained example status
    :header-rows: 1
@@ -277,6 +284,12 @@ than a scientific reference trajectory.
        elastic constants but not finite-wave-vector ZVR acoustic dispersion.
        A physical dielectric interface, surface chemistry, and production box
        convergence remain outside the promoted scope.
+   * - ``07.MetaDynamics``
+     - Experimental analytical validation
+     - A reduced run checks two simulation-owned dipole-sum CVs and HILLS
+       output. The full one-GPU workflow reconstructs a known four-well 2-D
+       free-energy surface using fixed, predeclared accuracy tolerances; the
+       current single-walker defaults are not yet promoted as passing them.
 
 A feature moves from experimental to stable only with a declared equation and
 parameter convention, independent energy or one-step coverage, force or

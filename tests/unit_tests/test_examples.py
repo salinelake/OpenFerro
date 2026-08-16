@@ -77,6 +77,11 @@ EXAMPLES = [
             "sample_dipole_avg.log",
         ),
     ),
+    (
+        ROOT / "examples/07.MetaDynamics/run.py",
+        ("--quick",),
+        ("HILLS", "run_summary.json"),
+    ),
 ]
 
 
@@ -84,7 +89,14 @@ EXAMPLES = [
 @pytest.mark.parametrize(
     "script, arguments, expected_files",
     EXAMPLES,
-    ids=("BaTiO3", "bcc_Fe", "sc_Heisenberg", "PTO_STO", "BTO_nanoparticle"),
+    ids=(
+        "BaTiO3",
+        "bcc_Fe",
+        "sc_Heisenberg",
+        "PTO_STO",
+        "BTO_nanoparticle",
+        "MetaDynamics",
+    ),
 )
 def test_maintained_example_smoke_mode(
     script, arguments, expected_files, tmp_path

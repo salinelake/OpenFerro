@@ -1,0 +1,51 @@
+{
+  "lattice": {
+    "size": [2, 2, 2],
+    "lattice_constant_angstrom": 1.0
+  },
+  "model": {
+    "A_eV_per_P4": 0.08,
+    "S0_P": 1.0,
+    "K_perp_eV_per_P2": 1.0
+  },
+  "field": {
+    "mass": 1.0
+  },
+  "dynamics": {
+    "temperature_K": 300.0,
+    "dt": 0.002,
+    "tau": 0.1,
+    "steps": 1000000,
+    "quick_steps": 200
+  },
+  "metadynamics": {
+    "pace": 200,
+    "sigma": [0.12, 0.12],
+    "height_eV": 0.001,
+    "grid_min": [-2.4, -2.4],
+    "grid_max": [2.4, 2.4],
+    "grid_bin": [200, 200],
+    "upper_walls": {
+      "at": [1.8, 1.8],
+      "kappa": [1.0, 1.0],
+      "exp": [4.0, 4.0],
+      "eps": [0.2, 0.2],
+      "offset": [0.0, 0.0]
+    },
+    "lower_walls": {
+      "at": [-1.8, -1.8],
+      "kappa": [1.0, 1.0],
+      "exp": [4.0, 4.0],
+      "eps": [0.2, 0.2],
+      "offset": [0.0, 0.0]
+    }
+  },
+  "analysis": {
+    "grid_bounds": [[-1.8, 1.8], [-1.8, 1.8]],
+    "comparison_bounds": [[-1.4, 1.4], [-1.4, 1.4]],
+    "grid_points": 151,
+    "max_normalized_rmse": 0.2,
+    "max_barrier_relative_error": 0.2
+  },
+  "seed": 42
+}
