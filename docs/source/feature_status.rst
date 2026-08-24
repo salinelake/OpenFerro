@@ -225,22 +225,24 @@ Dynamics and simulations
        documented determinant volume by default and can select the linearized
        compatibility mode; restart is manual state plus key restoration rather
        than a checkpoint file.
-   * - Fixed-height NVT metadynamics
+   * - Fixed-height NVT and NPT metadynamics
      - Experimental
      - Supports one to three differentiable scalar CV functions, fixed-shape
        bias grids with cubic interpolation, polynomial walls, and HILLS
-       output. Restart import, multiple walkers, and well-tempered
-       metadynamics are deferred.
+       output. NPT includes global-strain integration and propagates bias
+       forces from strain-dependent CVs to the barostat coordinate. Restart
+       import, multiple walkers, well-tempered metadynamics, and independent
+       constant-pressure scientific validation are deferred.
 
 Reference examples
 ------------------
 
-Examples 01 through 03, 06, and 07 have explicit entry points, reproducible
-seeds, and automated reduced CPU execution tests. Examples 01 through 03 expose
-``--tiny``; Example 06 supplies reduced values through its ordinary arguments,
-and Example 07 exposes ``--quick``.
-Examples 01 through 03 retain working-directory-relative defaults; Example 06
-and Example 07 resolve repository defaults. Example 04 resolves its default
+Examples 01 through 03 and 06 through 08 have explicit entry points,
+reproducible seeds, and automated reduced CPU execution tests. Examples 01
+through 03 expose ``--tiny``; Example 06 supplies reduced values through its
+ordinary arguments, and Examples 07 and 08 expose ``--quick``.
+Examples 01 through 03 retain working-directory-relative defaults; Examples
+06 through 08 resolve repository defaults. Example 04 resolves its default
 paths from the repository and script locations and has an automated,
 explicitly reduced 4x4x4 CPU smoke run. These checks validate construction and
 short execution; they do not regress full phase-transition curves or establish
@@ -290,6 +292,12 @@ benchmark rather than a scientific reference trajectory.
        output. The full one-GPU workflow reconstructs a known four-well 2-D
        free-energy surface using fixed, predeclared accuracy tolerances; the
        current single-walker defaults are not yet promoted as passing them.
+   * - ``08.BTO_MetaD``
+     - Experimental constant-pressure workflow
+     - A reduced run checks three polarization-difference CVs that depend on
+       the soft mode and instantaneous determinant volume. NPT metadynamics
+       integrates global strain and propagates CV bias forces to it. Production
+       phase free energies and finite-size convergence remain unvalidated.
 
 A feature moves from experimental to stable only with a declared equation and
 parameter convention, independent energy or one-step coverage, force or

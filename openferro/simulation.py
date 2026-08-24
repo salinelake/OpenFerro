@@ -524,6 +524,34 @@ class MetadynamicsNVT(SimulationNVTLangevin):
         key=None,
     ):
         super().__init__(system, seed=seed, key=key)
+        self._initialize_metadynamics(
+            collective_variables,
+            pace,
+            sigma,
+            height,
+            grid_min=grid_min,
+            grid_max=grid_max,
+            grid_bin=grid_bin,
+            upper_walls=upper_walls,
+            lower_walls=lower_walls,
+            hills_file=hills_file,
+        )
+
+    def _initialize_metadynamics(
+        self,
+        collective_variables,
+        pace,
+        sigma,
+        height,
+        *,
+        grid_min,
+        grid_max,
+        grid_bin,
+        upper_walls,
+        lower_walls,
+        hills_file,
+    ):
+        """Initialize bias state after the ensemble-specific simulation."""
         self._collective_variables, initial_values = (
             self._prepare_collective_variables(collective_variables)
         )
@@ -973,7 +1001,7 @@ class MetadynamicsNVT(SimulationNVTLangevin):
         self._write_hill(center)
 
     def run(self, nsteps=1, profile=False, seed=None):
-        """Run NVT metadynamics for a number of outer MD steps.
+        """Run metadynamics for a number of outer MD steps.
 
         Hills are deposited after steps divisible by ``pace`` and affect the
         following force evaluation. Repeated calls continue the deposition
@@ -1030,3 +1058,87 @@ class SimulationNPTLangevin(SimulationNVTLangevin):
         self.non_SO3_fields = self.system.get_all_non_SO3_fields()
         self.all_fields = self.SO3_fields + self.non_SO3_fields
         self.nfields = len(self.all_fields)
+
+
+class MetadynamicsNPT(MetadynamicsNVT, SimulationNPTLangevin):
+    """Fixed-height metadynamics with NPT Langevin dynamics.
+
+    This class uses the same collective variables, fixed bias grid, walls,
+    hill deposition, and HILLS output as :class:`MetadynamicsNVT`. The global
+    strain field is integrated with the other fields, and the configured
+    pressure is applied through the system's ``pV`` interaction.
+
+    Parameters
+    ----------
+    system : System
+        Physical system containing a global strain field and ``pV``
+        interaction.
+    collective_variables : sequence of dict
+        One to three CV definitions. Each definition contains ``id``,
+        ``field_ids``, ``engine``, and optional ``parameters`` entries.
+    pace : int
+        Number of outer MD steps between Gaussian hill depositions.
+    sigma : float or array_like
+        Gaussian widths in the native units of the CVs.
+    height : float
+        Fixed Gaussian height in eV.
+    grid_min, grid_max : float or array_like
+        Lower and upper bounds of the bias grid in the native CV units.
+    pressure : float, optional
+        External pressure in bar, by default 0.0.
+    grid_bin : int or array_like, optional
+        Number of grid intervals in each CV direction.
+    upper_walls, lower_walls : dict, optional
+        Wall definitions with required ``at`` and ``kappa`` entries and
+        optional ``exp``, ``eps``, and ``offset`` entries.
+    hills_file : path_like, optional
+        HILLS output path. Set to ``None`` to disable output.
+    seed : int, optional
+        Seed for the simulation-owned random stream, by default 42.
+    key : array_like, optional
+        Existing JAX ``PRNGKey`` state, by default None.
+
+    Notes
+    -----
+    A volume-dependent CV must include ``gstrain`` in its ``field_ids`` and
+    compute the volume dependence inside its engine. Its bias force is then
+    propagated to both the ordinary fields and the barostat coordinate.
+    """
+
+    def __init__(
+        self,
+        system,
+        collective_variables,
+        pace,
+        sigma,
+        height,
+        *,
+        grid_min,
+        grid_max,
+        pressure=0.0,
+        grid_bin=None,
+        upper_walls=None,
+        lower_walls=None,
+        hills_file="HILLS",
+        seed=42,
+        key=None,
+    ):
+        SimulationNPTLangevin.__init__(
+            self,
+            system,
+            pressure=pressure,
+            seed=seed,
+            key=key,
+        )
+        self._initialize_metadynamics(
+            collective_variables,
+            pace,
+            sigma,
+            height,
+            grid_min=grid_min,
+            grid_max=grid_max,
+            grid_bin=grid_bin,
+            upper_walls=upper_walls,
+            lower_walls=lower_walls,
+            hills_file=hills_file,
+        )

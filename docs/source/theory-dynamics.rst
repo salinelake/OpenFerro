@@ -80,12 +80,13 @@ restart state are specified in :doc:`scientific_conventions`.
 Classical metadynamics
 ----------------------
 
-``MetadynamicsNVT`` adds a classical fixed-height metadynamics bias to the NVT
-Langevin driver.  A collective variable is a pure scalar function with the
-same signature as an energy engine, ``engine(field1, ..., parameters)``.  CV
-functions belong to the simulation and are not registered as system
-interactions, so an observable such as a field sum contributes no physical
-Hamiltonian energy or force by itself.
+``MetadynamicsNVT`` and ``MetadynamicsNPT`` add a classical fixed-height
+metadynamics bias to the corresponding Langevin drivers. A collective
+variable is a pure scalar function with the same signature as an energy
+engine, ``engine(field1, ..., parameters)``. CV functions belong to the
+simulation and are not registered as system interactions, so an observable
+such as a field sum contributes no physical Hamiltonian energy or force by
+itself.
 
 For example, a total dipole component can be configured without adding it to
 the Hamiltonian:
@@ -111,6 +112,29 @@ the Hamiltonian:
        grid_max=1.5,
        upper_walls={"at": 1.0, "kappa": 0.1},
    )
+
+The NPT variant has the same bias arguments and additionally accepts pressure
+in bar:
+
+.. code-block:: python
+
+   simulation = MetadynamicsNPT(
+       system,
+       collective_variables=collective_variables,
+       pace=100,
+       sigma=0.02,
+       height=0.001,
+       grid_min=-1.5,
+       grid_max=1.5,
+       pressure=-4.8e4,
+   )
+
+``MetadynamicsNPT`` requires the system global-strain field and its associated
+``pV`` interaction. The global strain is integrated by its configured
+Langevin integrator. If a CV depends on the instantaneous cell volume, its
+definition must include ``gstrain`` in ``field_ids`` and its engine must
+calculate that dependence explicitly. The chain rule then adds the CV bias
+force to the global strain as well as to any other fields used by that CV.
 
 For :math:`1\leq d\leq3` collective variables and deposited centers
 :math:`c^{(k)}`, the bias is
@@ -163,8 +187,9 @@ the deposited Gaussian sum directly.  Repeated
 refuses to overwrite an existing HILLS file.  ``Thermo_Reporter`` continues to
 report the physical system potential; use ``calc_total_bias`` or
 ``calc_biased_potential_energy`` for bias-aware energies.  The
-``examples/07.MetaDynamics`` workflow compares a two-CV run with an exactly
-known toy free-energy surface.
+``examples/07.MetaDynamics`` workflow compares a two-CV NVT run with an
+exactly known toy free-energy surface. NPT metadynamics remains experimental
+and requires independent constant-pressure validation for each model.
 
 Structure Optimization
 ----------------------
