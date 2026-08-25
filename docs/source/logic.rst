@@ -96,6 +96,21 @@ conservative, and stochastic SIB methods.
    simulation.init_velocity(mode="zero")
    simulation.run(100)
 
+To keep a field in the Hamiltonian while holding its values fixed, assign the
+general no-op integrator explicitly:
+
+.. code-block:: python
+
+   from openferro.integrator.base import FrozenIntegrator
+
+   local_strain.set_custom_integrator(FrozenIntegrator())
+
+``FrozenIntegrator`` accepts the deterministic and stochastic simulation call
+signatures for real-valued and ``SO3`` fields. ``MDMinimize`` does not step a
+frozen field and excludes its force from convergence, while the frozen field
+continues to affect the energy and forces of active fields through registered
+interactions.
+
 ``MDMinimize``, ``SimulationNVE``, ``SimulationNVTLangevin``, and
 ``SimulationNPTLangevin`` provide the promoted orchestration paths. A
 simulation may attach thermo and field reporters before ``run``. Restart uses

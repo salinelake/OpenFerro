@@ -3,6 +3,7 @@ import logging
 import jax.numpy as jnp
 import numpy as np
 
+from openferro.integrator.base import FrozenIntegrator
 from openferro.lattice import SimpleCubic3D
 from openferro.simulation import MDMinimize
 from openferro.system import System
@@ -37,6 +38,33 @@ def test_fixed_cell_minimization_ignores_frozen_global_strain_force():
     assert minimizer.iterations == 0
     assert minimizer.max_force_by_field == {"active": 0.0}
     np.testing.assert_allclose(system.get_field_by_ID("gstrain").get_force(), -1.0)
+
+
+def test_minimization_excludes_frozen_field_from_updates_and_convergence():
+    system = System(SimpleCubic3D(1, 1, 1))
+    active = system.add_field("active", value=0.1)
+    frozen = system.add_field("frozen", value=2.0)
+    system.add_self_interaction(
+        "active_energy", "active", _quartic_energy, enable_jit=False
+    )
+    system.add_self_interaction(
+        "frozen_force", "frozen", _linear_energy, enable_jit=False
+    )
+    active.set_integrator("optimization", dt=1.0)
+    frozen.set_custom_integrator(FrozenIntegrator())
+    minimizer = MDMinimize(system, max_iter=2, tol=0.0037)
+
+    minimizer.run(variable_cell=False)
+
+    assert minimizer.converged
+    assert minimizer.iterations == 1
+    assert set(minimizer.max_force_by_field) == {"active"}
+    np.testing.assert_allclose(
+        minimizer.max_force_by_field["active"], np.abs(-4.0 * 0.096**3)
+    )
+    np.testing.assert_allclose(active.get_values(), 0.096)
+    np.testing.assert_allclose(frozen.get_values(), 2.0)
+    np.testing.assert_allclose(frozen.get_force(), -1.0)
 
 
 def test_minimization_does_not_move_an_initially_converged_state():

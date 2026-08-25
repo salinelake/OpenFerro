@@ -212,7 +212,9 @@ For flexible simulation cell, the strain tensor is optimized through
 ``MDMinimize`` evaluates forces at the initial state and after every accepted
 update. Convergence and force-based reporting therefore describe the stored
 field values, and a state already below the force tolerance returns with zero
-optimization iterations.
+optimization iterations. A field assigned
+``openferro.integrator.base.FrozenIntegrator`` remains part of the Hamiltonian
+but is excluded from minimization updates and the force-convergence criterion.
 
 
 **References**

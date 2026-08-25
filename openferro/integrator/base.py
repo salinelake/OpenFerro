@@ -47,3 +47,31 @@ class Integrator:
             The updated field
         """
         pass
+
+
+class FrozenIntegrator(Integrator):
+    """No-op integrator that keeps a field fixed during a simulation.
+
+    ``FrozenIntegrator`` deliberately has no time step. Its variadic
+    :meth:`step` signature accepts every calling convention used by the
+    current deterministic and stochastic simulation drivers, including the
+    random key and force-updater arguments used for Langevin and SO(3)
+    dynamics.
+
+    Notes
+    -----
+    Assign an instance with ``field.set_custom_integrator(FrozenIntegrator())``.
+    The field values and velocities are left unchanged.
+    """
+
+    def __init__(self):
+        self.dt = None
+
+    def step(self, *args, **kwargs):
+        """Leave the field unchanged and return it when identifiable."""
+        del kwargs
+        if not args:
+            return None
+        if len(args) == 1:
+            return args[0]
+        return args[1]

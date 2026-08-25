@@ -19,6 +19,7 @@ import jax.numpy as jnp
 
 from openferro.units import Constants
 from openferro.field import GlobalStrain
+from openferro.integrator.base import FrozenIntegrator
 from openferro.reporter import Thermo_Reporter, Field_Reporter
 
 class Simulation:
@@ -181,7 +182,8 @@ class MDMinimize(Simulation):
     -----
     Forces are evaluated at the initial state and after every accepted update.
     ``iterations`` counts accepted updates, so an initially converged system
-    finishes with zero iterations.
+    finishes with zero iterations. Fields using :class:`FrozenIntegrator` are
+    neither stepped nor included in the force-convergence criterion.
     """
     def __init__(self, system, max_iter=100, tol=1e-5 ):
         super().__init__(system)
@@ -207,10 +209,14 @@ class MDMinimize(Simulation):
             for field in non_SO3_fields:
                 if (variable_cell is False) and isinstance(field, GlobalStrain):
                     continue
+                if isinstance(field.integrator, FrozenIntegrator):
+                    continue
                 field.integrator.step(field)
         if len(SO3_fields) > 0:
             # Implicit SIB stages evaluate forces through this callback.
             for field in SO3_fields:
+                if isinstance(field.integrator, FrozenIntegrator):
+                    continue
                 field.integrator.step(field, force_updater=self.system.update_force)
 
     def _update_force_and_check_convergence(self, active_fields):
@@ -242,11 +248,16 @@ class MDMinimize(Simulation):
             If pressure specified for fixed cell minimization
             If integrator not set for any field
         """
-        self._validate_so3_field_count(self.system.get_all_SO3_fields())
         active_fields = [
             field for field in self.all_fields
-            if variable_cell or not isinstance(field, GlobalStrain)
+            if (variable_cell or not isinstance(field, GlobalStrain))
+            and not isinstance(field.integrator, FrozenIntegrator)
         ]
+        active_SO3_fields = [
+            field for field in self.system.get_all_SO3_fields()
+            if not isinstance(field.integrator, FrozenIntegrator)
+        ]
+        self._validate_so3_field_count(active_SO3_fields)
         ## sanity check
         if variable_cell:
             if pressure is None:
