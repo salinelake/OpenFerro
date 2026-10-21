@@ -360,7 +360,7 @@ class SimulationNVE(Simulation):
                 if profile:
                     jax.block_until_ready(field.get_values())
                     logging.info('Time for updating field {}: {:.8f}s'.format(type(field), timer()-t0))
-    def run(self, nsteps=1, profile=False):
+    def run(self, nsteps=1, profile=False, initialize_reporters=True):
         """
         Run the simulation.
 
@@ -370,6 +370,9 @@ class SimulationNVE(Simulation):
             Number of steps to run, by default 1
         profile : bool, optional
             Whether to profile timing, by default False
+        initialize_reporters : bool, optional
+            Initialize reporter files before this run. Set to ``False`` when
+            continuing the same reporters across repeated run calls.
 
         Raises
         ------
@@ -382,7 +385,8 @@ class SimulationNVE(Simulation):
             if field.integrator is None:
                 raise ValueError('Please set the integrator for the field %s before running the simulation' % type(field))
         ## run the simulation
-        self.initialize_reporters()
+        if initialize_reporters:
+            self.initialize_reporters()
         for i in range(nsteps):
             self._step(profile=profile)
             self.step_reporters()
@@ -439,7 +443,7 @@ class SimulationNVTLangevin(SimulationNVE):
                     logging.info('Time for updating field {}: {:.8f}s'.format(type(field), timer()-t0))
         return
 
-    def run(self, nsteps=1, profile=False, seed=None):
+    def run(self, nsteps=1, profile=False, seed=None, initialize_reporters=True):
         """
         Run the simulation.
 
@@ -452,6 +456,9 @@ class SimulationNVTLangevin(SimulationNVE):
         seed : int, optional
             Reset the random stream before this run. When omitted, the stream
             continues from previous initialization and run calls.
+        initialize_reporters : bool, optional
+            Initialize reporter files before this run. Set to ``False`` when
+            continuing the same reporters across repeated run calls.
 
         Raises
         ------
@@ -466,7 +473,8 @@ class SimulationNVTLangevin(SimulationNVE):
         if seed is not None:
             self.reset_random_key(seed=seed)
         ## run the simulation
-        self.initialize_reporters()
+        if initialize_reporters:
+            self.initialize_reporters()
         for id_step in range(nsteps):
             if profile:
                 t0 = timer()
@@ -1011,12 +1019,13 @@ class MetadynamicsNVT(SimulationNVTLangevin):
         self._hill_centers.append(center)
         self._write_hill(center)
 
-    def run(self, nsteps=1, profile=False, seed=None):
+    def run(self, nsteps=1, profile=False, seed=None, initialize_reporters=True):
         """Run metadynamics for a number of outer MD steps.
 
         Hills are deposited after steps divisible by ``pace`` and affect the
         following force evaluation. Repeated calls continue the deposition
-        counter and random stream.
+        counter and random stream. Set ``initialize_reporters=False`` when the
+        same reporter files should continue across those calls.
         """
         self._validate_so3_field_count(self.SO3_fields)
         for field in self.all_fields:
@@ -1028,7 +1037,8 @@ class MetadynamicsNVT(SimulationNVTLangevin):
         self._initialize_hills_file()
         if seed is not None:
             self.reset_random_key(seed=seed)
-        self.initialize_reporters()
+        if initialize_reporters:
+            self.initialize_reporters()
         for _ in range(nsteps):
             if profile:
                 t0 = timer()

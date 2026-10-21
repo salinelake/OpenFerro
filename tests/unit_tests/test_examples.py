@@ -82,6 +82,18 @@ EXAMPLES = [
         ("--quick",),
         ("HILLS", "run_summary.json"),
     ),
+    (
+        ROOT / "examples/08.BTO_MetaD/run.py",
+        ("--quick",),
+        (
+            "optimization.log",
+            "equilibration_thermo.log",
+            "metadynamics_thermo.log",
+            "metadynamics_dipole_avg.log",
+            "HILLS",
+            "run_summary.json",
+        ),
+    ),
 ]
 
 
@@ -96,6 +108,7 @@ EXAMPLES = [
         "PTO_STO",
         "BTO_nanoparticle",
         "MetaDynamics",
+        "BTO_MetaDynamics",
     ),
 )
 def test_maintained_example_smoke_mode(
@@ -138,3 +151,28 @@ def test_maintained_example_smoke_mode(
         assert config["radius"] == 1.0
         assert config["seed"] == 17
         assert config["output_dir"] == str(output_dir)
+    if script.parent.name == "08.BTO_MetaD":
+        with (output_dir / "run_summary.json").open(encoding="utf-8") as stream:
+            summary = json.load(stream)
+        px, py, pz = summary["final_polarization_C_per_m2"]
+        q1, q2, q3 = summary["final_q_C_per_m2"]
+        assert q1 == pytest.approx(px - py)
+        assert q2 == pytest.approx(py - pz)
+        assert q3 == pytest.approx(pz)
+        assert summary["ensemble"] == "NPT"
+        assert summary["pressure_bar"] == pytest.approx(-48000.0)
+        assert summary["initial_volume_per_cell_angstrom3"] > 0.0
+        assert summary["final_volume_per_cell_angstrom3"] > 0.0
+        assert len(summary["final_global_strain"]) == 6
+        polarization_scale = (
+            summary["born_effective_charge"]
+            * 16.02176634
+            / summary["final_volume_per_cell_angstrom3"]
+        )
+        assert (px, py, pz) == pytest.approx(
+            [
+                polarization_scale * value
+                for value in summary["final_mean_local_mode_angstrom"]
+            ]
+        )
+        assert summary["epsilon_C_per_m2"] > 0.0

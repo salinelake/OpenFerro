@@ -153,10 +153,6 @@ def main(argv=None):
     minimizer.run(variable_cell=True, pressure=pressure_bar)
 
     dt = 0.002
-    # temperatures = np.asarray([300] if args.tiny else [
-    #     400, 350, 320, 310, 300, 290, 280, 270, 260, 250, 240,
-    #     230, 220, 210, 200, 190, 180, 170, 160, 150, 140,
-    # ])
     temperatures = np.asarray([300] if args.tiny else [
         320, 310, 300, 290, 280, 270, 260, 250, 240, 230, 220, 210, 200, 190, 180, 170, 160, 150
         ]).astype(int)

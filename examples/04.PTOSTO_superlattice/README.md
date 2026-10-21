@@ -3,7 +3,7 @@
 This example simulates field-driven domain motion in a (PbTiO3)48/(SrTiO3)16
 superlattice at 300 K. The default 256x256x64 cell retains the original model,
 initial state, epitaxially fixed in-plane strain, 500 ps zero-field relaxation,
-and 4000 ps trajectory under a 0.01 V/Angstrom field along z.
+and 2000 ps trajectory under a 0.01 V/Angstrom field along z.
 
 The local field is the physical dipole moment in e Angstrom. The onsite,
 short-range, and strain-coupling parameters from

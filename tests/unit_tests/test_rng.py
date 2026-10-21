@@ -15,6 +15,20 @@ class _RecordingIntegrator:
         self.keys.append(np.asarray(key).copy())
 
 
+class _CountingReporter:
+    def __init__(self):
+        self.initialize_calls = 0
+        self.step_calls = 0
+
+    def initialize(self, system):
+        del system
+        self.initialize_calls += 1
+
+    def step(self, system):
+        del system
+        self.step_calls += 1
+
+
 def _sample_velocities(seed):
     system = System(SimpleCubic3D(16, 1, 1))
     first = system.add_field("first")
@@ -56,6 +70,18 @@ def test_repeated_runs_continue_the_random_stream():
 
     assert not np.array_equal(integrator.keys[0], integrator.keys[1])
     np.testing.assert_array_equal(integrator.keys, reference_integrator.keys)
+
+
+def test_repeated_run_can_continue_reporters_without_reinitializing():
+    simulation, _ = _recording_simulation(seed=17)
+    reporter = _CountingReporter()
+    simulation.reporters.append(reporter)
+
+    simulation.run(nsteps=1)
+    simulation.run(nsteps=2, initialize_reporters=False)
+
+    assert reporter.initialize_calls == 1
+    assert reporter.step_calls == 3
 
 
 def test_saved_random_key_restores_the_next_step_and_seed_can_reset():

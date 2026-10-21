@@ -6,31 +6,28 @@ Ewald dipole-dipole interaction, and uses the same masses, pressure, time step,
 and Langevin relaxation times. Structural minimization and trajectory output
 are omitted so the measurement covers the simulation kernel.
 
-The benchmark measures all combinations of cubic lattice size L=120, 240, and
-480 with 1, 2, 3, and 4 A100 GPUs on one node. Each value is the median of
-three 100-step measurements following compilation and three warmup steps. One
-JAX process controls the visible GPUs with OpenFerro's default `1 x N` mesh.
+The benchmark measures all combinations of cubic lattice size L=120, 240, 360,
+480, and 600 with 1, 2, 3, and 4 A100 GPUs on one node. Each value is the median
+of three 100-step measurements following compilation and three warmup steps.
+One JAX process controls the visible GPUs with OpenFerro's default `1 x N` mesh.
 
 On Perlmutter, request a full GPU node and run:
 
 ```bash
 salloc -N1 -t 04:00:00 -C gpu -q interactive -A m5218
 cd examples/05.BTO_GPU_Parallel
-bash run_benchmarks.bash
+bash run_strong_scaling.bash
 ```
 
 The launcher creates a unique `results/JOB_ID_TIMESTAMP/` directory containing:
 
-- `benchmark_results.csv`: timings, peak memory, and run metadata.
-- `benchmark_summary.csv`: raw data plus speedup and parallel efficiency.
-- `benchmark.png`: efficiency and peak per-GPU memory versus GPU count.
+- `strong_scaling.csv`: timings, peak memory, and run metadata.
 
 ## Reference results
 
-The checked-in [benchmark results](benchmark_results.csv),
-[derived summary](benchmark_summary.csv), and [plot](benchmark.png) were
-measured on an NVIDIA A100-SXM4-40GB node in Perlmutter allocation `56494987`
-with JAX 0.11.0.
+The checked-in [benchmark results](benchmark_results.csv) and
+[plot](benchmark.png) were measured on an NVIDIA A100-SXM4-40GB node in
+Perlmutter allocation `56494987` with JAX 0.11.0.
 
 | L | 1 GPU [ms/step] | 2 GPUs | 3 GPUs | 4 GPUs | 4-GPU efficiency | Peak GiB/GPU, 1 -> 4 GPUs |
 | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -53,13 +50,28 @@ memory reported by `nvidia-smi`.
 For a shorter diagnostic run, set the timing controls explicitly:
 
 ```bash
-BTO_STEPS=10 BTO_REPEATS=1 bash run_benchmarks.bash
+BTO_STEPS=10 BTO_REPEATS=1 bash run_strong_scaling.bash
 ```
 
-To redraw an existing result without running the simulation:
+## Maximal system size
+
+`max_size.py` finds the largest mesh-aligned cubic cell that completes one
+NPT step on the visible GPUs, then times that cell. Probe attempts run in
+child processes so an out-of-memory failure does not poison the parent.
+On a full GPU node:
 
 ```bash
-python plot_benchmarks.py results/RUN/benchmark_results.csv \
-    --summary results/RUN/benchmark_summary.csv \
-    --output results/RUN/benchmark.png
+salloc -N1 -t 04:00:00 -C gpu -q interactive -A m5218
+cd examples/05.BTO_GPU_Parallel
+bash run_max_size.bash
 ```
+
+The launcher writes `max_size.csv` with one timed maximum per GPU count.
+To time a chosen size without searching:
+
+```bash
+srun --gpus-per-task=4 --exact python max_size.py --size 720 \
+    --output results/RUN/max_size.csv
+```
+
+Plot a completed strong-scaling CSV from `plot_strong_scaling.ipynb`.

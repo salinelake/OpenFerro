@@ -126,7 +126,7 @@ def build_system(
         ],
     )
     system.add_homo_elastic_interaction(
-        "homo_elastic", field_ID="gstrain", **pto["elastic"]
+        "homo_elastic", field_ID="gstrain", **pto["elastic"], n_cells=lateral_size**2 * pto_layers
     )
     # The legacy model deliberately omits STO homogeneous strain coupling.
     system.add_mutual_interaction(
@@ -166,7 +166,7 @@ def parse_args(argv=None):
     parser.add_argument("--temperature", type=float, default=300.0)
     parser.add_argument("--dt-ps", type=float, default=0.002)
     parser.add_argument("--relax-time-ps", type=float, default=500.0)
-    parser.add_argument("--drive-time-ps", type=float, default=4000.0)
+    parser.add_argument("--drive-time-ps", type=float, default=2000.0)
     parser.add_argument("--log-interval", type=int, default=5000)
     parser.add_argument("--dump-interval", type=int, default=50000)
     parser.add_argument("--electric-field", type=float, default=0.01)
