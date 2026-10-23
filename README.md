@@ -41,43 +41,39 @@ field-count, and validation limits of the other workflows.
 
 ## Installation
 
-Install OpenFerro from PyPI using a Python environment satisfying the package
-compatibility ranges:
+Use Python 3.13 or 3.14. To start with a fresh Conda environment:
 
-- Python `>=3.13,<3.15`
-- JAX `>=0.10,<0.12`
-- NumPy `>=2.0,<3`
+```bash
+conda create -n openferro python=3.13 pip
+conda activate openferro
+```
+
+For **NVIDIA GPUs on Linux** with driver 580 or newer, install OpenFerro and
+JAX's GPU support together:
+
+```bash
+python -m pip install openferro "jax[cuda13]"
+```
+
+For drivers 525–579, use `"jax[cuda12]"` instead. Pip installs the CUDA
+libraries and compatible dependencies; a separate CUDA toolkit installation
+is unnecessary. See the [JAX installation guide](https://docs.jax.dev/en/latest/installation.html)
+for platform and driver requirements.
+
+Verify GPU access on a GPU node (inside a scheduler allocation on HPC systems):
+
+```bash
+JAX_PLATFORMS=cuda python -c "import jax; import openferro as of; print(jax.devices()); print(of.System)"
+```
+
+For **CPU execution**, install with:
 
 ```bash
 python -m pip install openferro
-JAX_PLATFORMS=cpu python -c "import openferro as of; print(of.System)"
 ```
 
-To install from source:
-
-```bash
-git clone https://github.com/salinelake/OpenFerro.git
-cd OpenFerro
-python -m pip install .
-JAX_PLATFORMS=cpu python -c "import openferro as of; print(of.System)"
-```
-
-For editable development and CPU checks, including the analysis tests:
-
-```bash
-python -m pip install -e ".[test]" matplotlib
-JAX_PLATFORMS=cpu python -m pytest tests/unit_tests -q \
-    -m "not slow and not stochastic and not gpu"
-```
-
-Matplotlib is used by the analysis scripts and plotting tests. The `slow`,
-`stochastic`, and `gpu` markers select additional execution and numerical
-checks; the short CPU run above is not the complete validation suite.
-
-For NVIDIA GPUs, first install the JAX accelerator build appropriate for the
-system, following the [official JAX installation guide](https://docs.jax.dev/en/latest/installation.html),
-then install OpenFerro with `python -m pip install --no-deps openferro`. See the
-[complete installation guide](docs/source/installation.rst) for details.
+See the [installation guide](docs/source/installation.rst) for compatibility
+ranges, source installation, development dependencies, and validation.
 
 ## Quick start
 
