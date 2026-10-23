@@ -1,0 +1,41 @@
+{
+  "lattice_size": 12,
+  "initial_local_mode_angstrom": [0.0, 0.0, 0.0],
+  "initial_global_strain": [0.01, 0.01, 0.01, 0.0, 0.0, 0.0],
+  "pressure_bar": -48000.0,
+  "temperature_K": 220.0,
+  "dynamics": {
+    "dt_ps": 0.002,
+    "dipole_tau_ps": 0.1,
+    "strain_tau_ps": 1.0,
+    "minimization_dt_ps": 0.0001,
+    "minimization_steps": 1000,
+    "minimization_tolerance": 1e-3,
+    "equilibration_steps": 5000,
+    "log_interval": 100
+  },
+  "metadynamics": {
+    "steps": 2500000,
+    "log_interval": 100,
+    "dt_ps": 0.002,
+    "dipole_tau_ps": 0.1,
+    "strain_tau_ps": 1.0,
+    "pace": 500,
+    "sigma_C_per_m2": [0.02, 0.02, 0.02],
+    "height_eV": 0.002,
+    "grid_min_C_per_m2": [-0.08, -0.08, -0.08],
+    "grid_max_C_per_m2": [0.5, 0.5, 0.5],
+    "grid_bin": [128, 128, 128],
+    "epsilon_C_per_m2": 0.02,
+    "lower_wall_kappa_eV": [0.2, 0.2, 0.2],
+    "lower_wall_scale_C_per_m2": [0.02, 0.02, 0.02],
+    "upper_wall_at_C_per_m2": [0.45, 0.45, 0.45],
+    "upper_wall_kappa_eV": [0.2, 0.2, 0.2],
+    "upper_wall_scale_C_per_m2": [0.03, 0.03, 0.03]
+  },
+  "analysis": {
+    "slice_max_C_per_m2": 0.4,
+    "slice_points": 121
+  },
+  "seed": 42
+}
