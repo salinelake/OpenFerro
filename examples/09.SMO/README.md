@@ -113,7 +113,7 @@ $\alpha=0.5$. It does not establish production convergence.
 ```bash
 python run_frozen.py
 python run_coupled.py
-python analyze.py
+python analyze.py --size 16
 ```
 
 For a login-node execution check, request a $4^3$ cell and two sampling
@@ -164,4 +164,11 @@ $$
 
 in eV$^{-1}$. It also overlays `evaluate_exchange` on the published
 $J_1(u/u_\mathrm{eq})$ points and, for coupled runs, the mean
-$|\langle u_x\rangle|$ and $|\langle u_y\rangle|$.  
+$|\langle u_x\rangle|$ and $|\langle u_y\rangle|$.
+
+`magnetic.png` includes plus or minus one standard error for magnetization
+and susceptibility. The magnetization error uses ten contiguous time-block
+means; the susceptibility error uses a delete-one-block jackknife of the full
+fluctuation estimator. For the $L=64$ submission template, each block spans
+1 ps. These finite-trajectory estimates do not establish sampling convergence
+near the transition. Regenerate that figure with `python analyze.py --size 64`.

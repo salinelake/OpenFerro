@@ -20,6 +20,11 @@ of 1,000 iterations), and performs one equilibration and one sampling step at
 `--seed`, `--config`, and `--output-dir` are also available. The example uses
 OpenFerro's default determinant pressure-volume convention.
 
+Run `python analyze.py` to regenerate `field_avg.png`. Error bars show plus or
+minus one standard error estimated from ten contiguous time blocks (5 ps per
+block for the default run), including both polarization and strain. These
+finite-trajectory estimates do not establish convergence near phase transitions.
+
 <p align="center" >
   <img width="80%" src="./field_avg.png" />
 </p>

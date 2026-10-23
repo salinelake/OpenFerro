@@ -18,6 +18,11 @@ The default run retains the original 20x20x20 cell and heating schedule.
 `--tiny` performs one equilibration and one sampling step at 10 K on a 2x2x2
 cell. `--size`, `--seed`, `--config`, and `--output-dir` are also available.
 
+Run `python analyze.py` to regenerate `M_avg.png`. Error bars show plus or minus
+one standard error of the magnetization mean estimated from ten contiguous
+time blocks (0.2 ps per block for the default run). These finite-trajectory
+estimates do not establish sampling convergence.
+
 <p align="center" >
   <img width="80%" src="./M_avg.png" />
 </p>

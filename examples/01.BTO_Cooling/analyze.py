@@ -1,4 +1,5 @@
-import os
+"""Plot cooling averages with one-standard-error bars from ten time blocks."""
+
 import numpy as np
 from matplotlib import pyplot as plt
 import matplotlib as mpl
@@ -26,11 +27,24 @@ mpl.rcParams.update({
     "savefig.bbox": "tight",
 })
 
+
+def _block_standard_error(values, n_blocks=10):
+    """Estimate mean uncertainty using contiguous blocks of the trajectory."""
+    if len(values) < 2 * n_blocks:
+        raise ValueError(f"Need at least {2 * n_blocks} samples for {n_blocks} blocks.")
+    block_means = np.array([
+        block.mean(axis=0) for block in np.array_split(values, n_blocks)
+    ])
+    return block_means.std(axis=0, ddof=1) / np.sqrt(n_blocks)
+
+
 temp_list =  [320, 310, 300, 290, 280, 270, 260, 250, 240, 230, 220, 210, 200, 190, 180, 170, 160, 150]
 temp_list = np.flip(np.array(temp_list).astype(int))
 
 field_list = []
 strain_list = []
+field_error_list = []
+strain_error_list = []
 dipole2polar = 9.956 / 3.9477**3 * 16.0217646 * 100 # eA -> uC/cm^2
 
 for temp in temp_list:
@@ -60,23 +74,31 @@ for temp in temp_list:
 
     field_list.append([field_1.mean(), field_2.mean(), field_3.mean()])
     strain_list.append([strain_1.mean(), strain_2.mean(), strain_3.mean(), strain_4.mean(), strain_5.mean(), strain_6.mean()])
+    # Retain the signed polarization trajectories used by the plotted means.
+    field_error_list.append(_block_standard_error(np.column_stack((field_1, field_2, field_3))))
+    strain_error_list.append(_block_standard_error(np.column_stack((
+        strain_1, strain_2, strain_3, strain_4, strain_5, strain_6
+    ))))
 
 field_list = np.abs(np.array(field_list).reshape(len(temp_list), 3)) * dipole2polar
 strain_list = np.abs(np.array(strain_list).reshape(len(temp_list), 6))
+field_error_list = np.array(field_error_list) * dipole2polar
+strain_error_list = np.array(strain_error_list)
 
 fig, ax = plt.subplots(2, 1, figsize=(4, 4), sharex=True)
-ax[0].plot(temp_list, field_list[:,0], label='$P_{1}$' )
-ax[0].plot(temp_list, field_list[:,1], label='$P_{2}$' )
-ax[0].plot(temp_list, field_list[:,2], label='$P_{3}$' ) 
+for component in range(3):
+    ax[0].errorbar(
+        temp_list, field_list[:, component], yerr=field_error_list[:, component],
+        fmt='o--', capsize=2, elinewidth=1, label=rf'$P_{{{component + 1}}}$'
+    )
 ax[0].set_ylabel(r'$P$ [$\mathrm{\mu C/cm^2}$] ')
 ax[0].legend()
 ax[0].set_ylim(-2, 32)
-ax[1].plot(temp_list, strain_list[:,0], label=r'$\eta_1$')
-ax[1].plot(temp_list, strain_list[:,1], label=r'$\eta_2$')
-ax[1].plot(temp_list, strain_list[:,2], label=r'$\eta_3$')
-ax[1].plot(temp_list, strain_list[:,3], label=r'$\eta_4$')
-ax[1].plot(temp_list, strain_list[:,4], label=r'$\eta_5$')
-ax[1].plot(temp_list, strain_list[:,5], label=r'$\eta_6$')
+for component in range(6):
+    ax[1].errorbar(
+        temp_list, strain_list[:, component], yerr=strain_error_list[:, component],
+        fmt='o--', capsize=2, elinewidth=1, label=rf'$\eta_{{{component + 1}}}$'
+    )
 ax[1].set_xlabel('T [K]')
 ax[1].set_ylabel(r'$\eta$ [$\%$]')
 ax[1].set_ylim(-0.1, 2.2) 

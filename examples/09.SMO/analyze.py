@@ -10,7 +10,11 @@ formula
 
 with ``N = size**3`` and units of eV^{-1}. ``parameter.png`` compares
 ``evaluate_exchange`` with the published ``exchange_vs_normalized_u_PRM_2018``
-values. ``magnetic.png`` shows magnetization and susceptibility.
+values. ``magnetic.png`` shows magnetization and susceptibility with
+one-standard-error bars from ten contiguous time blocks. Magnetization
+uses the standard error of block means; susceptibility uses a delete-one-block
+jackknife of the full fluctuation estimator. These finite-trajectory estimates
+do not establish sampling convergence.
 ``distortion.png`` shows the local-mode amplitude. Coupled runs also write
 ``local_mode_{T}K_avg.log``; frozen local-mode logs are not written, so that
 panel uses the fixed [110] amplitude from ``run_frozen.py``.
@@ -118,14 +122,32 @@ def fitted_exchange_meV(parameters, u_over_u_eq):
 
 
 def summarize_temperature(path, temperature, n_sites):
-    """Return mean |m| and chi for one temperature."""
+    """Return mean |m|, chi, sample count, and their block standard errors."""
     magnetization = load_magnetization(path)
-    if magnetization.size < 2:
-        raise ValueError(f"Need at least two samples in {path}.")
+    n_blocks = 10
+    if magnetization.size < 2 * n_blocks:
+        raise ValueError(f"Need at least {2 * n_blocks} samples in {path}.")
     mean_m = float(np.mean(magnetization))
     mean_m2 = float(np.mean(magnetization**2))
     chi = n_sites * (mean_m2 - mean_m**2) / (Constants.kb * float(temperature))
-    return mean_m, chi, magnetization.size
+
+    block_indices = np.array_split(np.arange(magnetization.size), n_blocks)
+    block_means = np.array([magnetization[indices].mean() for indices in block_indices])
+    magnetization_error = block_means.std(ddof=1) / np.sqrt(n_blocks)
+
+    # Recompute the full variance after deleting each contiguous time block.
+    # Averaging within-block variances would lose slow magnetization changes.
+    chi_prefactor = n_sites / (Constants.kb * float(temperature))
+    chi_without_block = []
+    for indices in block_indices:
+        remaining = np.delete(magnetization, indices)
+        chi_without_block.append(chi_prefactor * np.var(remaining))
+    chi_without_block = np.array(chi_without_block)
+    chi_error = np.sqrt(
+        (n_blocks - 1) / n_blocks
+        * np.sum((chi_without_block - chi_without_block.mean())**2)
+    )
+    return mean_m, chi, magnetization.size, float(magnetization_error), float(chi_error)
 
 
 def collect_case(output_root, size):
@@ -140,12 +162,16 @@ def collect_case(output_root, size):
         if match is None:
             continue
         temperature = float(match.group(1))
-        mean_m, chi, n_samples = summarize_temperature(path, temperature, n_sites)
+        mean_m, chi, n_samples, magnetization_error, chi_error = summarize_temperature(
+            path, temperature, n_sites
+        )
         record = {
             "size_dir": size_dir.name,
             "temperature": temperature,
             "magnetization": mean_m,
             "chi": chi,
+            "magnetization_error": magnetization_error,
+            "chi_error": chi_error,
             "n_sites": n_sites,
             "n_samples": n_samples,
         }
@@ -204,15 +230,17 @@ def main(argv=None):
             print(f"No spin average logs found under {output_root}")
             continue
         print(f"\n{case} ({records[0]['size_dir']}, N={records[0]['n_sites']})")
-        print("T [K],  |M|,  chi [eV^-1],  |ux|,  |uy|,  |uz|,  n_samples")
+        print("T [K],  |M| +/- SE,  chi +/- SE [eV^-1],  |ux|,  |uy|,  |uz|,  n_samples")
         for item in records:
             if "abs_ux" in item:
                 abs_u = (item["abs_ux"], item["abs_uy"], item["abs_uz"])
             else:
                 abs_u = frozen_u
             print(
-                f"{item['temperature']:6.1f},  {item['magnetization']:.6f},  "
-                f"{item['chi']:.4e},  {abs_u[0]:.6f},  {abs_u[1]:.6f},  "
+                f"{item['temperature']:6.1f},  {item['magnetization']:.6f} "
+                f"+/- {item['magnetization_error']:.6f},  "
+                f"{item['chi']:.4e} +/- {item['chi_error']:.4e},  "
+                f"{abs_u[0]:.6f},  {abs_u[1]:.6f},  "
                 f"{abs_u[2]:.6f},  {item['n_samples']}"
             )
 
@@ -234,9 +262,17 @@ def main(argv=None):
         temperatures = [item["temperature"] for item in records]
         magnetization = [item["magnetization"] for item in records]
         chi = [item["chi"] for item in records]
+        magnetization_error = [item["magnetization_error"] for item in records]
+        chi_error = [item["chi_error"] for item in records]
         label = f"{case}"
-        magnetic_axes[0].plot(temperatures, magnetization, label=label, **styles[case])
-        magnetic_axes[1].plot(temperatures, chi, label=label, **styles[case])
+        magnetic_axes[0].errorbar(
+            temperatures, magnetization, yerr=magnetization_error,
+            fmt="o", capsize=2, elinewidth=1, label=label, **styles[case]
+        )
+        magnetic_axes[1].errorbar(
+            temperatures, chi, yerr=chi_error,
+            fmt="o", capsize=2, elinewidth=1, label=label, **styles[case]
+        )
         mode_records = [item for item in records if "abs_ux" in item]
         if not mode_records:
             continue
@@ -267,7 +303,7 @@ def main(argv=None):
     magnetic_axes[1].set_ylim(25, 2e5)
     for ax in magnetic_axes:
         ax.axvline(100.0, color='k', marker='o', markersize=0, linestyle='--')
-        ax.legend()
+        ax.legend(loc="upper right")
     magnetic_fig.tight_layout()
     magnetic_fig.savefig(magnetic_path)
     print(f"Wrote {magnetic_path}")
