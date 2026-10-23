@@ -1,0 +1,157 @@
+{
+  "schema_version": 1,
+  "references": {
+    "PRM_2018": {
+      "citation": "A. Edstrom and C. Ederer, Phys. Rev. Materials 2, 104409 (2018)",
+      "doi": "10.1103/PhysRevMaterials.2.104409",
+      "arxiv": "1807.04777"
+    },
+    "PRL_2020": {
+      "citation": "A. Edstrom and C. Ederer, Phys. Rev. Lett. 124, 167201 (2020)",
+      "doi": "10.1103/PhysRevLett.124.167201",
+      "arxiv": "1905.12955"
+    }
+  },
+  "table_I_PRM_2018": {
+    "source_location": "article.tex, Table I",
+    "soft_mode_eigenvector": {
+      "Sr": 0.039,
+      "Mn": 0.390,
+      "O_parallel": -0.666,
+      "O_perpendicular": -0.449,
+      "unit": "dimensionless"
+    },
+    "lattice_constant": {
+      "value": 3.79,
+      "unit": "angstrom"
+    },
+    "elastic": {
+      "B11": 114.485,
+      "B12": 35.436,
+      "B44": 42.519,
+      "unit": "eV_per_cell"
+    },
+    "strain_mode": {
+      "B1xx": -214.736,
+      "B1yy": -10.540,
+      "B4yz": -10.000,
+      "unit": "eV_per_angstrom2"
+    },
+    "onsite": {
+      "alpha": 103.640,
+      "gamma": -224.286,
+      "k1": -928.579,
+      "k2": 1506.586,
+      "k3": 7712.958,
+      "k4": 4480.123,
+      "quartic_unit": "eV_per_angstrom4",
+      "sixth_order_unit": "eV_per_angstrom6",
+      "eighth_order_unit": "eV_per_angstrom8"
+    },
+    "effective_mass": {
+      "value": 22.042,
+      "unit_in_source": "not_stated",
+      "resolved_unit": "amu",
+      "resolution": "inferred from the standard effective-Hamiltonian convention and the side-by-side BaTiO3 value; the paper does not print a unit"
+    },
+    "born_charges": {
+      "Sr": 2.576,
+      "Mn": 7.673,
+      "O_perpendicular": -1.717,
+      "O_parallel": -6.813,
+      "mode_effective_charge": 9.17,
+      "unit": "elementary_charge"
+    },
+    "zero_strain": {
+      "epsilon_infinity": 10.68,
+      "kappa2": 3.981,
+      "j1": -1.296,
+      "j2": 4.347,
+      "j3": 0.272,
+      "j4": -0.226,
+      "j5": 0.0,
+      "j6": 0.100,
+      "j7": 0.0,
+      "epsilon_unit": "dimensionless",
+      "mode_energy_unit": "eV_per_angstrom2"
+    }
+  },
+  "five_percent_snapshot_PRM_2018": {
+    "strain": 0.05,
+    "source_locations": {
+      "ferroelectric_parameters": "j_of_strain.tex",
+      "dielectric": "eps_of_strain.tex",
+      "relaxed_structure": "u_of_strain.tex"
+    },
+    "epsilon_xx": 15.663585,
+    "epsilon_zz": 10.488743,
+    "kappa2": 5.91693082940924,
+    "j1": -0.895560206838188,
+    "j2": 0.77929928039072,
+    "j3": 0.0920171482490745,
+    "j4": -0.0793304881492078,
+    "j5": 0.0,
+    "j6": 0.0751774234784496,
+    "j7": 0.0,
+    "effective_hamiltonian_eta3": -0.0285170789772276,
+    "effective_hamiltonian_u_eq": 0.23,
+    "dft_eta3_nearest_source_point": -0.0271852340145023,
+    "dft_u_eq": 0.224581007289913,
+    "units": {
+      "epsilon": "dimensionless",
+      "short_range_and_kappa2": "eV_per_angstrom2",
+      "strain": "dimensionless",
+      "u_eq": "angstrom"
+    },
+    "unit_note": "The j_of_strain plot label says meV/angstrom^2, but the coordinates reproduce Table I magnitudes in eV/angstrom^2. Runtime values therefore use eV/angstrom^2."
+  },
+  "exchange_vs_normalized_u_PRM_2018": {
+    "source_location": "Jij_of_u_FM_FE.tex",
+    "structural_condition": "5 percent biaxial tensile strain, homogeneous [110] polar path, FM reference",
+    "u_over_u_eq": [0.0, 0.2, 0.4, 0.6, 0.8, 1.0],
+    "J1_ip_meV": [
+      10.2977978750118,
+      8.42378862500937,
+      4.8745033749924,
+      1.93801662499027,
+      2.22082212498975,
+      3.56725637500688
+    ],
+    "J1_op_meV": [
+      -27.2571687500047,
+      -25.5017938750086,
+      -18.5819116249988,
+      -8.25014937500868,
+      3.7841596249919,
+      14.3359492499968
+    ],
+    "mean_field_Tc_K": [
+      370.205225742734,
+      327.629106932668,
+      219.177599081105,
+      93.8122639932138,
+      63.6376103296485,
+      166.102780363086
+    ],
+    "exchange_unit": "meV",
+    "unit_note": "The exchange plot and physically consistent scale are meV; prose in the article prints eV and is treated as a typographical error."
+  },
+  "cubic_second_neighbor_PRM_2018": {
+    "source_location": "Jij_of_a.tex at zero strain",
+    "J2_ip_meV": -0.895188937494851,
+    "J2_op_meV": -0.894845499995967,
+    "unit": "meV",
+    "PRL_2020_mapping_note": "The 2020 supplement holds J2 fixed at its cubic value and assumes it is the same in every direction."
+  },
+  "relaxed_five_percent_exchange_PRM_2018": {
+    "source_location": "Jij_of_a.tex dashed curves at 5 percent",
+    "J1_ip_x_meV": 3.01312774998763,
+    "J1_ip_y_meV": 3.01312774998763,
+    "J1_op_meV": 13.2664776249882,
+    "J2_ip_branch_1_meV": 0.185531000006733,
+    "J2_ip_branch_2_meV": 0.778701000008652,
+    "J2_op_meV": 0.0622461250046058,
+    "unit": "meV",
+    "usage": "used by the reference-matched coupled validation; J1 anchors the relaxed endpoint and the direction-resolved J2 values are held constant below 200 K"
+  }
+}
