@@ -4,6 +4,7 @@ from pathlib import Path
 import subprocess
 import sys
 
+import numpy as np
 import pytest
 
 
@@ -50,31 +51,38 @@ EXAMPLES = [
         ),
     ),
     (
-        ROOT / "examples/06.BTO_Nanoparticle/01.npt.py",
+        ROOT / "examples/06.BTO_nanoparticle/01.npt.py",
         (
             "--size",
             "5",
             "--radius",
             "1.0",
-            "--minimization-steps",
+            "--cooldown_stages",
             "2",
-            "--equilibration-steps",
+            "--cooldown-steps",
             "2",
             "--sampling-steps",
             "2",
-            "--relax-log-interval",
+            "--cooldown-log-interval",
             "1",
             "--sample-log-interval",
             "1",
-            "--dump-field",
+            "--sample-dump-interval",
+            "1",
+            "--surface-shell-thickness-cells",
+            "0",
+            "--surface-k2-shift",
+            "0",
         ),
         (
             "config.json",
-            "optimization.log",
-            "relax_thermo.log",
-            "traj/relax_dipole_avg.log",
+            "cooldown_T320.0K_thermo.log",
+            "cooldown_T250.0K_thermo.log",
+            "cooldown_T250.0K_dipole_avg.log",
             "sample_thermo.log",
             "sample_dipole_avg.log",
+            "traj/sample_dipole_dump_0.npy",
+            "traj/sample_dipole_dump_1.npy",
         ),
     ),
     (
@@ -84,14 +92,13 @@ EXAMPLES = [
     ),
     (
         ROOT / "examples/08.BTO_MetaD/run.py",
-        ("--quick",),
+        (),
         (
-            "optimization.log",
-            "equilibration_thermo.log",
+            "model.json",
+            "settings.json",
             "metadynamics_thermo.log",
             "metadynamics_dipole_avg.log",
             "HILLS",
-            "run_summary.json",
         ),
     ),
 ]
@@ -120,6 +127,19 @@ def test_maintained_example_smoke_mode(
     environment["PYTHONPATH"] = os.pathsep.join(
         filter(None, (str(ROOT), environment.get("PYTHONPATH")))
     )
+    arguments = list(arguments)
+    if script.parent.name == "08.BTO_MetaD":
+        settings = json.loads((script.parent / "settings.json").read_text())
+        settings["lattice_size"] = 2
+        settings["seed"] = 17
+        settings["metadynamics"].update(
+            steps=2, pace=1, log_interval=1, grid_bin=[32, 32, 32]
+        )
+        settings_path = tmp_path / "smoke_settings.json"
+        settings_path.write_text(json.dumps(settings), encoding="utf-8")
+        arguments.extend(["--settings", str(settings_path)])
+    else:
+        arguments.extend(["--seed", "17"])
 
     result = subprocess.run(
         [
@@ -128,8 +148,6 @@ def test_maintained_example_smoke_mode(
             *arguments,
             "--output-dir",
             str(output_dir),
-            "--seed",
-            "17",
         ],
         cwd=script.parent,
         env=environment,
@@ -144,35 +162,69 @@ def test_maintained_example_smoke_mode(
         output = output_dir / filename
         assert output.is_file(), f"missing {output}"
         assert output.stat().st_size > 0, f"empty {output}"
-    if script.parent.name == "06.BTO_Nanoparticle":
+    if script.parent.name == "06.BTO_nanoparticle":
         with (output_dir / "config.json").open(encoding="utf-8") as stream:
             config = json.load(stream)
         assert config["size"] == 5
         assert config["radius"] == 1.0
         assert config["seed"] == 17
         assert config["output_dir"] == str(output_dir)
+        first_dump = np.load(output_dir / "traj/sample_dipole_dump_0.npy")
+        assert first_dump.shape == (5, 5, 5, 3)
+        assert np.isfinite(first_dump).all()
+        analysis_result = subprocess.run(
+            [sys.executable, "02.analyze.py", "--output-dir", str(output_dir)],
+            cwd=script.parent,
+            env=environment,
+            capture_output=True,
+            text=True,
+            timeout=120,
+            check=False,
+        )
+        assert analysis_result.returncode == 0, (
+            analysis_result.stdout + analysis_result.stderr
+        )
+        for filename in (
+            "polarization_chi.json", "polarization.png",
+            "radial_soft_mode_profile.json", "dipole_snapshots.png",
+        ):
+            assert (output_dir / filename).stat().st_size > 0
+        results = json.loads((output_dir / "polarization_chi.json").read_text())
+        assert results["n_samples"] == 2
+        assert results["n_particle"] == config["n_particle"]
+        assert np.isfinite(results["chi"]).all()
     if script.parent.name == "08.BTO_MetaD":
-        with (output_dir / "run_summary.json").open(encoding="utf-8") as stream:
-            summary = json.load(stream)
-        px, py, pz = summary["final_polarization_C_per_m2"]
-        q1, q2, q3 = summary["final_q_C_per_m2"]
-        assert q1 == pytest.approx(px - py)
-        assert q2 == pytest.approx(py - pz)
-        assert q3 == pytest.approx(pz)
-        assert summary["ensemble"] == "NPT"
-        assert summary["pressure_bar"] == pytest.approx(-48000.0)
-        assert summary["initial_volume_per_cell_angstrom3"] > 0.0
-        assert summary["final_volume_per_cell_angstrom3"] > 0.0
-        assert len(summary["final_global_strain"]) == 6
+        saved_settings = json.loads((output_dir / "settings.json").read_text())
+        model = json.loads((output_dir / "model.json").read_text())
+        assert saved_settings == settings
+        hills = np.loadtxt(output_dir / "HILLS", comments="#", ndmin=2)
+        thermo = np.loadtxt(
+            output_dir / "metadynamics_thermo.log", comments="#", delimiter=",",
+            ndmin=2,
+        )
+        dipole = np.loadtxt(
+            output_dir / "metadynamics_dipole_avg.log", comments="#",
+            delimiter=",", ndmin=2,
+        )
+        np.testing.assert_array_equal(hills[:, 0], [1, 2])
+        np.testing.assert_array_equal(thermo[:, 0], dipole[:, 0])
+        # Columns after Step are the six Voigt strains, then the volume.
+        volumes = thermo[:, 7]
+        assert np.all(volumes > 0.0)
         polarization_scale = (
-            summary["born_effective_charge"]
+            model["parameters"]["born"]["Z_star"]
             * 16.02176634
-            / summary["final_volume_per_cell_angstrom3"]
+            * settings["lattice_size"] ** 3
+            / volumes
         )
-        assert (px, py, pz) == pytest.approx(
-            [
-                polarization_scale * value
-                for value in summary["final_mean_local_mode_angstrom"]
-            ]
+        polarization = dipole[:, 1:4] * polarization_scale[:, None]
+        expected_q = np.column_stack(
+            (
+                polarization[:, 0] - polarization[:, 1],
+                polarization[:, 1] - polarization[:, 2],
+                polarization[:, 2],
+            )
         )
-        assert summary["epsilon_C_per_m2"] > 0.0
+        np.testing.assert_allclose(
+            hills[:, 1:4], expected_q, rtol=2e-5, atol=1e-7
+        )

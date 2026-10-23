@@ -55,24 +55,38 @@ checked before interpreting a production result.
 
 ## Ensemble and workflow
 
-`run.py` first minimizes and equilibrates the cell at $-48$ kbar, then
-continues directly with `MetadynamicsNPT` at the same pressure and temperature.
+`run.py` starts `MetadynamicsNPT` directly from the local modes and global
+strain in `settings.json`, at the configured pressure and temperature. The
+default pressure is $-48$ kbar.
 The homogeneous strain remains dynamical throughout metadynamics. Although an
 instantaneous symmetry-broken configuration can have anisotropic strain, the
 Hamiltonian and hydrostatic-pressure ensemble retain cubic symmetry. The
 result is therefore the constant-pressure surface $G(P_x,P_y,P_z;p,T)$.
 
-The default demonstrative system is $8^3$ at 250 K. It deposits a 0.002 eV
+The default demonstrative system is $12^3$ at 220 K. It deposits a 0.002 eV
 hill every 500 steps with a 0.002 ps timestep: one hill per ps, or about
-$0.093k_BT$ per ps. The three-dimensional bias uses a fixed $129^3$ grid, so
+$0.105k_BT$ per ps. The three-dimensional bias uses a fixed $129^3$ grid, so
 the per-step interpolation cost does not grow with the number of hills. The
-2 ns default is only a starting point; basin visitation and free-energy
+5 ns default is only a starting point; basin visitation and free-energy
 stability must be checked for every temperature and cell size.
 
-Run the smoke mode on a login node:
+For a short execution check, create reduced settings and run on an allocated
+compute node from this directory:
 
 ```bash
-python run.py --quick --output-dir output/quick
+python - <<'PY'
+import json
+from pathlib import Path
+
+settings = json.loads(Path("settings.json").read_text())
+settings["lattice_size"] = 2
+settings["seed"] = 17
+settings["metadynamics"].update(
+    steps=2, pace=1, log_interval=1, grid_bin=[32, 32, 32]
+)
+Path("smoke_settings.json").write_text(json.dumps(settings, indent=2))
+PY
+python run.py --settings smoke_settings.json --output-dir output/smoke
 ```
 
 Run production calculations on a GPU compute node, using a fresh output
@@ -80,19 +94,15 @@ directory at each temperature:
 
 ```bash
 python run.py --temperature 250 --output-dir output/250K
-python analyze.py --output-dir output/250K
 ```
 
 Do not carry the accumulated bias between temperatures. `HILLS` contains
 $(q_1,q_2,q_3)$ at each deposition, already normalized using the instantaneous
 volume. The field log contains the average soft-mode displacement and the
-thermo log contains the evolving strain and volume. `analyze.py` plots the CV
-and reconstructed polarization trajectories and shows $-V_\mathrm{meta}$ on the
-three chamber-boundary planes. In fixed-height metadynamics these slices are
-finite-run estimates,
-not guaranteed converged free energies. `analysis_summary.json` reports how
-often deposited hills leave the nominal chamber and how often a lower wall is
-active; the latter fraction should remain small.
+thermo log contains the evolving strain and volume. The saved `model.json`
+and `settings.json` record the run configuration. Use `analyze.ipynb` for
+free-energy reconstruction and plotting. These fixed-height metadynamics
+estimates require checks of convergence and wall effects.
 
 Pointwise free energies can be extended to the other cubic domains by signed
 permutations of $(P_x,P_y,P_z)$. Basin-integrated phase weights additionally
@@ -121,4 +131,4 @@ These finite-run estimates remain subject to sampling and wall effects.
 The convergence figures are saved as `bto_metadynamics_convergence_180K.png`,
 `bto_metadynamics_convergence_220K.png`,
 `bto_metadynamics_convergence_250K.png`, and
-`bto_metadynamics_convergence_310K.png`. 
+`bto_metadynamics_convergence_310K.png`.

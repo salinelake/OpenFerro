@@ -180,6 +180,10 @@ supported one to three CVs but increasingly memory-intensive with dimension.
 Adaptive widths, multiple walkers, restart import, and well-tempered
 metadynamics are not implemented.
 
+Both metadynamics classes raise ``NotImplementedError`` if any system field
+spans more than one device, either at construction or when ``run`` is called.
+Meshes containing a single device remain supported.
+
 The optional HILLS file records step, exact CV centers, widths, and height.
 It remains independent of the interpolated runtime grid and can reconstruct
 the deposited Gaussian sum directly.  Repeated

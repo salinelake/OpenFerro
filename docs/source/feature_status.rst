@@ -232,7 +232,8 @@ Dynamics and simulations
        output. NPT includes global-strain integration and propagates bias
        forces from strain-dependent CVs to the barostat coordinate. Restart
        import, multiple walkers, well-tempered metadynamics, and independent
-       constant-pressure scientific validation are deferred.
+       constant-pressure scientific validation are deferred. Distributed
+       fields are rejected with ``NotImplementedError``.
 
 Reference examples
 ------------------
@@ -240,12 +241,14 @@ Reference examples
 Examples 01 through 03 and 06 through 08 have explicit entry points,
 reproducible seeds, and automated reduced CPU execution tests. Examples 01
 through 03 expose ``--tiny``; Example 06 supplies reduced values through its
-ordinary arguments, and Examples 07 and 08 expose ``--quick``.
+ordinary arguments, Example 07 exposes ``--quick``, and Example 08 accepts a
+reduced JSON settings file through ``--settings``.
 Examples 01 through 03 retain working-directory-relative defaults; Examples
-06 through 08 resolve repository defaults. Example 04 resolves its default
-paths from the repository and script locations and has an automated,
-explicitly reduced 4x4x4 CPU smoke run. These checks validate construction and
-short execution; they do not regress full phase-transition curves or establish
+06 and 08 also load their default JSON files from the working directory,
+while Example 07 resolves its configuration beside the script. Example 04
+resolves its default paths from the repository and script locations and has
+an automated, explicitly reduced 4x4x4 CPU smoke run. These checks validate
+construction and short execution; they do not regress full phase-transition curves or establish
 convergence of a production run. Example 05 is a metadata-rich performance
 benchmark rather than a scientific reference trajectory.
 
@@ -278,14 +281,16 @@ benchmark rather than a scientific reference trajectory.
      - Experimental performance example
      - Reproducible one-node A100 measurements cover 1, 2, 3, and 4 devices for
        three BTO cell sizes. They do not promote multi-device correctness.
-   * - ``06.BTO_Nanoparticle``
+   * - ``06.BTO_nanoparticle``
      - Runnable Phase-B workflow; production validation pending
      - Masked soft modes, affine-constrained acoustic nodes, fully integrated
        finite-cell free-surface mechanics, Born-charge mappings, and reduced
        minimization/NPT execution are tested. The closure preserves cubic
        elastic constants but not finite-wave-vector ZVR acoustic dispersion.
        A physical dielectric interface, surface chemistry, and production box
-       convergence remain outside the promoted scope.
+       convergence remain outside the promoted scope. Analysis saves
+       polarization and susceptibility without bulk-run files; an explicit
+       ``--bulk-reference`` supplies optional snapshot colorbar markers.
    * - ``07.MetaDynamics``
      - Experimental analytical validation
      - A reduced run checks two simulation-owned dipole-sum CVs and HILLS

@@ -13,6 +13,17 @@ the appropriate powers of the Born effective charge. As in the legacy example,
 STO homogeneous strain coupling is omitted and the PTO dielectric constant is
 used by Ewald.
 
+**Deferred issue: homogeneous elasticity.** The homogeneous elastic energy
+currently uses PTO elastic constants and counts only the PTO cells. The STO
+elastic contribution is missing, both here and in
+[`04a.PTOSTO_superlattice_large`](../04a.PTOSTO_superlattice_large/npt.py).
+This underestimates the restoring force on global strain and can affect
+equilibrium strain and domain behavior. A future correction should add the STO
+homogeneous elastic energy using its elastic constants and cell count, with
+both materials acting on the shared global strain, and validate the combined
+energy and strain forces. This correction is deferred; the current Hamiltonian
+is unchanged.
+
 The production calculation is large. Submit the included Perlmutter batch
 template with your project account and adjust its time limit if needed:
 

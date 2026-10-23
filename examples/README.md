@@ -15,7 +15,7 @@ convergence.
 | [03.sc_Ising_Heating](03.sc_Ising_Heating) | Simple-cubic continuous Heisenberg heating; the directory name is historical. | Stable entry point |
 | [04.PTOSTO_superlattice](04.PTOSTO_superlattice) | Single-GPU field-driven PTO/STO domain dynamics and visualization. | Runnable; superlattice engines experimental |
 | [05.BTO_GPU_Parallel](05.BTO_GPU_Parallel) | Single-node BTO scaling and memory benchmark on 1, 2, 3, and 4 GPUs. | Experimental multi-device benchmark |
-| [06.BTO_Nanoparticle](06.BTO_Nanoparticle) | Masked, padded idealized BTO nanoparticle with finite-cell free-surface mechanics and electrostatic boundary validation. | Runnable Phase-B workflow; production physics validation pending |
+| [06.BTO_nanoparticle](06.BTO_nanoparticle) | Masked, padded idealized BTO nanoparticle with finite-cell free-surface mechanics and electrostatic boundary validation. | Runnable Phase-B workflow; production physics validation pending |
 | [07.MetaDynamics](07.MetaDynamics) | Fixed-height NVT metadynamics for an analytically solvable two-CV toy lattice. | Experimental analytical validation |
 | [08.BTO_MetaD](08.BTO_MetaD) | Three-CV NPT BaTiO3 metadynamics in a buffered cubic-symmetry chamber. | Experimental finite-size workflow |
 | [09.SMO](09.SMO) | 5% strained SrMnO3 heating: frozen-FE magnetic control and a coupled spin--local-mode extension. | Experimental coupled workflow |

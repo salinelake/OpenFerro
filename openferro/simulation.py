@@ -520,6 +520,11 @@ class MetadynamicsNVT(SimulationNVTLangevin):
         Seed for the simulation-owned random stream, by default 42.
     key : array_like, optional
         Existing JAX ``PRNGKey`` state, by default None.
+
+    Notes
+    -----
+    Distributed fields are not supported. Construction and :meth:`run` raise
+    ``NotImplementedError`` if any system field spans more than one device.
     """
 
     _cv_keys = {"id", "field_ids", "engine", "parameters"}
@@ -571,6 +576,7 @@ class MetadynamicsNVT(SimulationNVTLangevin):
         hills_file,
     ):
         """Initialize bias state after the ensemble-specific simulation."""
+        self._validate_single_device_fields()
         self._collective_variables, initial_values = (
             self._prepare_collective_variables(collective_variables)
         )
@@ -655,6 +661,15 @@ class MetadynamicsNVT(SimulationNVTLangevin):
         self._metadynamics_step = 0
         self._cv_dtype = initial_values[0].dtype
         self._hill_centers = []
+
+    def _validate_single_device_fields(self):
+        """Reject distributed fields before evaluating CVs or starting MD."""
+        for field in self.system.get_all_fields():
+            if len(field.get_values().devices()) > 1:
+                raise NotImplementedError(
+                    "Metadynamics with distributed fields is not implemented. "
+                    "Keep every system field on a single device."
+                )
 
     @staticmethod
     def _vector_parameter(name, value, size, *, positive=False, minimum=None):
@@ -1027,6 +1042,7 @@ class MetadynamicsNVT(SimulationNVTLangevin):
         counter and random stream. Set ``initialize_reporters=False`` when the
         same reporter files should continue across those calls.
         """
+        self._validate_single_device_fields()
         self._validate_so3_field_count(self.SO3_fields)
         for field in self.all_fields:
             if field.integrator is None:
@@ -1121,6 +1137,7 @@ class MetadynamicsNPT(MetadynamicsNVT, SimulationNPTLangevin):
 
     Notes
     -----
+    Distributed fields are not supported, as in :class:`MetadynamicsNVT`.
     A volume-dependent CV must include ``gstrain`` in its ``field_ids`` and
     compute the volume dependence inside its engine. Its bias force is then
     propagated to both the ordinary fields and the barostat coordinate.

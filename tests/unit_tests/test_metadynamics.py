@@ -477,12 +477,82 @@ def test_hills_file_is_not_overwritten(tmp_path):
     assert hills_file.read_text(encoding="utf-8") == "existing\n"
 
 
-def test_bias_force_preserves_explicit_field_sharding():
+@pytest.mark.parametrize("simulation_class", [MetadynamicsNVT, MetadynamicsNPT])
+@pytest.mark.parametrize("distributed_field", ["dipole", "spectator"])
+def test_metadynamics_rejects_distributed_fields(
+    simulation_class, distributed_field, tmp_path
+):
+    devices = jax.devices()[:4]
+    if len(devices) < 2:
+        pytest.skip("Requires at least two devices.")
+    system = System(SimpleCubic3D(2, 2 * len(devices), 1))
+    system.add_field("dipole", ftype="R3")
+    system.add_field("spectator", ftype="R3")
+    if simulation_class is MetadynamicsNPT:
+        system.add_global_strain()
+    mesh = DeviceMesh(devices=devices, num_rows=1, num_cols=len(devices))
+    system.get_field_by_ID(distributed_field).to_multi_devs(mesh)
+    hills_file = tmp_path / "HILLS"
+
+    with pytest.raises(NotImplementedError, match="distributed fields"):
+        simulation_class(
+            system,
+            [{"id": "sx", "field_ids": "dipole", "engine": _component_sum(0)}],
+            pace=1,
+            sigma=0.5,
+            height=0.1,
+            grid_min=-2.0,
+            grid_max=2.0,
+            hills_file=hills_file,
+        )
+
+    assert not hills_file.exists()
+
+
+@pytest.mark.parametrize("simulation_class", [MetadynamicsNVT, MetadynamicsNPT])
+def test_metadynamics_rejects_distribution_after_construction(
+    simulation_class, tmp_path
+):
+    devices = jax.devices()[:4]
+    if len(devices) < 2:
+        pytest.skip("Requires at least two devices.")
+    system = System(SimpleCubic3D(2, 2 * len(devices), 1))
+    field = system.add_field("dipole", ftype="R3")
+    if simulation_class is MetadynamicsNPT:
+        system.add_global_strain()
+    hills_file = tmp_path / "HILLS"
+    simulation = simulation_class(
+        system,
+        [{"id": "sx", "field_ids": "dipole", "engine": _component_sum(0)}],
+        pace=1,
+        sigma=0.5,
+        height=0.1,
+        grid_min=-2.0,
+        grid_max=2.0,
+        hills_file=hills_file,
+    )
+    for active_field in simulation.all_fields:
+        active_field.integrator = _NoOpLangevin()
+    field.to_multi_devs(
+        DeviceMesh(devices=devices, num_rows=1, num_cols=len(devices))
+    )
+
+    with pytest.raises(NotImplementedError, match="distributed fields"):
+        simulation.run(1)
+
+    assert simulation.get_hill_centers().shape == (0, 1)
+    assert not hills_file.exists()
+
+
+@pytest.mark.parametrize("simulation_class", [MetadynamicsNVT, MetadynamicsNPT])
+def test_bias_force_preserves_single_device_mesh_sharding(simulation_class):
     system = System(SimpleCubic3D(1, 1, 1))
     field = system.add_field("dipole", ftype="R3", value=(0.2, 0.0, 0.0))
     mesh = DeviceMesh(devices=jax.devices()[:1], num_rows=1, num_cols=1)
     system.move_fields_to_multi_devs(mesh)
-    simulation = MetadynamicsNVT(
+    if simulation_class is MetadynamicsNPT:
+        system.add_global_strain()
+    simulation = simulation_class(
         system,
         [{"id": "sx", "field_ids": "dipole", "engine": _component_sum(0)}],
         pace=2,
