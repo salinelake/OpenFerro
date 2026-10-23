@@ -41,14 +41,19 @@ field-count, and validation limits of the other workflows.
 
 ## Installation
 
-OpenFerro 0.3.0 is installed from source. Use a Python environment satisfying
-the package compatibility ranges:
+Install OpenFerro from PyPI using a Python environment satisfying the package
+compatibility ranges:
 
 - Python `>=3.13,<3.15`
 - JAX `>=0.10,<0.12`
 - NumPy `>=2.0,<3`
 
-Clone the repository and install OpenFerro:
+```bash
+python -m pip install openferro
+JAX_PLATFORMS=cpu python -c "import openferro as of; print(of.System)"
+```
+
+To install from source:
 
 ```bash
 git clone https://github.com/salinelake/OpenFerro.git
@@ -71,7 +76,7 @@ checks; the short CPU run above is not the complete validation suite.
 
 For NVIDIA GPUs, first install the JAX accelerator build appropriate for the
 system, following the [official JAX installation guide](https://docs.jax.dev/en/latest/installation.html),
-then install OpenFerro with `python -m pip install --no-deps .`. See the
+then install OpenFerro with `python -m pip install --no-deps openferro`. See the
 [complete installation guide](docs/source/installation.rst) for details.
 
 ## Quick start

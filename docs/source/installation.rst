@@ -1,8 +1,8 @@
 Installation
 ============
 
-OpenFerro is currently installed from source. The package metadata is the
-authoritative compatibility contract.
+OpenFerro is available on PyPI and can also be installed from source. The
+package metadata is the authoritative compatibility contract.
 
 Supported versions
 ------------------
@@ -15,12 +15,19 @@ GPU and multi-host execution remain experimental; see
 CPU installation
 ----------------
 
-Create and activate a Python 3.13 or 3.14 environment, then install from the
-repository root:
+Create and activate a Python 3.13 or 3.14 environment, then install from PyPI:
 
 .. code-block:: bash
 
    python -m pip install --upgrade pip
+   python -m pip install openferro
+
+For a source installation, clone the repository and install from its root:
+
+.. code-block:: bash
+
+   git clone https://github.com/salinelake/OpenFerro.git
+   cd OpenFerro
    python -m pip install .
 
 For editable development with the unit-test dependencies:
@@ -43,7 +50,7 @@ OpenFerro. For CUDA installed through pip, the current JAX commands are:
    # CUDA 12 alternative
    # python -m pip install --upgrade "jax[cuda12]>=0.10,<0.12"
 
-   python -m pip install --no-deps .
+   python -m pip install --no-deps openferro
 
 Consult the official `JAX installation guide
 <https://docs.jax.dev/en/latest/installation.html>`_ for driver, CUDA, cuDNN,
