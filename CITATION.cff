@@ -8,8 +8,8 @@ authors:
   - family-names: Xie
     given-names: Pinchen
     email: pinchenxie@lbl.gov
-version: 0.2.0
-date-released: 2026-08-08
+version: 0.3.0
+date-released: 2026-10-23
 repository-code: https://github.com/salinelake/OpenFerro
 url: https://openferro.readthedocs.io/
 license: MIT

@@ -7,7 +7,7 @@ authoritative compatibility contract.
 Supported versions
 ------------------
 
-OpenFerro 0.2 supports Python 3.13 and 3.14, JAX versions from 0.10 up to (but
+OpenFerro 0.3 supports Python 3.13 and 3.14, JAX versions from 0.10 up to (but
 not including) 0.12, and NumPy versions from 2.0 up to (but not including) 3.
 GPU and multi-host execution remain experimental; see
 :doc:`feature_status`.

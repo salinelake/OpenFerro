@@ -3,7 +3,7 @@ Feature Status
 
 OpenFerro is currently a research alpha. A callable API is not necessarily a
 scientifically validated API. This page is the authoritative status statement
-for the 0.2 series. Exact promoted equations and units are in
+for the 0.3 series. Exact promoted equations and units are in
 :doc:`scientific_conventions`.
 
 Status definitions
@@ -11,7 +11,7 @@ Status definitions
 
 ``Stable``
    The listed behavior has focused analytical or invariant tests and is
-   intended to remain compatible within the 0.2 series, within the stated
+   intended to remain compatible within the 0.3 series, within the stated
    geometry and field-count limits.
 
 ``Experimental``
