@@ -11,6 +11,8 @@ energies, derives forces with automatic differentiation, and simulates coupled
 ferroelectric, elastic, and magnetic degrees of freedom. Models can combine
 built-in Hamiltonian terms with custom JAX energy functions.
 
+Preprint: [OpenFerro: a unified framework for mesoscale ferroic dynamics and enhanced sampling](https://arxiv.org/abs/2610.33335).
+
 > [!IMPORTANT]
 > OpenFerro is a research alpha. A callable API is not necessarily a
 > scientifically validated API. Review the
@@ -216,11 +218,24 @@ construction API. See [Model records](model_configs/README.md).
 
 ## Citation
 
-Until a dedicated OpenFerro software paper or archival DOI is available, cite
-the software repository with its version and access date:
+If you use OpenFerro in your research, please cite the preprint:
 
-> Pinchen Xie, *OpenFerro*, version 0.3.0, computer software,
-> https://github.com/salinelake/OpenFerro.
+> Pinchen Xie. *OpenFerro: a unified framework for mesoscale ferroic dynamics
+> and enhanced sampling*. arXiv:2610.33335 (2026).
+> [doi:10.48550/arXiv.2610.33335](https://doi.org/10.48550/arXiv.2610.33335).
+
+```bibtex
+@misc{xie2026openferro,
+  title = {{OpenFerro}: a unified framework for mesoscale ferroic dynamics and enhanced sampling},
+  author = {Pinchen Xie},
+  year = {2026},
+  eprint = {2610.33335},
+  archivePrefix = {arXiv},
+  primaryClass = {cond-mat.mtrl-sci},
+  doi = {10.48550/arXiv.2610.33335},
+  url = {https://arxiv.org/abs/2610.33335}
+}
+```
 
 Machine-readable metadata is provided in [`CITATION.cff`](CITATION.cff).
 

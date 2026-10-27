@@ -11,6 +11,10 @@ OpenFerro is a JAX-based framework for on-lattice atomistic dynamics. Version
 derives forces with automatic differentiation, and supports promoted CPU and
 single-GPU workflows together with experimental multi-device execution.
 
+Read the preprint, `OpenFerro: a unified framework for mesoscale ferroic dynamics
+and enhanced sampling <https://arxiv.org/abs/2610.33335>`_. See :doc:`credits`
+for the full citation and BibTeX entry.
+
 .. warning::
    OpenFerro is a research alpha. Review :doc:`feature_status` before using
    available Hamiltonians or integrators for scientific production.
