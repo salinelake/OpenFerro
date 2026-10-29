@@ -1,7 +1,7 @@
 cff-version: 1.2.0
 message: >-
-  If you use OpenFerro, please cite the software repository with its version
-  and access date.
+  If you use OpenFerro in your research, please cite the preprint listed
+  in preferred-citation.
 title: OpenFerro
 type: software
 authors:
@@ -13,6 +13,17 @@ date-released: 2026-10-23
 repository-code: https://github.com/salinelake/OpenFerro
 url: https://openferro.readthedocs.io/
 license: MIT
+preferred-citation:
+  type: article
+  authors:
+    - family-names: Xie
+      given-names: Pinchen
+  title: >-
+    OpenFerro: a unified framework for mesoscale ferroic dynamics and enhanced sampling
+  journal: arXiv
+  year: 2026
+  doi: 10.48550/arXiv.2610.33335
+  url: https://arxiv.org/abs/2610.33335
 abstract: >-
   A JAX-based framework for constructing and simulating on-lattice atomistic
   Hamiltonian models with automatic differentiation and CPU/GPU execution.

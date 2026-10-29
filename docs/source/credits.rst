@@ -4,17 +4,28 @@ Credits
 Cite OpenFerro
 --------------
 
-Until a dedicated software paper or archival DOI is available, cite the
-repository with its version and access date. For version 0.2.0, the suggested
-citation is:
+If you use OpenFerro in your research, please cite the preprint:
 
-.. code-block:: text
+   Pinchen Xie. *OpenFerro: a unified framework for mesoscale ferroic dynamics
+   and enhanced sampling*. `arXiv:2610.33335 <https://arxiv.org/abs/2610.33335>`_
+   (2026). `doi:10.48550/arXiv.2610.33335 <https://doi.org/10.48550/arXiv.2610.33335>`_.
 
-   Pinchen Xie, OpenFerro, version 0.2.0, computer software,
-   https://github.com/salinelake/OpenFerro.
+.. code-block:: bibtex
 
-The repository ``CITATION.cff`` file provides the same information in a
-machine-readable form.
+   @misc{xie2026openferro,
+     title = {{OpenFerro}: a unified framework for mesoscale ferroic dynamics and enhanced sampling},
+     author = {Pinchen Xie},
+     year = {2026},
+     eprint = {2610.33335},
+     archivePrefix = {arXiv},
+     primaryClass = {cond-mat.mtrl-sci},
+     doi = {10.48550/arXiv.2610.33335},
+     url = {https://arxiv.org/abs/2610.33335}
+   }
+
+The repository `CITATION.cff <https://github.com/salinelake/OpenFerro/blob/main/CITATION.cff>`_
+file provides machine-readable software metadata with the preprint as the
+preferred citation.
 
 Package contributors
 ---------------------
