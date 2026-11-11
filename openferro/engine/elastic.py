@@ -175,10 +175,32 @@ def inhomo_elastic_energy(local_displacement, parameters):
     """
     Returns the inhomogeneous elastic energy of a strain field.
 
+    The displacement ``local_displacement`` is in units of the cubic lattice
+    constant (the formula assumes a1 = a2 = a3 = a). The energy is evaluated
+    with backward (``_m``) and forward (``_p``) finite differences of the
+    displacement between neighboring cells. Both approximate the same
+    derivative at long wavelength, ``v(R+a)-v(R) ~ v(R)-v(R-a) ~ dv/dx``, so
+    the local strains are ``eps_ii ~ d_i v_i`` and ``gamma_ij ~ d_i v_j + d_j v_i``
+    (engineering shear, ``gamma_ij = 2 eps_ij``).
+
+    The long-wavelength limit of each term is:
+
+    - ``2 g11 * vxx_m**2`` -> ``(B11/2) eps_xx**2``, so ``g11 = B11/4``.
+    - ``g12 * (vxx_m+vxx_p) * (vyy_m+vyy_p)`` -> ``4 g12 eps_xx eps_yy``,
+      so ``g12 = B12/4`` (B12 multiplies eps_xx eps_yy in the continuum).
+    - The four ``g44`` terms of each shear pair, e.g. ``(vyx_a + vxy_b)**2``
+      with ``a, b`` in ``{m, p}``, each -> ``gamma_xy**2``, so
+      ``4 g44 gamma_xy**2 = (B44/2) gamma_xy**2`` and ``g44 = B44/8``.
+
+    Using the same sign for all forward and backward differences is essential:
+    otherwise the mixed-sign shear terms give ``gamma**2 + omega**2``
+    (``omega`` the local rotation) and the B12 term cancels.
+
     Parameters
     ----------
     local_displacement : jnp.ndarray
-        The local displacement field, shape=(nx, ny, nz, 3)
+        The local displacement field in units of the lattice constant,
+        shape=(nx, ny, nz, 3)
     parameters : tuple
         The parameters of the energy function containing:
         - B11 (float): elastic constant B11
@@ -192,7 +214,7 @@ def inhomo_elastic_energy(local_displacement, parameters):
     """
     B11, B12, B44 = parameters
     g11 = B11 / 4
-    g12 = B12 / 8
+    g12 = B12 / 4
     # Zhong, Vanderbilt, and Rabe, PRB 52, 6301 (1995), Eq. (13).
     g44 = B44 / 8
 
@@ -201,40 +223,40 @@ def inhomo_elastic_energy(local_displacement, parameters):
     grad_0 = ls - jnp.roll( ls, 1, axis=0)     # v(R)-v(R-x)
     grad_1 = ls - jnp.roll( ls, 1, axis=1)     # v(R)-v(R-y)
     grad_2 = ls - jnp.roll( ls, 1, axis=2)     # v(R)-v(R-z)
-    
+
     vxx_m = grad_0[...,0]
-    vxx_p = - jnp.roll(vxx_m, -1, axis=0)
+    vxx_p = jnp.roll(vxx_m, -1, axis=0)        # v(R+x)-v(R)
     vyy_m = grad_1[...,1]
-    vyy_p = - jnp.roll(vyy_m, -1, axis=1)
+    vyy_p = jnp.roll(vyy_m, -1, axis=1)
     vzz_m = grad_2[...,2]
-    vzz_p = - jnp.roll(vzz_m, -1, axis=2)
+    vzz_p = jnp.roll(vzz_m, -1, axis=2)
     inhomo_elastic_energy = 2 * g11 * (jnp.sum(vxx_m**2) + jnp.sum(vyy_m**2) + jnp.sum(vzz_m**2))
     inhomo_elastic_energy +=  g12 * jnp.sum((vxx_m + vxx_p) * (vyy_m + vyy_p))
     inhomo_elastic_energy +=  g12 * jnp.sum((vzz_m + vzz_p) * (vyy_m + vyy_p))
     inhomo_elastic_energy +=  g12 * jnp.sum((vxx_m + vxx_p) * (vzz_m + vzz_p))
-    
+
     vyx_m = grad_1[...,0]
-    vyx_p = - jnp.roll(vyx_m, -1, axis=1)
+    vyx_p = jnp.roll(vyx_m, -1, axis=1)
     vxy_m = grad_0[...,1]
-    vxy_p = - jnp.roll(vxy_m, -1, axis=0)
+    vxy_p = jnp.roll(vxy_m, -1, axis=0)
     inhomo_elastic_energy +=  g44 * jnp.sum((vyx_m+vxy_m)**2)
     inhomo_elastic_energy +=  g44 * jnp.sum((vyx_p+vxy_m)**2)
     inhomo_elastic_energy +=  g44 * jnp.sum((vyx_m+vxy_p)**2)
     inhomo_elastic_energy +=  g44 * jnp.sum((vyx_p+vxy_p)**2)
 
     vzx_m = grad_2[...,0]
-    vzx_p = - jnp.roll(vzx_m, -1, axis=2)
+    vzx_p = jnp.roll(vzx_m, -1, axis=2)
     vxz_m = grad_0[...,2]
-    vxz_p = - jnp.roll(vxz_m, -1, axis=0)
+    vxz_p = jnp.roll(vxz_m, -1, axis=0)
     inhomo_elastic_energy +=  g44 * jnp.sum((vzx_m+vxz_m)**2)
     inhomo_elastic_energy +=  g44 * jnp.sum((vzx_p+vxz_m)**2)
     inhomo_elastic_energy +=  g44 * jnp.sum((vzx_m+vxz_p)**2)
     inhomo_elastic_energy +=  g44 * jnp.sum((vzx_p+vxz_p)**2)
-    
+
     vyz_m = grad_1[...,2]
-    vyz_p = - jnp.roll(vyz_m, -1, axis=1)
+    vyz_p = jnp.roll(vyz_m, -1, axis=1)
     vzy_m = grad_2[...,1]
-    vzy_p = - jnp.roll(vzy_m, -1, axis=2)
+    vzy_p = jnp.roll(vzy_m, -1, axis=2)
     inhomo_elastic_energy +=  g44 * jnp.sum((vyz_m+vzy_m)**2)
     inhomo_elastic_energy +=  g44 * jnp.sum((vyz_p+vzy_m)**2)
     inhomo_elastic_energy +=  g44 * jnp.sum((vyz_m+vzy_p)**2)

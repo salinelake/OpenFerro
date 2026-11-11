@@ -79,8 +79,11 @@ The parameter order is ``(B11, B12, B44, N)``. ``N`` is the number of
 primitive cells. ``System.add_homo_elastic_interaction(..., n_cells=N)`` can
 select this scale explicitly; omitting it preserves ``lattice.nsites``. For
 the local acoustic-displacement form of Eq. (13), the
-production coefficients are ``g11 = B11 / 4``, ``g12 = B12 / 8``, and
-``g44 = B44 / 8``. A uniform local displacement has zero elastic energy.
+production coefficients are ``g11 = B11 / 4``, ``g12 = B12 / 4``, and
+``g44 = B44 / 8``, with forward and backward differences of the displacement
+(in units of the lattice constant, a1 = a2 = a3) taken with the same sign so
+that the long-wavelength limit reproduces the continuum energy. A uniform
+local displacement has zero elastic energy.
 
 The homogeneous and inhomogeneous strain-mode interactions implement Eq. (14)
 with parameter order ``(B1xx, B1yy, B4yz)``. For homogeneous strain, the
